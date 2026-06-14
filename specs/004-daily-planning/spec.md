@@ -118,7 +118,7 @@ Accessibility (per Constitution Principle II):
 Error Handling & Data Integrity (per Constitution Principle VII):
 - **FR-049**: All errors MUST be presented to the user with a clear message and an actionable recovery suggestion. No operation may fail silently.
 - **FR-050**: Errors MUST be logged with structured context (severity level, operation context, and error details) for debugging purposes.
-- **FR-051**: Before any data migration, the system MUST automatically create a local backup of user data. The user MUST be able to restore from this backup.
+- **FR-051**: Before any data migration, the system MUST automatically create a backup of user data. The user MUST be able to restore from this backup.
 
 ### Key Entities
 
@@ -135,12 +135,12 @@ This slice introduces no new entity. It populates the `priority` and `descriptio
 
 ## Constitution Compliance
 
-This slice is evaluated against constitution v1.1.0. Cross-cutting principles realized here:
+This slice is evaluated against constitution v2.0.0. Cross-cutting principles realized here:
 
 - **I. Keyboard-First**: the entire daily loop — open Today (`G T`), open Inbox (`G I`), open Upcoming (`G U`), navigate, toggle done (`Space`), set priority (`1`-`4`), reschedule (`T`), edit (`E`), save (`Ctrl+Enter`), cancel (`Esc`) — is keyboard-driven; this realizes SC-001 (complete mouse-free daily workflow).
 - **II. Accessibility (WCAG 2.1 AA)**: FR-042 (focus indicator), FR-043 (ARIA roles/labels), FR-044 (contrast ≥ 4.5:1), FR-045 (no AT-binding collisions), FR-046 (no hover-only content), FR-047 (prefers-reduced-motion). FR-031 keeps single-key shortcuts (including `1`-`4`, `E`, `T`) from hijacking text entry in the editor and date input. SC-008 audits the Today and Upcoming views at WCAG 2.1 AA.
-- **III. Instant Response**: priority changes produce immediate visual feedback (US-02.AS-04) and reschedules reflect within one frame; the inherited SC-003 (16ms feedback, owned by slice 001) continues to apply.
-- **V. Offline-Only, Local-First**: all view rendering, priority changes, edits, and reschedules run on local data with zero network calls (SC-004, owned by slice 001).
+- **III. Instant Response**: priority changes and reschedules paint their optimistic result within one frame (<16ms) of the keypress (SC-003), then the server reconciles or rolls back; the server mutation budget is p95<200ms (SC-012).
+- **V. Connected, Server-Authoritative**: view rendering and all mutations (priority, edit, reschedule) flow through the C# API with PostgreSQL as the system of record; the app depends on no third-party runtime data service (SC-004, owned by slice 001).
 - **VI. Type Safety End-to-End**: the `priority` (P0-P3 enum) and `description` (markdown string) fields added to the Task type are generated from the schema and validated at the editor input boundary.
 - **VII. Data Integrity & Resilience**: FR-049 (error + recovery) and FR-050 (structured logging) cover edit/reschedule failures; FR-051 keeps the backup hook in place ahead of the schema change that populates `priority` and `description`. The editor's `Esc` (US-02.AS-08) discards in-flight changes without committing partial state.
 - **VIII. Test-First**: each owned acceptance scenario above is independently testable (Red-Green-Refactor).
@@ -149,7 +149,7 @@ This slice is evaluated against constitution v1.1.0. Cross-cutting principles re
 
 ## Assumptions
 
-No assumptions (ASM-NN) from product-vision.md are assigned to this slice; the assumptions established in slices 001–003 (single user, desktop, Polish date parsing, no subtasks, no notifications, data format) continue to apply.
+No assumptions (ASM-NN) from product-vision.md are assigned to this slice; the assumptions established in slices 001–003 (single user, web platform, Polish date parsing, no subtasks, no notifications, data format) continue to apply.
 
 ## Out of Scope
 

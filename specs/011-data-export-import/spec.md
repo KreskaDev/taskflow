@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Input**: Slice 011 of the TaskFlow MVP. Source of truth: `.specify/memory/product-vision.md`. Goal: full data portability — lossless JSON export and human-readable CSV export, plus import from a TaskFlow JSON export and a Todoist CSV export with a field-mapping preview the user accepts before any data is written. Import is additive with no deduplication, and an automatic local backup runs before a bulk import.
+**Input**: Slice 011 of the TaskFlow MVP. Source of truth: `.specify/memory/product-vision.md`. Goal: full data portability — lossless JSON export and human-readable CSV export, plus import from a TaskFlow JSON export and a Todoist CSV export with a field-mapping preview the user accepts before any data is written. Import is additive with no deduplication, and an automatic backup runs before a bulk import.
 
 ## Provenance
 
@@ -43,7 +43,7 @@ Depends on:
 - Slice 007 (cycles) — provides cycles that the lossless JSON export must serialize and restore
 - Slice 008 (recurring-tasks) — provides recurrence rules that the lossless JSON export must serialize and restore
 
-> Scope note: import is additive with no deduplication — a conflict such as a duplicate task title produces a new entry that the user resolves manually (FR-038 mapping; US-07.AS-07). The FR-051 automatic local backup runs before a bulk import, so the user has a restore point if an import is not what they wanted.
+> Scope note: import is additive with no deduplication — a conflict such as a duplicate task title produces a new entry that the user resolves manually (FR-038 mapping; US-07.AS-07). The FR-051 automatic backup runs before a bulk import, so the user has a restore point if an import is not what they wanted.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -51,7 +51,7 @@ Depends on:
 
 User can export all their data in JSON (lossless) and CSV (human-readable) formats, and import data from a TaskFlow JSON export or a Todoist CSV export with field mapping preview.
 
-**Why this priority**: Data portability is a trust requirement for offline-first apps but is not part of daily usage flow.
+**Why this priority**: Data portability is a trust requirement for a connected app but is not part of daily usage flow.
 
 **Independent Test**: Can be tested by creating sample data, exporting to JSON, clearing data, importing from JSON, and verifying all data is restored identically.
 
@@ -93,7 +93,7 @@ Accessibility (per Constitution Principle II):
 Error Handling & Data Integrity (per Constitution Principle VII):
 - **FR-049**: All errors MUST be presented to the user with a clear message and an actionable recovery suggestion. No operation may fail silently.
 - **FR-050**: Errors MUST be logged with structured context (severity level, operation context, and error details) for debugging purposes.
-- **FR-051**: Before any data migration, the system MUST automatically create a local backup of user data. The user MUST be able to restore from this backup.
+- **FR-051**: Before any data migration, the system MUST automatically create a backup of user data. The user MUST be able to restore from this backup.
 
 ### Key Entities
 
@@ -107,14 +107,14 @@ This slice introduces no new entity and owns no entity attribute. Export seriali
 
 ## Constitution Compliance
 
-This slice is evaluated against constitution v1.1.0. Cross-cutting principles realized here:
+This slice is evaluated against constitution v2.0.0. Cross-cutting principles realized here:
 
 - **I. Keyboard-First**: export and import are initiated and driven from the keyboard — selecting a format, navigating the mapping preview, and accepting or cancelling (US-07.AS-05, AS-06) require no mouse; FR-031 keeps single-key shortcuts from hijacking text entry in the import flow.
 - **II. Accessibility (WCAG 2.1 AA)**: FR-042 (focus indicator), FR-043 (ARIA roles/labels), FR-044 (contrast ≥ 4.5:1), FR-045 (no AT-binding collisions), FR-046 (no hover-only content — the "will not be imported" marking on unmapped columns is conveyed without relying on hover), FR-047 (prefers-reduced-motion).
-- **III. Instant Response**: the mapping preview and accept/cancel controls respond within one animation frame; non-blocking progress is not surfaced via spinners for local operations.
-- **V. Offline-Only, Local-First**: export and import are purely local file operations with zero network calls; the exported format is documented and human-inspectable (JSON lossless, CSV human-readable), consistent with data sovereignty.
+- **III. Instant Response**: accepting the mapping and triggering an export paint an optimistic result within 16ms (the preview opens, the accept/cancel controls react immediately), while the server reconciles asynchronously; server-side export/import mutations target a p95 under 200ms (Principle VII handles recovery on failure). Skeleton screens are permitted for network-bound loads such as fetching the dataset to export or rendering the mapping preview.
+- **V. Connected, Server-Authoritative**: export and import flow through the C# API — PostgreSQL is the system of record, so an export serializes the server-held dataset and an import is written back through the API rather than to any local store. The export format is documented and human-inspectable (JSON lossless, CSV human-readable), keeping the documented relational schema portable per Principle VII.
 - **VI. Type Safety End-to-End**: import is a trust boundary the constitution names explicitly — deserialization from storage and JSON/CSV parsing. The TaskFlow JSON importer and the Todoist CSV importer MUST runtime-validate their input before any data is written, so a malformed or partial file is rejected with a typed, recoverable error rather than corrupting the store.
-- **VII. Data Integrity & Resilience**: FR-049 (a failed or partially-mappable import reports a clear message and an actionable next step — proceed, cancel, or fix the file), FR-050 (import/export failures are logged with structured context), and FR-051 realized meaningfully — an automatic local backup is created before a bulk import runs, and the user can restore from it if the additive import (FR-038; US-07.AS-07) is not what they wanted. Export/Import availability itself satisfies the constitution's Export/Import requirement under this principle.
+- **VII. Data Integrity & Resilience**: FR-049 (a failed or partially-mappable import reports a clear message and an actionable next step — proceed, cancel, or fix the file), FR-050 (import/export failures are logged with structured context), and FR-051 realized meaningfully — an automatic backup (a server-side pg_dump or managed database snapshot) is created before a bulk import runs, and the user can restore from it if the additive import (FR-038; US-07.AS-07) is not what they wanted. Export/Import availability itself satisfies the constitution's Export/Import requirement under this principle.
 - **VIII. Test-First**: each owned acceptance scenario above, plus EC-07 and the SC-005 round-trip, is independently testable (Red-Green-Refactor).
 
 **Deferral note (accepted at slicing time):** Principle VII's 30-second undo for destructive actions (FR-040) is owned by slice 010 (undo). Import here is additive — it deletes nothing — so undo is not the recovery path for this slice; the pre-import FR-051 backup is. No compliance gap is introduced.

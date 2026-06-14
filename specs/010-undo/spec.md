@@ -97,7 +97,7 @@ Accessibility (per Constitution Principle II):
 Error Handling & Data Integrity (per Constitution Principle VII):
 - **FR-049**: All errors MUST be presented to the user with a clear message and an actionable recovery suggestion. No operation may fail silently.
 - **FR-050**: Errors MUST be logged with structured context (severity level, operation context, and error details) for debugging purposes.
-- **FR-051**: Before any data migration, the system MUST automatically create a local backup of user data. The user MUST be able to restore from this backup.
+- **FR-051**: Before any data migration, the system MUST automatically create a backup of user data. The user MUST be able to restore from this backup.
 
 ### Key Entities
 
@@ -105,17 +105,17 @@ This slice introduces no new entity and populates no new entity attribute. The u
 
 ## Success Criteria *(mandatory)*
 
-This slice introduces no new slice-specific success criteria. The relevant measurable outcomes are owned by earlier slices and continue to apply: SC-003 (visible feedback within 16ms of keypress — the undo toast must appear within one frame of the destructive action, owned by slice 001) and SC-004 (zero network calls — undo state is held and restored entirely locally, owned by slice 001).
+This slice introduces no new slice-specific success criteria. The relevant measurable outcomes are owned by earlier slices and continue to apply: SC-003 (the destructive action paints its optimistic result within 16ms of the triggering keypress — the undo toast appears within one frame — while the server reconciles or rolls back asynchronously, owned by slice 001) and SC-004 (the application depends on no third-party runtime data services — only its own API and PostgreSQL database; undo state persists and restores through the app's own API, owned by slice 001).
 
 ## Constitution Compliance
 
-This slice is evaluated against constitution v1.1.0. Cross-cutting principles realized here:
+This slice is evaluated against constitution v2.0.0. Cross-cutting principles realized here:
 
 - **I. Keyboard-First**: the destructive action (`Del`, US-08.AS-06) and the undo itself are keyboard-driven — US-09.AS-02 explicitly requires that "Undo" be keyboard-activatable, not mouse-only.
 - **II. Accessibility (WCAG 2.1 AA)**: the undo toast and its countdown are conveyed accessibly — FR-043 (ARIA roles/labels, with the countdown announced via an ARIA-live region rather than visual-only), FR-042 (focus indicator on the toast's "Undo" control), FR-044 (contrast ≥ 4.5:1), FR-045 (no AT-binding collisions), FR-046 (no hover-only content — the undo action is reachable by keyboard/focus), FR-047 (prefers-reduced-motion governs the toast and countdown animation). FR-031 keeps single-key shortcuts from hijacking text entry.
-- **III. Instant Response**: the toast appears within one animation frame of the destructive action (SC-003, owned by slice 001).
-- **V. Offline-Only, Local-First**: undo state capture and restoration run fully on-device with no network calls (SC-004, owned by slice 001).
-- **VI. Type Safety End-to-End**: the captured pre-action snapshot is a typed structure; restoration validates the snapshot at the storage boundary before re-applying it.
+- **III. Instant Response**: the destructive action paints its optimistic result — the undo toast — within one animation frame (under 16ms) of the keypress, before the server confirms; the C# API then reconciles or rolls back asynchronously within a p95 server budget of 200ms (the 16ms optimistic paint is SC-003; the 200ms server-mutation budget is SC-012 / Performance Standards — both owned by slice 001). Skeleton screens are permitted for network-bound loads but MUST NOT mask the optimistic toast.
+- **V. Connected, Server-Authoritative**: undo is a server-authoritative operation through the C# API — the destructive action optimistically removes the item from the client view while the API performs the delete, and undo restores the prior state via the API, with PostgreSQL as the system of record. The app depends on no third-party runtime data services, only its own API and database (SC-004, owned by slice 001).
+- **VI. Type Safety End-to-End**: the captured pre-action snapshot is a typed structure; restoration validates the snapshot at the API/persistence boundary before re-applying it.
 - **VII. Data Integrity & Resilience**: **this slice closes the Principle VII undo guarantee that slice 001 documented as a deferred, accepted gap.** Principle VII requires that delete, bulk update, and any irreversible operation be undoable for a minimum of 30 seconds after execution. FR-040 delivers that 30-second window and retrofits it onto the delete path from slice 001 (task deletion, US-08.AS-06 — previously a permanent delete), onto project deletion from slice 003 (US-09.AS-04), and onto cycle rollover and bulk cycle moves from slice 007 (US-09.AS-05). EC-09 ensures rapid successive actions each get an independent undo entry and timer, so no in-flight undo is lost. FR-049 (recovery surfaced, no silent loss), FR-050 (structured logging of the destructive action and any restore failure), and FR-051 (backup hook in place) round out the resilience guarantees.
 - **VIII. Test-First**: each owned acceptance scenario above, plus EC-09, is independently testable (Red-Green-Refactor).
 
@@ -123,7 +123,7 @@ This slice is evaluated against constitution v1.1.0. Cross-cutting principles re
 
 ## Assumptions
 
-This slice introduces no new assumptions. It operates under the assumptions established by the slices it depends on (single user, desktop, local data format) without adding to or modifying them.
+This slice introduces no new assumptions. It operates under the assumptions established by the slices it depends on (ASM-01 single user; ASM-02 web platform, modern desktop browsers; ASM-08 relational schema in PostgreSQL) without adding to or modifying them.
 
 ## Out of Scope
 

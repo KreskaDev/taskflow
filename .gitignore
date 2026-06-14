@@ -8,3 +8,17 @@ desktop.ini
 
 # Spec Kit scratch / working artifacts
 .specify/memory/.scratch/
+
+# Secrets / environment — NEVER commit (public repo)
+.env
+.env.*
+*.env
+!.env.example
+secrets/
+*.pem
+*.key
+*.pfx
+appsettings.*.local.json
+**/appsettings.Production.json
+Caddyfile.local
+docker-compose.override.yml

@@ -111,7 +111,7 @@ Accessibility (per Constitution Principle II):
 Error Handling & Data Integrity (per Constitution Principle VII):
 - **FR-049**: All errors MUST be presented to the user with a clear message and an actionable recovery suggestion. No operation may fail silently.
 - **FR-050**: Errors MUST be logged with structured context (severity level, operation context, and error details) for debugging purposes.
-- **FR-051**: Before any data migration, the system MUST automatically create a local backup of user data. The user MUST be able to restore from this backup.
+- **FR-051**: Before any data migration, the system MUST automatically create a backup of user data. The user MUST be able to restore from this backup.
 
 ### Key Entities
 
@@ -129,13 +129,13 @@ This slice introduces no new slice-specific success criteria. The measurable per
 
 ## Constitution Compliance
 
-This slice is evaluated against constitution v1.1.0. Cross-cutting principles realized here:
+This slice is evaluated against constitution v2.0.0. Cross-cutting principles realized here:
 
 - **I. Keyboard-First**: cycle assignment (`#`), navigation to the current cycle (`G C`), and the rollover review are all keyboard-driven. This slice completes the navigation (FR-028) and list-shortcut (FR-029) grammar begun in earlier slices, so the full keyboard shortcut set is now consistent and composable across all views.
 - **II. Accessibility (WCAG 2.1 AA)**: FR-042 (focus indicator), FR-043 (ARIA roles/labels), FR-044 (contrast ≥ 4.5:1), FR-045 (no AT-binding collisions), FR-046 (no hover-only content), FR-047 (prefers-reduced-motion). FR-031 keeps single-key shortcuts (including `#`) from hijacking text entry; the cycle selector, metrics view, and rollover dialog are operable and labeled for screen readers.
-- **III. Instant Response**: cycle assignment, the metrics render, and rollover confirmation produce immediate visible feedback; no loading affordances are used for these local operations.
-- **V. Offline-Only, Local-First**: cycles, assignments, and rollover are computed and persisted entirely on-device with no network calls.
-- **VI. Type Safety End-to-End**: the Cycle entity and its status enum (active/closed/planned) are typed from the schema (source of truth), with runtime validation at the storage-deserialization boundary; the cycle-reference on Task is a validated, nullable relation.
+- **III. Instant Response**: cycle assignment, the metrics render, and rollover confirmation paint an optimistic result within ~16ms of the triggering keypress while the C# API reconciles asynchronously (p95 < 200ms); skeleton screens are permitted for the network-bound metrics and cycle fetch.
+- **V. Connected, Server-Authoritative**: cycles, assignments, and rollover are persisted server-side in PostgreSQL through the C# API, which owns all writes and is the single source of truth; the Next.js client renders these mutations optimistically while the server reconciles.
+- **VI. Type Safety End-to-End**: the Cycle entity and its status enum (active/closed/planned) are typed end-to-end, with EF Core code-first migrations as the schema source of truth for the Cycle entity and the Task cycle-reference; runtime validation is applied at the trust boundaries — Zod on the web client for user input and API responses, FluentValidation (or data annotations) at the C# API boundary. The cycle-reference on Task is a validated, nullable relation.
 - **VII. Data Integrity & Resilience**: FR-049 (error + recovery — e.g. the "create a new cycle first" prompt of US-05.AS-06 and the active-cycle deletion guard of US-05.AS-07 / EC-04 / FR-019), FR-050 (structured logging), FR-051 (auto-backup hook ahead of the schema change that adds the Cycle entity and the Task cycle reference). The deletion guards (FR-019/FR-020) actively protect data by refusing to remove an active cycle or a non-empty planned/closed cycle.
 - **VIII. Test-First**: each owned acceptance scenario above (US-05.AS-01..AS-07), plus EC-04, EC-10, and EC-12, is independently testable (Red-Green-Refactor).
 

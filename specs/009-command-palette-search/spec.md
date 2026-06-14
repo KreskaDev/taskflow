@@ -112,7 +112,7 @@ Accessibility (per Constitution Principle II):
 Error Handling & Data Integrity (per Constitution Principle VII):
 - **FR-049**: All errors MUST be presented to the user with a clear message and an actionable recovery suggestion. No operation may fail silently.
 - **FR-050**: Errors MUST be logged with structured context (severity level, operation context, and error details) for debugging purposes.
-- **FR-051**: Before any data migration, the system MUST automatically create a local backup of user data. The user MUST be able to restore from this backup.
+- **FR-051**: Before any data migration, the system MUST automatically create a backup of user data. The user MUST be able to restore from this backup.
 
 ### Key Entities
 
@@ -127,12 +127,12 @@ This slice introduces no new entity and populates no entity attribute. The comma
 
 ## Constitution Compliance
 
-This slice is evaluated against constitution v1.1.0. Cross-cutting principles realized here:
+This slice is evaluated against constitution v2.0.0. Cross-cutting principles realized here:
 
 - **I. Keyboard-First**: the palette is the central keyboard-first navigation hub — opened with `Ctrl+K`, driven entirely by typing and Enter/Esc, with no mouse required. This slice completes the global-shortcut grammar (FR-027) begun in slice 001, so the full global shortcut set (`C`, `Ctrl+K`, `/`, `?`) is now consistent and composable across all views, and FR-033 surfaces each action's shortcut, keeping shortcuts discoverable.
 - **II. Accessibility (WCAG 2.1 AA)**: FR-042 (focus indicator on the search input and every result), FR-043 (ARIA roles/labels for the palette overlay and its listbox/option semantics), FR-044 (contrast ≥ 4.5:1), FR-045 (no AT-binding collisions — relevant since `Ctrl+K` and `/` join the active set), FR-046 (no hover-only content), FR-047 (prefers-reduced-motion for the overlay transition). FR-031 keeps single-key shortcuts from hijacking text entry inside the palette and the `/` filter input.
 - **III. Instant Response**: US-04.AS-01 (palette open within 16ms) and US-04.AS-02 / US-04.AS-07 / SC-009 (results under 50ms, including at 10,000+ tasks) keep the palette within the instant-response envelope; the keypress-to-paint and virtualization performance criteria themselves are owned by slice 001.
-- **V. Offline-Only, Local-First**: fuzzy search runs entirely on local data with zero network calls; the palette indexes only the user's on-device tasks, projects, and labels.
+- **V. Connected, Server-Authoritative**: fuzzy search runs either over a client-side index built after the user's data loads, or against a server search endpoint exposed by the C# API — either path meeting the under-50ms budget. PostgreSQL, accessed through the C# API, remains the source of truth for the tasks, projects, and labels the palette searches over; the client holds no authoritative copy.
 - **VI. Type Safety End-to-End**: palette result types (task / project / label / action) are discriminated and typed; the search query boundary is validated at runtime, and action descriptors carry their typed shortcut bindings for FR-033.
 - **VII. Data Integrity & Resilience**: search and navigation are read-only over existing data, so no data is mutated here; FR-049 (clear message + recovery) and FR-050 (structured logging) cover any palette/search failure, and FR-051 keeps the backup hook in place.
 - **VIII. Test-First**: each owned acceptance scenario above (US-04.AS-01..AS-07 and US-08.AS-08) is independently testable (Red-Green-Refactor). Because the search & command journey lands here as the fifth primary journey, SC-006 (all five journeys pass end-to-end) is reached at this slice.
@@ -141,7 +141,7 @@ No compliance gap is introduced by this slice. The palette's read-only behavior 
 
 ## Assumptions
 
-No assumptions (ASM-NN) are assigned to this slice in product-vision.md. The single-user, desktop, offline assumptions that frame the product (ASM-01, ASM-02, ASM-08) are established by slice 001 and continue to apply.
+No assumptions (ASM-NN) are assigned to this slice in product-vision.md. The single-user, web-platform assumptions that frame the product (ASM-01, ASM-02, ASM-08) — a connected single-user web app targeting modern desktop browsers — are established by slice 001 and continue to apply.
 
 ## Out of Scope
 

@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Input**: Slice 001 of the TaskFlow MVP. Source of truth: `.specify/memory/product-vision.md`. Goal: keyboard capture of tasks into a single local list, with core navigation, completion, inline rename, deletion, and help — the atomic unit of value, with the accessibility and resilience foundation in place.
+**Input**: Slice 001 of the TaskFlow MVP. Source of truth: `.specify/memory/product-vision.md`. Goal: keyboard capture of tasks into a single task list, with core navigation, completion, inline rename, deletion, and help — the atomic unit of value, with the accessibility and resilience foundation in place.
 
 ## Provenance
 
@@ -18,19 +18,19 @@ Slice-specific:
 - FR-001 (create task with mandatory title)
 - FR-003 (status enum; default "backlog")
 - FR-004 (created_at / updated_at / completed_at timestamps)
-- FR-041 (local storage, zero network calls)
+- FR-041 (server-side persistence via the app's own API)
 - EC-01 (empty Inbox state)
 - EC-06 (10,000+ tasks performance / virtualization)
 - EC-08 (single-key shortcuts suppressed in text inputs)
-- SC-002 (cold start < 500ms)
-- SC-003 (16ms keypress-to-paint feedback)
-- SC-004 (zero network calls)
+- SC-002 (FCP < 1s, TTI < 2.5s from a warm backend)
+- SC-003 (16ms optimistic keypress-to-paint; async server reconcile)
+- SC-004 (no third-party runtime data services)
 - SC-007 (strict type safety)
-- SC-010 (60fps virtualized list at 10,000 items)
-- SC-011 (< 150MB memory at 10,000 tasks)
-- SC-012 (< 1s open/save at 50MB)
+- SC-010 (60fps client-side virtualized list at 10,000 items)
+- SC-011 (< 300MB browser tab memory at 10,000 tasks)
+- SC-012 (server data operations p95 < 200ms)
 - ENT-01 (Task)
-- ASM-01 (single user), ASM-02 (desktop), ASM-05 (no subtasks), ASM-06 (no notifications), ASM-08 (data format)
+- ASM-01 (single user), ASM-02 (web platform), ASM-05 (no subtasks), ASM-06 (no notifications), ASM-08 (data format)
 
 Cross-cutting (realized in this slice):
 - FR-031 (suppress single-key shortcuts in text inputs)
@@ -101,7 +101,7 @@ User navigates the single task list and operates on the selected task using keyb
 - **FR-001**: System MUST allow creating a task with a mandatory title field.
 - **FR-003**: System MUST track task status as one of: backlog, todo, in_progress, done, cancelled. New tasks MUST default to "backlog" status.
 - **FR-004**: System MUST automatically record `created_at`, `updated_at`, and `completed_at` timestamps on tasks.
-- **FR-041**: All data MUST be stored locally with zero network calls.
+- **FR-041**: All task data MUST be persisted server-side in PostgreSQL through the application's own API; the client holds no authoritative copy. The application MUST depend on no third-party runtime data service — only its own API and database.
 
 ### Cross-cutting Requirements (realized in this slice)
 
@@ -129,23 +129,23 @@ Error Handling & Data Integrity (per Constitution Principle VII):
 
 ### Measurable Outcomes
 
-- **SC-002**: Application is fully interactive within 500ms of cold start.
-- **SC-003**: Every user action on a task (create, edit, complete, delete, move, reprioritize) produces visible feedback within 16ms of the triggering keypress.
-- **SC-004**: Application functions with zero network calls — fully offline, no external dependencies at runtime.
+- **SC-002**: Application reaches first contentful paint in under 1 second and time-to-interactive in under 2.5 seconds on a broadband connection from a warm backend.
+- **SC-003**: Every user action on a task (create, edit, complete, delete, move, reprioritize) paints its optimistic result within 16ms of the triggering keypress; the server reconciles or rolls back asynchronously.
+- **SC-004**: Application depends on no third-party runtime data services — only its own API and PostgreSQL database; there are no external SaaS data dependencies at runtime.
 - **SC-007**: Codebase enforces strict type safety with no bypasses, per Constitution Principle VI.
-- **SC-010**: List views maintain smooth scrolling (60fps) with 10,000 items loaded via virtualization.
-- **SC-011**: Application memory usage stays below 150 MB with 10,000 tasks loaded (per Constitution Performance Standards).
-- **SC-012**: Data storage operations (open/save) complete in under 1 second for datasets up to 50 MB (per Constitution Performance Standards).
+- **SC-010**: List views maintain smooth scrolling (60fps) with 10,000 items loaded via client-side virtualization.
+- **SC-011**: Browser tab memory usage stays below 300 MB with 10,000 tasks loaded.
+- **SC-012**: Server data operations (single-entity reads/writes) complete within a p95 of 200ms against a representative dataset.
 
 ## Constitution Compliance
 
-This slice is evaluated against constitution v1.1.0. Cross-cutting principles realized here:
+This slice is evaluated against constitution v2.0.0. Cross-cutting principles realized here:
 
 - **I. Keyboard-First**: every action in this slice (create, navigate, toggle done, inline rename, delete, help) is keyboard-driven; the `?` overlay (US-08.AS-07) makes shortcuts discoverable.
 - **II. Accessibility (WCAG 2.1 AA)**: FR-042 (focus indicator), FR-043 (ARIA roles/labels), FR-044 (contrast ≥ 4.5:1), FR-045 (no AT-binding collisions), FR-046 (no hover-only content), FR-047 (prefers-reduced-motion). FR-031 keeps single-key shortcuts from hijacking text entry.
-- **III. Instant Response**: SC-002 (cold start), SC-003 (16ms feedback), SC-010 (60fps virtualized list).
-- **V. Offline-Only, Local-First**: FR-041 and SC-004 (zero network calls); ASM-08 (documented, inspectable local format).
-- **VI. Type Safety End-to-End**: SC-007; Task types generated from the schema (source of truth), with runtime validation at the title-input and storage-deserialization boundaries.
+- **III. Instant Response**: SC-003 (optimistic UI paints the result within 16ms of keypress, with the server reconciling or rolling back asynchronously), SC-012 (server data operations within a p95 of 200ms), SC-010 (60fps client-side virtualized list); skeleton/loading states are permitted while the backend responds (SC-002 first contentful paint < 1s, time-to-interactive < 2.5s from a warm backend).
+- **V. Connected, Server-Authoritative**: FR-041 and SC-004 — task data is persisted server-side in PostgreSQL through the application's own API, which is the system of record; the client holds no authoritative copy, and the app depends on no third-party runtime data service. ASM-08 (documented, inspectable PostgreSQL relational schema; export/import keeps data portable).
+- **VI. Type Safety End-to-End**: SC-007; the EF Core / PostgreSQL schema is the source of truth, with C# entity types on the server and TypeScript types on the Next.js client kept in lockstep, and runtime validation at the title-input and API request/response boundaries.
 - **VII. Data Integrity & Resilience**: FR-049 (error + recovery), FR-050 (structured logging), FR-051 (auto-backup infrastructure — no-op at v1 since there is no prior schema to migrate, but the hook and restore path are in place).
 - **VIII. Test-First**: each owned acceptance scenario above is independently testable (Red-Green-Refactor).
 
@@ -154,10 +154,10 @@ This slice is evaluated against constitution v1.1.0. Cross-cutting principles re
 ## Assumptions
 
 - **ASM-01 — Single user only**: The application serves exactly one user. No authentication, multi-tenancy, or sharing features are needed.
-- **ASM-02 — Desktop platform**: The MVP targets desktop usage. Mobile, PWA, and cross-device sync are explicitly out of scope.
+- **ASM-02 — Web platform**: The MVP targets modern desktop browsers. Native mobile apps, PWA/offline operation, and cross-device sync are explicitly out of scope.
 - **ASM-05 — No subtasks**: Tasks are flat entities. Only projects support hierarchy (one level). Task nesting (subtasks) is explicitly out of scope.
 - **ASM-06 — No notifications**: Push notifications, reminders, and alerts are out of scope. The app is passive — the user checks it when they want to.
-- **ASM-08 — Data format**: Local storage format is documented and human-inspectable, consistent with the offline-first, data-sovereignty principle.
+- **ASM-08 — Data format**: The relational schema in PostgreSQL is documented and inspectable; full export/import (Principle VII) keeps user data portable, consistent with the data-sovereignty principle.
 
 ## Out of Scope
 

@@ -38,7 +38,7 @@ Entity touchpoint:
 - ENT-01 (Task) — this slice populates the `due_date` attribute (the Task entity is owned by slice 001)
 
 Depends on:
-- Slice 001 (task-capture) — provides the capture input, the Task entity, and local persistence
+- Slice 001 (task-capture) — provides the capture input, the Task entity, and server-side persistence
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -84,7 +84,7 @@ Accessibility (per Constitution Principle II):
 Error Handling & Data Integrity (per Constitution Principle VII):
 - **FR-049**: All errors MUST be presented to the user with a clear message and an actionable recovery suggestion. No operation may fail silently.
 - **FR-050**: Errors MUST be logged with structured context (severity level, operation context, and error details) for debugging purposes.
-- **FR-051**: Before any data migration, the system MUST automatically create a local backup of user data. The user MUST be able to restore from this backup.
+- **FR-051**: Before any data migration, the system MUST automatically create a backup of user data. The user MUST be able to restore from this backup.
 
 ### Key Entities
 
@@ -96,18 +96,18 @@ This slice introduces no new entity. It populates the `due_date` attribute of **
 
 ### Measurable Outcomes
 
-This slice introduces no new slice-specific success criteria. The relevant measurable outcomes are owned by slice 001 and continue to apply: SC-003 (visible feedback within 16ms of keypress — the parse-and-set must complete within one frame) and SC-004 (zero network calls — date parsing runs fully locally).
+This slice introduces no new slice-specific success criteria. The relevant measurable outcomes are owned by slice 001 and continue to apply: SC-003 (every user action paints its optimistic result within 16ms of the triggering keypress; the server reconciles or rolls back asynchronously — here, the parsed due date is painted optimistically within 16ms while the C# API persists it and the client reconciles) and SC-004 (depends on no third-party runtime data services — only its own API and PostgreSQL database).
 
 ## Constitution Compliance
 
-This slice is evaluated against constitution v1.1.0. Cross-cutting principles realized here:
+This slice is evaluated against constitution v2.0.0. Cross-cutting principles realized here:
 
 - **I. Keyboard-First**: date entry is part of the keyboard capture flow — the user types the phrase inline and presses Enter; no mouse interaction is required.
 - **II. Accessibility (WCAG 2.1 AA)**: the FR-006 error ("nie rozpoznano") is conveyed via an ARIA-live region and meets contrast requirements (FR-044), not by color alone; FR-031, FR-042, FR-043, FR-045, FR-046, FR-047 carry from the capture UI.
-- **III. Instant Response**: parsing and due-date assignment produce visible feedback within one animation frame (SC-003, owned by slice 001).
-- **V. Offline-Only, Local-First**: the Polish natural-language parser runs entirely on-device with no network calls (SC-004, owned by slice 001).
+- **III. Instant Response**: the parsed due date is painted optimistically within one animation frame (under 16ms of the keypress) while the C# API persists the change and the client reconciles or rolls back asynchronously; server-confirmed mutations target a p95 under 200ms, and skeleton screens are permitted for network-bound loads (SC-003, owned by slice 001).
+- **V. Connected, Server-Authoritative**: the Polish natural-language parser interprets the typed phrase client-side as input interpretation, but the resulting `due_date` write is server-authoritative — persisted in PostgreSQL through the C# API, which is the system of record; network connectivity is required for normal operation, and the app depends on no third-party runtime data services (SC-004, owned by slice 001).
 - **VI. Type Safety End-to-End**: the parser returns a typed result (a resolved date, or an "unrecognized" outcome that drives FR-006); the date boundary is validated at runtime.
-- **VII. Data Integrity & Resilience**: FR-006 is the in-flow recovery for a parse failure (retain prior value, no silent loss), satisfying FR-049; FR-050 logs the failure with context; FR-051 keeps the backup hook in place ahead of the schema change that adds `due_date`.
+- **VII. Data Integrity & Resilience**: FR-006 is the in-flow recovery for a parse failure (retain prior value, no silent loss), satisfying FR-049; FR-050 logs the failure with context; FR-051 keeps the automatic pre-migration backup (pg_dump or a managed database snapshot) in place ahead of the EF Core schema change that adds `due_date`.
 - **VIII. Test-First**: each owned acceptance scenario above, plus EC-02, is independently testable (Red-Green-Refactor).
 
 ## Assumptions

@@ -64,7 +64,7 @@ Accessibility (per Constitution Principle II):
 Error Handling & Data Integrity (per Constitution Principle VII):
 - **FR-049**: All errors MUST be presented to the user with a clear message and an actionable recovery suggestion. No operation may fail silently.
 - **FR-050**: Errors MUST be logged with structured context (severity level, operation context, and error details) for debugging purposes.
-- **FR-051**: Before any data migration, the system MUST automatically create a local backup of user data. The user MUST be able to restore from this backup.
+- **FR-051**: Before any data migration, the system MUST automatically create a backup of user data. The user MUST be able to restore from this backup.
 
 ### Key Entities
 
@@ -78,13 +78,13 @@ This slice introduces no new slice-specific success criteria. Product-vision.md 
 
 ## Constitution Compliance
 
-This slice is evaluated against constitution v1.1.0. Cross-cutting principles realized here:
+This slice is evaluated against constitution v2.0.0. Cross-cutting principles realized here:
 
 - **I. Keyboard-First**: the theme switch is reachable entirely via the keyboard — through the command palette (slice 009) or the keyboard-navigable application settings; no mouse interaction is required.
 - **II. Accessibility (WCAG 2.1 AA)**: FR-042 (focus indicator), FR-043 (ARIA roles/labels), FR-044 (contrast ≥ 4.5:1), FR-045 (no AT-binding collisions), FR-046 (no hover-only content), FR-047 (prefers-reduced-motion). FR-031 keeps single-key shortcuts from hijacking text entry. Critically for this slice, FR-044 MUST be satisfied independently by both the dark and the light theme, so neither mode regresses contrast; FR-047 ensures the theme transition respects reduced-motion preferences.
-- **III. Instant Response**: switching themes is a local operation and produces visible feedback within one animation frame, consistent with Principle III; no foreign success-criterion IDs are claimed by this slice.
+- **III. Instant Response**: the theme switch paints its optimistic result within one animation frame (<16ms); the preference is persisted server-side and reconciled within the p95<200ms server budget, consistent with Principle III (skeletons permitted where data is loading); no foreign success-criterion IDs are claimed by this slice.
 - **IV. Minimalist UI**: dark/light modes are the entire theming surface — the configuration surface stays minimal (sensible default of following the OS color scheme), consistent with YAGNI discipline and ASM-07 (no custom themes).
-- **V. Offline-Only, Local-First**: theme detection and selection run entirely on-device; following the OS color scheme requires no network access, and the preference is stored locally.
+- **V. Connected, Server-Authoritative**: the user's selected theme preference is written through the C# API and persisted in PostgreSQL (the client holds no authoritative copy); the OS color-scheme default is detected client-side from the browser/OS, but the user's explicit choice is server-authoritative — the switch is shown optimistically, then reconciled by the server.
 - **VI. Type Safety End-to-End**: the theme selection is a typed enumeration (dark / light / follow-OS) validated at its trust boundary (settings deserialization and the OS color-scheme query).
 - **VII. Data Integrity & Resilience**: FR-049 (error + recovery) and FR-050 (structured logging) govern any failure in reading or applying the appearance preference; FR-051 keeps the auto-backup hook in place ahead of any preference-schema change.
 - **VIII. Test-First**: the realized cross-cutting requirements above are independently testable (Red-Green-Refactor), including automated contrast checks run against both themes.

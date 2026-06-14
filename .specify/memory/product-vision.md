@@ -9,7 +9,7 @@
 
 ## 1. Product Pitch
 
-TaskFlow MVP — core task management application combining Todoist simplicity with Linear speed and aesthetics. Keyboard-first, offline-only, single-user.
+TaskFlow MVP — core task management application combining Todoist simplicity with Linear speed and aesthetics. Keyboard-first, single-user, web-based (connected client + backend).
 
 ---
 
@@ -139,7 +139,7 @@ User creates tasks that repeat on a schedule (daily, every N days, specific week
 
 User can export all their data in JSON (lossless) and CSV (human-readable) formats, and import data from a TaskFlow JSON export or a Todoist CSV export with field mapping preview.
 
-**Why this priority**: Data portability is a trust requirement for offline-first apps but is not part of daily usage flow.
+**Why this priority**: Data portability is a trust requirement for a connected app but is not part of daily usage flow.
 
 **Independent Test**: Can be tested by creating sample data, exporting to JSON, clearing data, importing from JSON, and verifying all data is restored identically.
 
@@ -269,7 +269,7 @@ User creates, edits, archives, and organizes projects with one level of nesting 
 - **FR-038**: System MUST support import from Todoist CSV with best-effort mapping: projects to projects, labels to labels, priority p1 (highest) to P0 (highest), p2 to P1, p3 to P2, p4 (lowest) to P3 (lowest).
 - **FR-039**: When importing CSV with unmappable columns, the system MUST show a preview with the mapping for user acceptance before proceeding.
 - **FR-040**: System MUST provide a 30-second undo window for all destructive and irreversible actions, including but not limited to: task deletion, project deletion, bulk moves, bulk status changes, and cycle rollover operations.
-- **FR-041**: All data MUST be stored locally with zero network calls.
+- **FR-041**: All task data MUST be persisted server-side in PostgreSQL through the application's own API; the client holds no authoritative copy. The application MUST depend on no third-party runtime data service — only its own API and database.
 
 ### Accessibility (per Constitution Principle II)
 - **FR-042**: Every focusable element MUST have a visible focus indicator.
@@ -287,7 +287,7 @@ User creates, edits, archives, and organizes projects with one level of nesting 
 - **FR-050**: Errors MUST be logged with structured context (severity level, operation context, and error details) for debugging purposes.
 
 ### Data Integrity (per Constitution Principle VII)
-- **FR-051**: Before any data migration, the system MUST automatically create a local backup of user data. The user MUST be able to restore from this backup.
+- **FR-051**: Before any data migration, the system MUST automatically create a backup of user data. The user MUST be able to restore from this backup.
 
 ---
 
@@ -311,17 +311,17 @@ User creates, edits, archives, and organizes projects with one level of nesting 
 ## 5. Success Criteria (SC-001..SC-012)
 
 - **SC-001**: User can perform a complete daily workflow (capture task, review today's tasks, reprioritize, reschedule, mark done) without using the mouse at any point.
-- **SC-002**: Application is fully interactive within 500ms of cold start.
-- **SC-003**: Every user action on a task (create, edit, complete, delete, move, reprioritize) produces visible feedback within 16ms of the triggering keypress.
-- **SC-004**: Application functions with zero network calls — fully offline, no external dependencies at runtime.
+- **SC-002**: Application reaches first contentful paint in under 1 second and time-to-interactive in under 2.5 seconds on a broadband connection from a warm backend.
+- **SC-003**: Every user action on a task (create, edit, complete, delete, move, reprioritize) paints its optimistic result within 16ms of the triggering keypress; the server reconciles or rolls back asynchronously.
+- **SC-004**: Application depends on no third-party runtime data services — only its own API and PostgreSQL database; there are no external SaaS data dependencies at runtime.
 - **SC-005**: Exporting all data to JSON and re-importing produces an identical dataset with zero data loss.
 - **SC-006**: All five primary user journeys (daily capture, planning session, project work, cycle review, search & command) pass end-to-end automated tests.
 - **SC-007**: Codebase enforces strict type safety with no bypasses, per Constitution Principle VI.
 - **SC-008**: Every main view passes automated accessibility audit at WCAG 2.1 AA level.
 - **SC-009**: Fuzzy search across 10,000+ tasks returns results in under 50ms.
-- **SC-010**: List views maintain smooth scrolling (60fps) with 10,000 items loaded via virtualization.
-- **SC-011**: Application memory usage stays below 150 MB with 10,000 tasks loaded (per Constitution Performance Standards).
-- **SC-012**: Data storage operations (open/save) complete in under 1 second for datasets up to 50 MB (per Constitution Performance Standards).
+- **SC-010**: List views maintain smooth scrolling (60fps) with 10,000 items loaded via client-side virtualization.
+- **SC-011**: Browser tab memory usage stays below 300 MB with 10,000 tasks loaded.
+- **SC-012**: Server data operations (single-entity reads/writes) complete within a p95 of 200ms against a representative dataset.
 
 ---
 
@@ -338,13 +338,13 @@ User creates, edits, archives, and organizes projects with one level of nesting 
 ## 7. Assumptions (ASM-01..ASM-09)
 
 - **ASM-01 — Single user only**: The application serves exactly one user. No authentication, multi-tenancy, or sharing features are needed.
-- **ASM-02 — Desktop platform**: The MVP targets desktop usage. Mobile, PWA, and cross-device sync are explicitly out of scope.
+- **ASM-02 — Web platform**: The MVP targets modern desktop browsers. Native mobile apps, PWA/offline operation, and cross-device sync are explicitly out of scope.
 - **ASM-03 — Polish language UI for date parsing**: Natural language date input supports Polish expressions as the primary language. Error messages related to date parsing (e.g., "nie rozpoznano") are in Polish. Additional language support may be added later but is not required for MVP.
 - **ASM-04 — Preset colors and icons**: Project colors and icons are selected from a predefined set, not custom user values.
 - **ASM-05 — No subtasks**: Tasks are flat entities. Only projects support hierarchy (one level). Task nesting (subtasks) is explicitly out of scope.
 - **ASM-06 — No notifications**: Push notifications, reminders, and alerts are out of scope. The app is passive — the user checks it when they want to.
 - **ASM-07 — Dark/light theme only**: Visual theming is limited to dark and light modes. Custom themes are out of scope.
-- **ASM-08 — Data format**: Local storage format is documented and human-inspectable, consistent with the offline-first, data-sovereignty principle.
+- **ASM-08 — Data format**: The relational schema in PostgreSQL is documented and inspectable; full export/import (Principle VII) keeps user data portable, consistent with the data-sovereignty principle.
 - **ASM-09 — Recurrence based on due date**: Next recurring task instance is calculated from the original due date, not the completion date, ensuring consistent scheduling.
 
 ---
@@ -375,7 +375,7 @@ The MVP is delivered through 12 sequential vertical slices, each independently s
 Cross-cutting requirements are realized (not merely referenced) in every slice to which their scope applies: UI accessibility (FR-031, FR-042–FR-047) in every slice that renders UI, and resilience (FR-049, FR-050, FR-051) in every slice that modifies data. The full out-of-scope boundary (OOS-01–OOS-12) is confirmed in every slice.
 
 High-level mapping (slice → coverage):
-- 001 task-capture — keyboard capture, single task list, core navigation/done/inline-rename/delete, local persistence, accessibility & resilience foundation
+- 001 task-capture — keyboard capture, single task list, core navigation/done/inline-rename/delete, server-side persistence, accessibility & resilience foundation
 - 002 natural-language-dates — Polish natural-language due-date parsing and parser-failure UX
 - 003 project-management — projects with one-level nesting, archive, Inbox definition, move-to-project
 - 004 daily-planning — Today & Upcoming views, priorities, full task editor, the mouse-free daily loop

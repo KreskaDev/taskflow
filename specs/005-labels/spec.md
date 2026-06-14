@@ -76,7 +76,7 @@ Accessibility (per Constitution Principle II):
 Error Handling & Data Integrity (per Constitution Principle VII):
 - **FR-049**: All errors MUST be presented to the user with a clear message and an actionable recovery suggestion. No operation may fail silently.
 - **FR-050**: Errors MUST be logged with structured context (severity level, operation context, and error details) for debugging purposes.
-- **FR-051**: Before any data migration, the system MUST automatically create a local backup of user data. The user MUST be able to restore from this backup.
+- **FR-051**: Before any data migration, the system MUST automatically create a backup of user data. The user MUST be able to restore from this backup.
 
 ### Key Entities
 
@@ -88,16 +88,16 @@ Error Handling & Data Integrity (per Constitution Principle VII):
 
 ### Measurable Outcomes
 
-This slice introduces no new slice-specific success criteria. The relevant measurable outcomes are owned by slice 001 and continue to apply: SC-003 (visible feedback within 16ms of keypress — opening the label selector and toggling a label must produce feedback within one frame) and SC-004 (zero network calls — label management runs fully locally).
+This slice introduces no new slice-specific success criteria. The relevant measurable outcomes are owned by slice 001 and continue to apply: SC-003 (opening the label selector and toggling a label paint their optimistic result within 16ms of the keypress; the server reconciles or rolls back asynchronously) and SC-004 (label management depends on no third-party runtime data services — only the app's own API and PostgreSQL database).
 
 ## Constitution Compliance
 
-This slice is evaluated against constitution v1.1.0. Cross-cutting principles realized here:
+This slice is evaluated against constitution v2.0.0. Cross-cutting principles realized here:
 
 - **I. Keyboard-First**: the label selector is opened with `L` on the selected task and labels are added/removed entirely via keyboard (US-08.AS-04); no mouse interaction is required.
 - **II. Accessibility (WCAG 2.1 AA)**: FR-042 (focus indicator on the selector and its options), FR-043 (ARIA roles/labels for the selector list and toggle state), FR-044 (contrast ≥ 4.5:1, including any label color chip — color is never the sole carrier of meaning), FR-045 (no AT-binding collisions), FR-046 (the selector popover is focus/keyboard-triggered, never hover-only), FR-047 (prefers-reduced-motion). FR-031 keeps single-key shortcuts (including `L`) from hijacking text entry while a label-search/name input is focused.
-- **III. Instant Response**: opening the selector and toggling a label produce visible feedback within one animation frame (SC-003, owned by slice 001).
-- **V. Offline-Only, Local-First**: label data is stored and edited entirely on-device with no network calls (SC-004, owned by slice 001); ASM-08 (documented, inspectable local format) governs the label storage.
+- **III. Instant Response**: opening the selector and toggling a label paint their optimistic result within 16ms of the keypress, while the server remains the source of truth and reconciles (or rolls back) the mutation asynchronously within a p95 < 200ms server data-operation budget (SC-003, owned by slice 001); skeleton placeholders are permitted while server state resolves.
+- **V. Connected, Server-Authoritative**: label data is persisted server-side in PostgreSQL through the app's own API (the client holds no authoritative copy), edited via optimistic mutations that the server reconciles (SC-004, owned by slice 001); ASM-08 (documented, inspectable relational PostgreSQL schema) governs label storage.
 - **VI. Type Safety End-to-End**: Label types are generated from the schema (source of truth), with runtime validation at the label-name input and storage-deserialization boundaries.
 - **VII. Data Integrity & Resilience**: FR-049 (error + recovery) and FR-050 (structured logging) cover label operation failures; FR-051 keeps the backup hook in place ahead of the schema change that adds the Label entity and its task association.
 - **VIII. Test-First**: the owned acceptance scenario above (US-08.AS-04) is independently testable (Red-Green-Refactor).

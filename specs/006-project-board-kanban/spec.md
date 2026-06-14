@@ -91,7 +91,7 @@ Accessibility (per Constitution Principle II):
 Error Handling & Data Integrity (per Constitution Principle VII):
 - **FR-049**: All errors MUST be presented to the user with a clear message and an actionable recovery suggestion. No operation may fail silently.
 - **FR-050**: Errors MUST be logged with structured context (severity level, operation context, and error details) for debugging purposes.
-- **FR-051**: Before any data migration, the system MUST automatically create a local backup of user data. The user MUST be able to restore from this backup.
+- **FR-051**: Before any data migration, the system MUST automatically create a backup of user data. The user MUST be able to restore from this backup.
 
 ### Key Entities
 
@@ -104,17 +104,17 @@ This slice introduces no new entity. It reads and updates the `status` attribute
 
 ### Measurable Outcomes
 
-This slice introduces no new slice-specific success criteria. The measurable outcomes that apply here — SC-003 (instant feedback) and SC-004 (zero network calls) — are owned by slice 001; how they are realized by this slice's Board and List interactions is described under Constitution Compliance below.
+This slice introduces no new slice-specific success criteria. The measurable outcomes that apply here — SC-003 (optimistic result painted immediately, then reconciled or rolled back asynchronously by the server) and SC-004 (no third-party runtime data services — only its own API and PostgreSQL) — are owned by slice 001; how they are realized by this slice's Board and List interactions is described under Constitution Compliance below.
 
 ## Constitution Compliance
 
-This slice is evaluated against constitution v1.1.0. Cross-cutting principles realized here:
+This slice is evaluated against constitution v2.0.0. Cross-cutting principles realized here:
 
 - **I. Keyboard-First**: the project list is opened with `G P` (US-03.AS-01), a project is selected from it (US-03.AS-02), and tasks are moved between Board columns with the arrow keys (US-03.AS-04, AS-05, AS-06) — every Board and List interaction is keyboard-driven, with no required mouse action.
 - **II. Accessibility (WCAG 2.1 AA)**: FR-042 (focus indicator on the selected card and the group-by control), FR-043 (ARIA roles/labels for columns, cards, and the list), FR-044 (contrast ≥ 4.5:1, so column/status is never conveyed by color alone), FR-045 (no AT-binding collisions for the arrow-move keys), FR-046 (no hover-only content), FR-047 (prefers-reduced-motion for column-move transitions). FR-031 keeps single-key shortcuts inert while a text input (e.g., the editor or search) is focused.
-- **III. Instant Response**: SC-003 (owned by slice 001) — selecting a card, moving it between columns, and switching the List group-by all paint within one animation frame.
+- **III. Instant Response**: SC-003 (owned by slice 001) — selecting a card, moving it between columns, and switching the List group-by all paint their optimistic result within one animation frame while the C# API reconciles or rolls back the status change asynchronously (server-confirmed mutations within a p95 < 200ms budget).
 - **IV. Minimalist UI**: the Board surfaces the four workflow columns and hides cancelled tasks (FR-025 / EC-11), and the List exposes grouping on demand through a single group-by control (FR-024), keeping density without clutter.
-- **V. Offline-Only, Local-First**: SC-004 (owned by slice 001) — both views read and write task status entirely on-device with zero network calls.
+- **V. Connected, Server-Authoritative**: SC-004 (owned by slice 001) — both views read and write task status through the app's own C# API and PostgreSQL database, the system of record, with no third-party runtime data service.
 - **VI. Type Safety End-to-End**: the column-to-status mapping (FR-025) is expressed over the typed status enum (backlog/todo/in_progress/done/cancelled) from the schema; a right/left move resolves to a valid adjacent status, with the Done boundary (US-03.AS-05) enforced as a typed no-op.
 - **VII. Data Integrity & Resilience**: FR-049 (any failed status update surfaces a clear, recoverable message), FR-050 (structured logging of such failures), FR-051 (the auto-backup hook stays in place ahead of any schema change).
 - **VIII. Test-First**: each owned acceptance scenario above, plus EC-11, is independently testable (Red-Green-Refactor).
@@ -123,7 +123,7 @@ This slice is evaluated against constitution v1.1.0. Cross-cutting principles re
 
 ## Assumptions
 
-This slice introduces no new assumptions. The assumptions owned by earlier slices continue to apply unchanged — in particular ASM-01 (single user) and ASM-02 (desktop platform) from slice 001, and the project-model assumptions established in slice 003.
+This slice introduces no new assumptions. The assumptions owned by earlier slices continue to apply unchanged — in particular ASM-01 (single user) and ASM-02 (web platform / modern desktop browsers) from slice 001, and the project-model assumptions established in slice 003.
 
 ## Out of Scope
 

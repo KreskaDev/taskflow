@@ -90,7 +90,7 @@ Accessibility (per Constitution Principle II):
 Error Handling & Data Integrity (per Constitution Principle VII):
 - **FR-049**: All errors MUST be presented to the user with a clear message and an actionable recovery suggestion. No operation may fail silently.
 - **FR-050**: Errors MUST be logged with structured context (severity level, operation context, and error details) for debugging purposes.
-- **FR-051**: Before any data migration, the system MUST automatically create a local backup of user data. The user MUST be able to restore from this backup.
+- **FR-051**: Before any data migration, the system MUST automatically create a backup of user data. The user MUST be able to restore from this backup.
 
 ### Key Entities
 
@@ -102,16 +102,16 @@ This slice introduces and owns **ENT-05 — Recurrence Rule**. It populates the 
 
 ### Measurable Outcomes
 
-This slice introduces no new slice-specific success criteria. The measurable outcomes that apply here — SC-003 (instant feedback) and SC-004 (zero network calls) — are owned by slice 001; how they are realized by this slice's recurrence computation and next-instance generation is described under Constitution Compliance below.
+This slice introduces no new slice-specific success criteria. The measurable outcomes that apply here — SC-003 (optimistic UI: the optimistic result is painted within 16ms of the triggering keypress while the server reconciles or rolls back asynchronously) and SC-004 (no third-party runtime data services — only the application's own API and PostgreSQL database) — are owned by slice 001; how they are realized by this slice's recurrence computation and next-instance generation is described under Constitution Compliance below.
 
 ## Constitution Compliance
 
-This slice is evaluated against constitution v1.1.0. Cross-cutting principles realized here:
+This slice is evaluated against constitution v2.0.0. Cross-cutting principles realized here:
 
 - **I. Keyboard-First**: setting a recurrence rule in the task editor and completing an instance (`Space`, owned by slice 004) are keyboard-driven; the recurring visual indicator (US-06.AS-01) is discoverable without the mouse.
 - **II. Accessibility (WCAG 2.1 AA)**: FR-042 (focus indicator), FR-043 (ARIA roles/labels), FR-044 (contrast ≥ 4.5:1), FR-045 (no AT-binding collisions), FR-046 (no hover-only content — the recurring indicator and any recurrence controls have keyboard/focus-triggered equivalents), FR-047 (prefers-reduced-motion). FR-031 keeps single-key shortcuts from hijacking text entry in the recurrence-rule fields.
-- **III. Instant Response**: marking an instance done and generating/surfacing its successor produces visible feedback within one animation frame (SC-003, owned by slice 001).
-- **V. Offline-Only, Local-First**: recurrence computation, the on/after-due startup check, and periodic checks all run entirely on-device with no network calls (SC-004, owned by slice 001).
+- **III. Instant Response (Optimistic UI)**: marking an instance done paints the successor optimistically within one animation frame (SC-003, owned by slice 001), while the C# API confirms or reconciles the generation asynchronously against a p95 < 200ms server budget; rollback is applied if the server rejects the operation. Skeleton/loading states are permitted (Principle IV) where the successor or its reconciled state has not yet been confirmed.
+- **V. Connected, Server-Authoritative**: recurrence computation and next-instance generation are performed and persisted through the application's own C# API into PostgreSQL, which is the source of truth; the Next.js client surfaces the successor via optimistic UI and reconciles against the server. The on/after-due check (at startup and periodically) drives generation through that same API. The only data dependency is the application's own API and database — no third-party runtime data services (SC-004, owned by slice 001).
 - **VI. Type Safety End-to-End**: the Recurrence Rule (ENT-05) frequency type and parameters are a typed model; the recurrence boundary is validated at runtime (user input in the editor and deserialization from storage).
 - **VII. Data Integrity & Resilience**: FR-008's deterministic carry-forward and resets prevent silent data loss across instance generation; FR-049 surfaces any generation error with a recovery suggestion and FR-050 logs it with structured context; FR-051 keeps the backup hook in place ahead of the schema change that adds the recurrence rule.
 - **VIII. Test-First**: each owned acceptance scenario above, plus EC-05, is independently testable (Red-Green-Refactor).

@@ -43,7 +43,7 @@ Entity touchpoint(s):
 - ENT-01 (Task) — owned by slice 001; this slice populates the `project reference` attribute (reserved there as a nullable, forward-compatible column) via FR-021 (Inbox) and US-08.AS-05 (move-to-project)
 
 Depends on:
-- Slice 001 (task-capture) — provides the Task entity, the single task list (here redefined as the Inbox), and local persistence
+- Slice 001 (task-capture) — provides the Task entity, the single task list (here redefined as the Inbox), and server-side persistence (PostgreSQL via the C# API)
 
 Exercised-but-not-owned (scenario owned here; its umbrella requirement lives in a later slice):
 - `M` move-to-project mechanic — the canonical acceptance scenario US-08.AS-05 is owned by this slice, but `M` is a member of the full list-shortcut requirement FR-029, which is owned by slice 007 (cycles). FR-029 is therefore not included in this slice's Requirements list.
@@ -113,7 +113,7 @@ Accessibility (per Constitution Principle II):
 Error Handling & Data Integrity (per Constitution Principle VII):
 - **FR-049**: All errors MUST be presented to the user with a clear message and an actionable recovery suggestion. No operation may fail silently.
 - **FR-050**: Errors MUST be logged with structured context (severity level, operation context, and error details) for debugging purposes.
-- **FR-051**: Before any data migration, the system MUST automatically create a local backup of user data. The user MUST be able to restore from this backup.
+- **FR-051**: Before any data migration, the system MUST automatically create a backup of user data. The user MUST be able to restore from this backup.
 
 ### Key Entities
 
@@ -127,16 +127,16 @@ This slice also populates an attribute of an entity owned elsewhere. It does not
 
 ### Measurable Outcomes
 
-This slice introduces no new slice-specific success criteria. The measurable outcomes owned by slice 001 continue to apply: SC-003 (visible feedback within 16ms of keypress — creating a project, moving a task, and archiving must produce feedback within one frame) and SC-004 (zero network calls — all project operations run fully locally).
+This slice introduces no new slice-specific success criteria. The measurable outcomes owned by slice 001 continue to apply: SC-003 (creating a project, moving a task, and archiving each paints its optimistic result within 16ms of the triggering keypress; the server reconciles or rolls back asynchronously) and SC-004 (project operations depend on no third-party runtime data services — only its own API and PostgreSQL database; there are no external SaaS data dependencies at runtime).
 
 ## Constitution Compliance
 
-This slice is evaluated against constitution v1.1.0. Cross-cutting principles realized here:
+This slice is evaluated against constitution v2.0.0. Cross-cutting principles realized here:
 
 - **I. Keyboard-First**: project organization is keyboard-driven — projects are created via the command palette or a dedicated action (US-10.AS-01), and a selected task is moved to a project with `M` (US-08.AS-05); no mouse interaction is required.
 - **II. Accessibility (WCAG 2.1 AA)**: FR-042 (focus indicator), FR-043 (ARIA roles/labels) on the project form, selector, and delete dialog, FR-044 (contrast ≥ 4.5:1 — preset colors and icons convey meaning together with text, never by color alone), FR-045 (no AT-binding collisions), FR-046 (no hover-only content), FR-047 (prefers-reduced-motion). FR-031 keeps `M` and other single-key shortcuts from hijacking text entry in the project name field and project selector.
-- **III. Instant Response**: SC-003 (16ms feedback, owned by slice 001) applies to project creation, the `M` move, archiving, and the nesting-prevention message.
-- **V. Offline-Only, Local-First**: SC-004 (zero network calls, owned by slice 001); project records and the Task `project reference` are stored in the documented, inspectable local format (ASM-08, owned by slice 001).
+- **III. Instant Response**: the project create, `M` move, archive, and nesting-prevention message paint their optimistic result within 16ms (SC-003, owned by slice 001) while the server reconciles or rolls back asynchronously; server mutations meet a p95<200ms budget. Skeleton screens are permitted for network-bound loads (Principle IV).
+- **V. Connected, Server-Authoritative**: PostgreSQL accessed through the C# API is the system of record; project records and the Task `project reference` are persisted server-side in the documented, inspectable relational schema (ASM-08, owned by slice 001), and the app depends on no third-party runtime data service (SC-004).
 - **VI. Type Safety End-to-End**: the Project type is generated from the schema (source of truth), with runtime validation at the project-form input boundary and at storage deserialization; the one-level-nesting invariant (FR-012) is enforced as a validated rule.
 - **VII. Data Integrity & Resilience**: FR-049 (error + recovery — e.g., the grandchild-prevention message of US-10.AS-03), FR-050 (structured logging), FR-051 (auto-backup hook in place ahead of the schema change that adds the Project entity and the Task `project reference`).
 - **VIII. Test-First**: each owned acceptance scenario above, plus EC-03, is independently testable (Red-Green-Refactor).
