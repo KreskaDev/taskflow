@@ -1,6 +1,6 @@
 # ADR-0001 — TaskFlow technical foundation
 
-**Status:** Accepted (2026-06-14)
+**Status:** Accepted (2026-06-14); Decision 1 (single-user, no auth, no owner/org/role fields) superseded by ADR-0003/ADR-0004 under constitution v3.0.0 (collaborative multi-user). The stack decisions (2–10) remain in force.
 **Supersedes:** the offline-only, local-first desktop assumption of constitution v1.1.0
 **Drives:** constitution v2.0.0 amendment and the product-vision technical-requirement updates
 

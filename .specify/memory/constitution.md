@@ -1,49 +1,55 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 1.1.0 -> 2.0.0
-  Bump rationale: MAJOR — Principle V redefined backward-incompatibly
-    (Offline-Only, Local-First -> Connected, Server-Authoritative). The
-    product's foundational delivery model changes from an offline local
-    desktop app to a connected single-user web app with a C# backend and
-    PostgreSQL. Principles III, IV, and VI are materially redefined to
-    match; a new Architecture & Stack section is added. Single-User scope,
-    Keyboard-First, Accessibility, Data Integrity, and Test-First are
-    retained.
+  Version change: 2.0.0 -> 3.0.0
+  Bump rationale: MAJOR — the "Single-User Only" hard scope boundary is
+    replaced backward-incompatibly by "Collaborative, Multi-User". The
+    product becomes a connected, multi-user (~10) collaborative web app
+    with Google OAuth sign-in, project sharing with roles, assignment,
+    comments, real-time updates, and in-app notifications. A new
+    Authentication & Authorization principle is added; Principles III and
+    V are amended; the Caddy basic_auth access gate is removed.
 
   Modified principles:
     - I. Keyboard-First                    — unchanged
     - II. Accessibility (WCAG 2.1 AA)       — unchanged
-    - III. Instant Response                 — redefined (optimistic UI +
-      networked latency budget; skeletons now permitted)
-    - IV. Minimalist UI                     — amended (skeleton-screen
-      prohibition removed)
-    - VI. Type Safety End-to-End            — redefined (TS web + C# api,
-      OpenAPI contract, EF Core migrations as schema source of truth)
-    - VII. Data Integrity & Resilience      — adapted (EF Core migrations,
-      pg_dump/snapshot backups; undo + export/import retained)
+    - III. Instant Response                 — amended (real-time reconciliation
+      clause for SignalR server-initiated updates)
+    - IV. Minimalist UI                     — unchanged
+    - V. Connected, Server-Authoritative    — amended (OAuth IdP carve-out:
+      authentication-only external runtime dependency)
+    - VI. Type Safety End-to-End            — unchanged
+    - VII. Data Integrity & Resilience      — amended (membership/role changes
+      use a confirmation dialog, not the 30s data undo)
+    - VIII. Test-First                      — unchanged
 
-  Replaced principles:
-    - V. Offline-Only, Local-First -> V. Connected, Server-Authoritative
+  Added principles:
+    - IX. Authentication & Authorization    — NEW
 
-  Added sections:
-    - Architecture & Stack (codifies ADR-0001 and ADR-0002 —
-      including Deployment & Operations: Docker/Compose on a single
-      Hetzner VPS, host Caddy + basic_auth single-origin, GHCR + GitHub
-      Actions CD, backup-before-migrate, internal-only data services)
+  Replaced sections:
+    - Constraints & Scope: "Single-User Only" -> "Collaborative, Multi-User"
 
-  Rewritten sections:
-    - Performance Standards (reframed for web client + networked backend)
+  Modified sections:
+    - Architecture & Stack — add Identity & Access context, SignalR real-time,
+      in-app notifications, application-layer authorization; remove the Caddy
+      basic_auth gate (Caddy keeps TLS + proxy); update Operational scope
+    - Performance Standards — add ~10 concurrent users + real-time fan-out budget
 
-  Removed sections: N/A
+  Removed: the Caddy basic_auth access-gate rule; all single-user / no-auth /
+    "MUST NOT carry owner/org/role" language.
 
   Templates requiring updates:
-    - .specify/templates/plan-template.md  — ⚠ pending: re-evaluate the
-      "Constitution Check" gate against the new stack at first /plan
+    - .specify/templates/plan-template.md  — ⚠ pending: the dynamic "Constitution
+      Check" gate re-derives at /plan time; new Principle IX (authz) and the
+      multi-user scope will surface there automatically
     - .specify/templates/spec-template.md  — ✅ no change (no constitution refs)
     - .specify/templates/tasks-template.md — ✅ no change (no constitution refs)
-    - .specify/templates/commands/*.md      — ✅ no files present
-    - docs/architecture/adr-0001-stack.md  — ✅ source of these amendments
+    - docs/architecture/adr-0002-deployment.md — ✅ done: basic_auth removed,
+      SignalR added (amended 2026-06-14)
+    - docs/architecture/adr-0003-domain-model.md — ✅ done: Identity & Access
+      context + new entities + authorization (rewritten 2026-06-14)
+    - docs/architecture/adr-0004..0008 — ✅ added (identity, authorization,
+      sharing, real-time, notifications)
 
   Follow-up TODOs: none
 -->
@@ -97,8 +103,13 @@ server:
   server confirms. The client reconciles or rolls back when the server
   responds.
 - Server budget: server-confirmed mutations SHOULD complete within a p95
-  of 200 ms; failures MUST surface a clear, recoverable message
-  (Principle VII).
+  of 200 ms (enforced as a hard budget in Performance Standards); failures
+  MUST surface a clear, recoverable message (Principle VII).
+- Real-time reconciliation: shared views receive server-initiated updates
+  over SignalR. An inbound remote patch resolves under last-write-wins, but
+  MUST yield to a pending local optimistic mutation until that mutation's
+  server acknowledgement resolves, then reconcile. A remote update MUST NOT
+  clobber an in-flight local edit.
 - Skeleton screens ARE permitted for initial page loads and network-bound
   data fetches (see Principle IV). They MUST NOT be used to mask a
   mutation whose optimistic result could have been shown instead.
@@ -106,8 +117,9 @@ server:
   animation or in-flight request is pending.
 
 Rationale: perceived speed is the product's primary differentiator. A
-network now sits in the path, so the instant *feel* is delivered by
-optimistic rendering while the server remains the source of truth.
+network and other collaborators now sit in the path, so the instant
+*feel* is delivered by optimistic rendering while the server remains the
+source of truth.
 
 ### IV. Minimalist UI
 
@@ -130,22 +142,25 @@ thought process, not a product demanding attention.
 
 ### V. Connected, Server-Authoritative
 
-The application is a connected single-user web app. PostgreSQL,
+The application is a connected multi-user web app. PostgreSQL,
 accessed through the C# backend, is the system of record.
 
 - The Next.js client communicates with the C# API over REST; the API
   owns all writes and is the single source of truth.
 - Network connectivity is required for normal operation. Offline-first
   operation and cross-device sync are out of scope for this iteration.
-- User data MUST remain under the user's control in a documented,
+- User data MUST remain under the team's control in a documented,
   inspectable relational schema; export and import (Principle VII) keep
   the data portable.
-- No third-party runtime data services: the app depends only on its own
-  API and database, with no external SaaS dependency at runtime.
+- No third-party runtime **data** services: the app stores and serves all
+  task data through its own API and database, with no external SaaS data
+  dependency at runtime. A single external **authentication** provider
+  (Google OAuth, see Principle IX) is the one permitted external runtime
+  dependency, and only for sign-in — never for storing application data.
 
 Rationale: a server-authoritative model gives a single, consistent source
-of truth and a clean place to enforce domain invariants (see Architecture
-& Stack), while the single-user scope keeps the surface small.
+of truth and a clean place to enforce domain invariants and authorization
+(see Architecture & Stack), while keeping data ownership in-house.
 
 ### VI. Type Safety End-to-End
 
@@ -187,10 +202,13 @@ User data is sacred. The application MUST protect it proactively:
   stacktrace) and presented to the user with an actionable recovery
   suggestion. No silent failures.
 - **Undo for destructive actions**: delete, bulk update, and any
-  irreversible operation MUST be undoable for a minimum of 30 seconds
-  after execution.
+  irreversible operation on task/project **data** MUST be undoable for a
+  minimum of 30 seconds after execution. Membership and role changes
+  (sharing, role assignment, removing a member) are NOT covered by this
+  undo; they MUST instead require an explicit confirmation dialog before
+  taking effect.
 
-Rationale: the backend is the sole custodian of the user's data; a lost
+Rationale: the backend is the sole custodian of the team's data; a lost
 or corrupted write has no external recovery path beyond these guarantees.
 
 ### VIII. Test-First
@@ -201,36 +219,68 @@ Tests MUST be written before implementation (Red-Green-Refactor).
   independently testable.
 - Backend: xUnit unit tests cover domain logic and aggregate invariants;
   integration tests cover command/query handlers through the real
-  database.
+  database, **including authorization** (a request without the required
+  ownership/role MUST be denied).
 - Frontend: Vitest covers unit/component logic; Playwright covers user
   journeys end-to-end through the real stack.
 - A failing test suite MUST block merging.
 
-Rationale: correctness across a client/API/database stack depends on
-tests at each tier and on end-to-end journeys that exercise the seams.
+Rationale: correctness across a client/API/database stack with multiple
+users depends on tests at each tier, on authorization tests, and on
+end-to-end journeys that exercise the seams.
+
+### IX. Authentication & Authorization
+
+Every request is authenticated and every data operation is authorized.
+
+- **Authentication**: sign-in is via Google OAuth (open sign-up). Sessions
+  are HttpOnly cookies issued and managed by the single-origin Next.js BFF;
+  no access tokens are exposed to client JavaScript.
+- **Authorization is mandatory and deny-by-default**: every read and write
+  MUST be authorized at the API/handler layer. Two tiers apply:
+  - *Per-user isolation* — a caller may only read or write data they own
+    (their tasks, their personal projects). All queries are scoped to the
+    caller's identity.
+  - *Membership + role* — for shared projects, access requires membership,
+    and the action requires sufficient role: **viewer** (read-only, no
+    commenting), **editor** (change tasks, comment), **owner** (manage
+    members, share/unshare, delete). Least privilege is enforced per
+    operation.
+- Authorization MUST live in the application layer (a policy backed by
+  project membership), not be scattered ad hoc; aggregates remain focused
+  on domain invariants.
+
+Rationale: in a collaborative app, the boundary between users is a
+correctness and trust requirement. A missed check is a data leak, so
+authorization is a first-class, tested, deny-by-default concern.
 
 ## Constraints & Scope
 
-### Single-User Only
+### Collaborative, Multi-User
 
-TaskFlow is designed for exactly one person. This is a hard scope
-boundary, not a principle to be weighed — it constrains what
-features may exist.
+TaskFlow serves a small team — on the order of ten people — on a single
+shared instance. This shapes what features exist and how data is modeled.
 
-- No collaboration features, no permissions model, no sharing,
-  no multi-tenancy, and no authentication.
-- Features that only make sense in a team context MUST NOT be
-  added.
-- Data model MUST NOT carry fields (owner, org, role) that exist
-  solely to support multi-user scenarios.
+- Users have accounts (Google OAuth) and personal, private data by default.
+- Data carries ownership and membership: tasks have a `createdBy` and may
+  have `assignees`; projects have an `ownerId` and a `visibility`
+  (personal or shared); shared projects have a `ProjectMembership` set with
+  roles. These fields are REQUIRED — they are the basis of authorization.
+- Collaboration is in scope: sharing projects, roles/permissions,
+  assignment, comments/@mentions, real-time updates, and in-app
+  notifications.
+- Out of bounds: organizations / multi-tenancy beyond the single team,
+  anonymous or guest access, and public share links. The data model MUST
+  NOT add an organization/tenant dimension.
 
-The single-user model keeps the codebase small, the data schema
-focused, and the UX free of access-control noise.
+The single-team scope keeps the authorization model tractable (ownership +
+per-project membership) without the weight of full multi-tenancy.
 
 ## Architecture & Stack
 
-This section codifies ADR-0001 (`docs/architecture/adr-0001-stack.md`).
-It is normative: deviations require an amendment.
+This section codifies ADR-0001 (`docs/architecture/adr-0001-stack.md`) and
+the Identity/Access, Authorization, Sharing, Real-time, and Notifications
+ADRs (0004–0008). It is normative: deviations require an amendment.
 
 - **Repository**: monorepo. `apps/web` (Next.js + TypeScript) and
   `apps/api` (C# / ASP.NET Core) live alongside `specs/` and `.specify/`.
@@ -240,13 +290,26 @@ It is normative: deviations require an amendment.
   with optimistic mutations.
 - **API contract**: REST with an OpenAPI specification as the source of
   truth; a typed TypeScript client is generated from it.
-- **Backend**: C# / ASP.NET Core using full tactical Domain-Driven Design
-  — aggregate roots (Task, Project, Cycle), value objects, domain events,
-  repositories, and a CQRS command/query split. Domain invariants live in
-  the aggregates (e.g. single active cycle, one-level project nesting,
-  recurrence/status rules).
+- **Backend**: C# / ASP.NET Core using full tactical Domain-Driven Design.
+  Two bounded contexts: **Task Management** (aggregate roots Task, Project,
+  Cycle; value objects; domain events) and **Identity & Access** (the User
+  aggregate and the application-layer authorization policy, which consumes
+  each shared project's ProjectMembership set — modeled in the Project
+  aggregate per ADR-0003). Domain
+  invariants live in the aggregates (e.g. single active cycle, one-level
+  project nesting, recurrence/status rules).
+- **Authorization**: an application-layer policy backed by ProjectMembership
+  enforces per-user isolation and role checks on every command/query
+  (Principle IX), deny-by-default.
 - **Messaging & dispatch**: Wolverine handles command/query dispatch and
-  the transactional outbox, with RabbitMQ as the message transport.
+  the transactional outbox, with RabbitMQ as the message transport. Domain
+  events (e.g. `TaskAssigned`, `UserMentioned`, `TaskCompleted`,
+  `CycleClosed`) drive cross-aggregate effects and notification generation.
+- **Real-time**: SignalR pushes live updates to members viewing shared
+  projects; reconciliation follows Principle III (last-write-wins, yielding
+  to in-flight local edits).
+- **Notifications**: an in-app notification center plus live SignalR toasts,
+  generated by domain-event handlers (assigned / mentioned / changed).
 - **Persistence**: EF Core (code-first migrations) over PostgreSQL for the
   write side; CQRS read projections (query handlers returning DTOs)
   optimized for the view requirements.
@@ -261,15 +324,18 @@ It is normative: deviations require an amendment.
 - **Edge & access**: a host-installed Caddy terminates TLS and reverse-
   proxies a single origin to the web container; the API is reached via the
   web origin's `/api` path over the internal network (no separate public
-  API surface, no CORS). Because the app has no in-domain authentication,
-  Caddy `basic_auth` MUST gate all public access.
+  API surface, no CORS). Public access is gated by **application-layer
+  Google OAuth + sessions** (Principle IX) — there is no shared-password
+  edge gate.
 - **CI/CD**: GitHub Actions builds and tests both stacks, publishes images
   to GHCR, and deploys to the VPS (production-only). Each deploy MUST take
   a `pg_dump` backup (Principle VII) and apply EF Core migrations before
   starting services. Backups are stored on a local volume.
-- **Operational scope**: realtime push/websockets, multi-node
-  orchestration, offsite backups, and a staging environment are out of
-  scope for this iteration (YAGNI). See `docs/architecture/adr-0002-deployment.md`.
+- **Operational scope**: real-time (SignalR) and in-app notifications are
+  in scope. Email/push notifications, reminders, presence indicators,
+  activity/audit feeds, non-Google SSO, multi-node orchestration, offsite
+  backups, and a staging environment are out of scope for this iteration
+  (YAGNI). See `docs/architecture/adr-0002-deployment.md` and ADR-0004..0008.
 
 ## Performance Standards
 
@@ -279,6 +345,10 @@ It is normative: deviations require an amendment.
   action under 16 ms (see Principle III).
 - **Server mutations**: p95 under 200 ms for single-entity writes against
   a representative dataset.
+- **Concurrency**: the system MUST serve ~10 concurrent users without
+  perceptible degradation.
+- **Real-time fan-out**: a change to a shared item MUST propagate to other
+  members' open shared views within ~1 s.
 - **Rendering**: list views MUST maintain 60 fps while scrolling through
   10 000 items (client-side virtualization required).
 - **Search**: command-palette search MUST return results in under 50 ms
@@ -295,16 +365,18 @@ It is normative: deviations require an amendment.
   `###-feature-name` matching the spec directory.
 - **Commits**: atomic, descriptive; one logical change per commit.
 - **Code review**: every merge MUST pass constitution compliance
-  check (see Governance).
+  check (see Governance), including an authorization review for any new
+  data operation.
 - **CI gates**: for both stacks — lint + type-check (TS strict; C#
   nullable/analyzers-as-errors), OpenAPI client generation in sync, the
-  full test suite (xUnit + integration, Vitest + Playwright), and (when
-  available) performance benchmarks MUST all pass before merge.
+  full test suite (xUnit + integration incl. authorization, Vitest +
+  Playwright), and (when available) performance benchmarks MUST all pass
+  before merge.
 - **Release cadence**: ship when ready; no fixed schedule. Each
   release MUST include a changelog entry.
 - **YAGNI discipline**: every feature MUST justify its existence
-  against the core promise — fast, quiet, keyboard-driven task
-  management. When in doubt, leave it out. Three lines of clear
+  against the core promise — fast, quiet, keyboard-driven collaborative
+  task management. When in doubt, leave it out. Three lines of clear
   code are better than a premature abstraction. Configuration
   surface MUST be minimal — sensible defaults over settings
   screens. No plugin system, scripting API, or extensibility
@@ -341,4 +413,4 @@ proposals MUST be evaluated against this document.
 - **Guidance file**: refer to the current plan and spec for
   runtime development guidance.
 
-**Version**: 2.0.0 | **Ratified**: 2026-06-13 | **Last Amended**: 2026-06-14
+**Version**: 3.0.0 | **Ratified**: 2026-06-13 | **Last Amended**: 2026-06-14

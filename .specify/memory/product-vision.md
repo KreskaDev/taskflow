@@ -9,11 +9,11 @@
 
 ## 1. Product Pitch
 
-TaskFlow MVP — core task management application combining Todoist simplicity with Linear speed and aesthetics. Keyboard-first, single-user, web-based (connected client + backend).
+TaskFlow MVP — core task management application combining Todoist simplicity with Linear speed and aesthetics. Keyboard-first, collaborative (small team), web-based (connected client + backend).
 
 ---
 
-## 2. User Stories (US-01..US-10 + acceptance scenarios)
+## 2. User Stories (US-01..US-16 + acceptance scenarios)
 
 ### US-01 — Daily Task Capture (Priority: P1)
 
@@ -214,17 +214,120 @@ User creates, edits, archives, and organizes projects with one level of nesting 
 
 ---
 
-## 3. Functional Requirements (FR-001..FR-051)
+### US-11 — Account & Sign-In (Priority: P1)
+
+A team member signs in with Google to reach their tasks and shared projects (open sign-up); can sign out; profile shows Google name/avatar.
+
+**Why this priority**: Authentication is the gate to every collaborative feature — without an identity there are no personal data, no shared projects, and no authorization. This is the foundation the multi-user product stands on.
+
+**Independent Test**: Can be tested by signing in with Google as a new visitor, verifying account creation and landing in the workspace, then signing out and confirming protected views are no longer accessible.
+
+**Acceptance Scenarios**:
+
+1. **Given** a signed-out visitor, **When** they choose "Sign in with Google" and complete OAuth, **Then** a new account is created or a returning one matched, and they land in their workspace.
+2. **Given** a signed-in user, **When** they sign out, **Then** the session ends and protected views are no longer accessible.
+3. **Given** an unauthenticated request to any protected route/endpoint, **When** it is made, **Then** it is denied (deny-by-default) and the user is directed to sign in.
+4. **Given** a signed-in user, **When** they open their profile, **Then** their Google display name and avatar are shown.
+
+---
+
+### US-12 — Project Sharing, Membership & Roles (Priority: P1)
+
+An owner shares a personal project, invites members with roles (owner/editor/viewer), changes roles, removes members, can unshare (revert to personal); members can leave.
+
+**Why this priority**: Sharing with roles is the core of collaboration — it defines who can access a project and what they may do. Assignment, comments, real-time, and notifications all build on membership.
+
+**Independent Test**: Can be tested by sharing a personal project, inviting a member at a given role, changing the role, removing the member, having a member leave, and unsharing, verifying access and assignments at each step.
+
+**Acceptance Scenarios**:
+
+1. **Given** an owner of a personal project, **When** they share it and invite a member, **Then** the project becomes shared and the member gains access at the assigned role.
+2. **Given** an owner, **When** they set a member's role to viewer/editor/owner, **Then** that member's permissions change accordingly.
+3. **Given** a viewer, **When** they attempt to modify a task in the shared project, **Then** the action is denied (read-only).
+4. **Given** an owner, **When** they remove a member (after confirmation), **Then** that member loses access and is unassigned from the project's tasks.
+5. **Given** a non-owner member, **When** they leave a shared project, **Then** they lose access and are unassigned from its tasks.
+6. **Given** an owner, **When** they unshare a shared project (after confirmation), **Then** all other members lose access, their assignments on its tasks are cleared, and the project becomes personal again.
+
+---
+
+### US-13 — Task Assignment (Priority: P2)
+
+In a shared project, members assign one or more members to a task and filter by "assigned to me"; assignment is shared-only.
+
+**Why this priority**: Assignment turns shared projects into coordinated work — it tells members what is theirs. It depends on sharing and membership being in place first.
+
+**Independent Test**: Can be tested by assigning members to a task in a shared project, changing and removing assignees, opening "Assigned to me", and confirming no assignment control appears on personal-project tasks.
+
+**Acceptance Scenarios**:
+
+1. **Given** a task in a shared project, **When** an editor/owner assigns one or more members, **Then** they appear as assignees and each is notified.
+2. **Given** assignees on a task, **When** an editor/owner changes/removes assignees, **Then** the assignee set updates.
+3. **Given** a user with assigned tasks, **When** they open "Assigned to me", **Then** they see tasks across shared projects where they are an assignee.
+4. **Given** a personal (not shared) project, **When** a user views a task, **Then** no assignment control is offered.
+
+---
+
+### US-14 — Comments & @Mentions (Priority: P2)
+
+Editors/owners comment on shared tasks and @mention members; viewers can read but not comment.
+
+**Why this priority**: Comments and @mentions are how members discuss work in context. They enrich collaboration but depend on shared projects and roles already existing.
+
+**Independent Test**: Can be tested by posting a comment on a shared task as an editor, @mentioning a member and verifying notification, confirming a viewer has no comment input, and editing/deleting one's own comment.
+
+**Acceptance Scenarios**:
+
+1. **Given** an editor/owner on a shared task, **When** they post a comment, **Then** it appears in the task's thread with author and timestamp.
+2. **Given** a comment being composed, **When** the author @mentions a project member, **Then** that member is notified.
+3. **Given** a viewer on a shared task, **When** they view it, **Then** they can read comments but have no comment input (cannot post).
+4. **Given** a comment's author, **When** they edit or delete their own comment, **Then** the thread updates.
+
+---
+
+### US-15 — Real-Time Collaboration (Priority: P2)
+
+When a member changes a shared item, other members viewing it see the change live.
+
+**Why this priority**: Live updates make collaboration feel coherent — members see each other's work without manual refresh. It layers on top of sharing and the optimistic-UI model.
+
+**Independent Test**: Can be tested by having two members view the same shared project, changing a task in one client and observing the live update in the other, verifying in-flight edits are not clobbered, and confirming re-sync after a dropped connection.
+
+**Acceptance Scenarios**:
+
+1. **Given** two members viewing the same shared project, **When** one changes a task, **Then** the other's view updates live within ~1s without manual refresh.
+2. **Given** a member with a pending local optimistic edit, **When** a remote update for the same item arrives, **Then** it does not clobber the in-flight edit (reconciles after the local server-ack under last-write-wins).
+3. **Given** a dropped connection, **When** connectivity returns, **Then** the client reconnects and re-syncs the current state of visible shared views.
+
+---
+
+### US-16 — Notifications (Priority: P2)
+
+Members get in-app notifications when assigned, @mentioned, or when items they are an assignee of change; a notification center, live toasts, mark-read, per-type preferences; in-app only.
+
+**Why this priority**: Notifications close the loop on collaboration — members learn when something needs their attention. They depend on assignment, mentions, and real-time being present.
+
+**Independent Test**: Can be tested by triggering an assignment and an @mention, verifying in-app notifications and a live toast when online, opening the notification center, marking notifications read, and disabling a notification type.
+
+**Acceptance Scenarios**:
+
+1. **Given** a member, **When** they are assigned to a task or @mentioned, **Then** they receive an in-app notification (and a live toast if online).
+2. **Given** the notification center, **When** they open it, **Then** notifications are listed newest-first with read/unread state.
+3. **Given** an unread notification, **When** they mark it read (or mark all read), **Then** its state updates.
+4. **Given** notification preferences, **When** they disable a type, **Then** they stop receiving that type.
+
+---
+
+## 3. Functional Requirements (FR-001..FR-084)
 
 ### Task Management
 - **FR-001**: System MUST allow creating a task with a mandatory title field.
-- **FR-002**: System MUST support optional task fields: description (markdown), priority (P0/P1/P2/P3), due date, labels (multiple), and project assignment.
+- **FR-002**: System MUST support optional task fields: description (markdown), priority (P0/P1/P2/P3), due date, labels (multiple), project assignment, and assignees (shared-project tasks only).
 - **FR-003**: System MUST track task status as one of: backlog, todo, in_progress, done, cancelled. New tasks MUST default to "backlog" status.
 - **FR-004**: System MUST automatically record `created_at`, `updated_at`, and `completed_at` timestamps on tasks.
 - **FR-005**: System MUST parse natural language date expressions in Polish ("jutro", "piatek", "za 3 dni", "po 17", "30.06") and set the due date accordingly.
 - **FR-006**: When the natural language date parser cannot interpret input, the system MUST retain the previous date value and display a red error message "nie rozpoznano" below the date field.
 - **FR-007**: System MUST support recurring tasks with the following schedules: daily, every N days, specific weekdays, monthly.
-- **FR-008**: When a recurring task instance is marked as done (on or after its due date), the system MUST automatically generate the next instance with the appropriate due date according to the recurrence rule. The new instance MUST carry forward all fields from the completed instance (title, description, priority, labels, project) except: status (reset to backlog), timestamps (new created_at, no completed_at), and cycle assignment (new instance is unassigned to any cycle — the user assigns it manually).
+- **FR-008**: When a recurring task instance is marked as done (on or after its due date), the system MUST automatically generate the next instance with the appropriate due date according to the recurrence rule. The new instance MUST carry forward all fields from the completed instance (title, description, priority, labels, project, assignees) except: status (reset to backlog), timestamps (new created_at, no completed_at), and cycle assignment (new instance is unassigned to any cycle — the user assigns it manually). The new instance keeps the same assignees.
 - **FR-009**: When a recurring task instance is marked as done before its due date, the system MUST NOT generate the next instance immediately. The next instance MUST be generated when the application is opened on or after the original due date (checked at application startup and periodically while running).
 - **FR-010**: When a recurring task is cancelled, the system MUST stop generating further instances.
 
@@ -289,6 +392,45 @@ User creates, edits, archives, and organizes projects with one level of nesting 
 ### Data Integrity (per Constitution Principle VII)
 - **FR-051**: Before any data migration, the system MUST automatically create a backup of user data. The user MUST be able to restore from this backup.
 
+### Authentication & Authorization
+- **FR-052**: System MUST support sign-in via Google OAuth with open sign-up; first-time sign-in creates an account, returning sign-in matches the existing one.
+- **FR-053**: Sessions MUST be HttpOnly cookies issued and managed by the web BFF; auth tokens MUST NOT be exposed to client JavaScript.
+- **FR-054**: System MUST allow sign-out, ending the session.
+- **FR-055**: Unauthenticated requests to protected routes/endpoints MUST be denied (deny-by-default) and directed to sign-in.
+- **FR-056**: System MUST display the signed-in user's Google profile (display name, avatar).
+- **FR-057**: Projects MUST have a visibility of personal (private to owner) or shared; new projects default to personal.
+- **FR-058**: An owner MUST be able to convert a personal project to shared and to revert a shared project to personal (unshare).
+- **FR-059**: On unshare, all non-owner members MUST lose access and their assignments on that project's tasks MUST be cleared.
+- **FR-060**: An owner MUST be able to invite a user to a shared project and assign a role.
+- **FR-061**: System MUST support three per-shared-project roles: owner (manage members, share/unshare, delete), editor (change tasks, comment), viewer (read-only, no commenting).
+- **FR-062**: An owner MUST be able to change a member's role and remove a member; removal MUST unassign that member from the project's tasks.
+- **FR-063**: A non-owner member MUST be able to leave a shared project, losing access and being unassigned from its tasks.
+- **FR-064**: Membership and role changes (invite, role change, remove, leave, unshare) MUST require explicit confirmation and MUST NOT be covered by the 30-second data undo (FR-040).
+- **FR-065**: Every query MUST be scoped to data the caller owns or has membership access to (per-user isolation).
+- **FR-066**: Access to a shared project's data MUST require membership in that project.
+- **FR-067**: Each operation MUST require sufficient role (viewer=read, editor=write, owner=manage); insufficient role MUST be denied.
+- **FR-068**: Authorization MUST be deny-by-default and enforced at the API/handler layer for every read and write.
+
+### Collaboration
+- **FR-069**: Tasks in shared projects MUST support multiple assignees (members of that project); personal-project tasks MUST NOT offer assignment.
+- **FR-070**: Editors/owners MUST be able to add/remove assignees; assigning a member MUST notify them.
+- **FR-071**: System MUST provide an "Assigned to me" view listing tasks across shared projects where the current user is an assignee.
+- **FR-072**: Editors and owners MUST be able to post comments on tasks in shared projects; viewers MUST NOT be able to comment.
+- **FR-073**: A comment MUST record author and creation timestamp and support @mentions of project members.
+- **FR-074**: An @mention MUST notify the mentioned member.
+- **FR-075**: A comment's author MUST be able to edit and delete their own comments.
+
+### Real-time & Notifications
+- **FR-076**: Changes to a shared item MUST propagate to other members' open shared views in real time (SignalR) within the fan-out budget.
+- **FR-077**: An inbound real-time update MUST NOT overwrite an in-flight local optimistic edit; it reconciles under last-write-wins after the local mutation's server-ack.
+- **FR-078**: On reconnect after a dropped connection, the client MUST re-sync the current state of visible shared views.
+- **FR-079**: System MUST generate an in-app notification when a user is assigned to a task, @mentioned, or when a task they are an assignee of changes.
+- **FR-080**: System MUST present a notification center listing the user's notifications newest-first with read/unread state.
+- **FR-081**: When the user is online, a new notification MUST also surface as a live toast.
+- **FR-082**: Users MUST be able to mark a notification read and mark all read.
+- **FR-083**: Users MUST be able to set per-type notification preferences (enable/disable a type).
+- **FR-084**: Notifications MUST be in-app only; email and push/device notifications are out of scope.
+
 ---
 
 ## 4. Edge Cases (EC-01..EC-12)
@@ -308,7 +450,7 @@ User creates, edits, archives, and organizes projects with one level of nesting 
 
 ---
 
-## 5. Success Criteria (SC-001..SC-012)
+## 5. Success Criteria (SC-001..SC-015)
 
 - **SC-001**: User can perform a complete daily workflow (capture task, review today's tasks, reprioritize, reschedule, mark done) without using the mouse at any point.
 - **SC-002**: Application reaches first contentful paint in under 1 second and time-to-interactive in under 2.5 seconds on a broadband connection from a warm backend.
@@ -322,70 +464,90 @@ User creates, edits, archives, and organizes projects with one level of nesting 
 - **SC-010**: List views maintain smooth scrolling (60fps) with 10,000 items loaded via client-side virtualization.
 - **SC-011**: Browser tab memory usage stays below 300 MB with 10,000 tasks loaded.
 - **SC-012**: Server data operations (single-entity reads/writes) complete within a p95 of 200ms against a representative dataset.
+- **SC-013**: Authorization is enforced on 100% of data operations (no read/write bypasses the policy; deny cases covered by integration tests).
+- **SC-014**: A change to a shared item is reflected on other members' open shared views within ~1 second.
+- **SC-015**: The system serves ~10 concurrent users performing typical operations without perceptible degradation.
 
 ---
 
-## 6. Key Entities (ENT-01..ENT-05)
+## 6. Key Entities (ENT-01..ENT-09)
 
-- **ENT-01 — Task**: The core work item. Has a title (required), description, priority (P0-P3), status (backlog/todo/in_progress/done/cancelled), due date, labels, project reference, cycle reference, recurrence rule, and system timestamps (created_at, updated_at, completed_at). New tasks default to "backlog" status. A recurring task has a linked recurrence rule that generates successor instances.
-- **ENT-02 — Project**: An organizational container for tasks. Has a name, color, icon, optional parent project reference, and archived flag. Supports one level of nesting. Contains zero or more tasks.
+- **ENT-01 — Task**: The core work item. Has a title (required), description, priority (P0-P3), status (backlog/todo/in_progress/done/cancelled), due date, labels, project reference, cycle reference, recurrence rule, createdBy (the User who created it), assignees (zero or more Users; only on shared-project tasks), and system timestamps (created_at, updated_at, completed_at). New tasks default to "backlog" status. A recurring task has a linked recurrence rule that generates successor instances.
+- **ENT-02 — Project**: An organizational container for tasks. Has a name, color, icon, optional parent project reference, archived flag, ownerId (the owning User), and visibility (personal or shared). Supports one level of nesting. Contains zero or more tasks. Shared projects have a membership set.
 - **ENT-03 — Cycle**: A time-boxed period (default 2 weeks) for organizing work. Has a start date, end date, and status (active/closed/planned). Contains zero or more tasks. Only one cycle can be active at a time. A task not assigned to any cycle is considered "in the cycle backlog" (distinct from the task status "backlog" — cycle backlog refers to cycle assignment, not workflow state). Tasks remaining in a closed cycle may carry a "carried over" flag indicating they were not completed during that cycle's timeframe.
 - **ENT-04 — Label**: A tag that can be applied to multiple tasks for cross-cutting categorization. Has a name and optional color. Many-to-many relationship with tasks.
 - **ENT-05 — Recurrence Rule**: Defines a repeating schedule attached to a task. Specifies frequency type (daily, every N days, specific weekdays, monthly) and parameters. Used to generate the next task instance upon completion.
+- **ENT-06 — User**: Identity from Google (subject id, email, display name, avatar).
+- **ENT-07 — ProjectMembership**: Links a User to a shared Project with a role (owner/editor/viewer).
+- **ENT-08 — Comment**: Has an author User, parent task, body, @mentions, and created/edited timestamps.
+- **ENT-09 — Notification**: Has a recipient User, type (assigned/mentioned/changed), source reference, read flag, and created timestamp.
 
 ---
 
-## 7. Assumptions (ASM-01..ASM-09)
+## 7. Assumptions (ASM-01..ASM-11)
 
-- **ASM-01 — Single user only**: The application serves exactly one user. No authentication, multi-tenancy, or sharing features are needed.
+- **ASM-01 — Multi-user team**: The application serves a small collaborating team (~10). Each user authenticates (Google) and has personal data plus access to shared projects.
 - **ASM-02 — Web platform**: The MVP targets modern desktop browsers. Native mobile apps, PWA/offline operation, and cross-device sync are explicitly out of scope.
 - **ASM-03 — Polish language UI for date parsing**: Natural language date input supports Polish expressions as the primary language. Error messages related to date parsing (e.g., "nie rozpoznano") are in Polish. Additional language support may be added later but is not required for MVP.
 - **ASM-04 — Preset colors and icons**: Project colors and icons are selected from a predefined set, not custom user values.
 - **ASM-05 — No subtasks**: Tasks are flat entities. Only projects support hierarchy (one level). Task nesting (subtasks) is explicitly out of scope.
-- **ASM-06 — No notifications**: Push notifications, reminders, and alerts are out of scope. The app is passive — the user checks it when they want to.
+- **ASM-06 — In-app notifications only**: The app provides in-app notifications (assignment, mention, changes); email and push/device notifications and reminders are out of scope.
 - **ASM-07 — Dark/light theme only**: Visual theming is limited to dark and light modes. Custom themes are out of scope.
 - **ASM-08 — Data format**: The relational schema in PostgreSQL is documented and inspectable; full export/import (Principle VII) keeps user data portable, consistent with the data-sovereignty principle.
 - **ASM-09 — Recurrence based on due date**: Next recurring task instance is calculated from the original due date, not the completion date, ensuring consistent scheduling.
+- **ASM-10 — Small team scale**: Small team (~10 users) on a single shared instance; not organizational multi-tenancy.
+- **ASM-11 — Google identity provider**: Google is the sole identity provider for the MVP.
 
 ---
 
-## 8. Out of Scope (OOS-01..OOS-12)
+## 8. Out of Scope (OOS-01..OOS-17)
 
 The following are explicitly excluded from this MVP iteration:
 
-- **OOS-01**: Multi-user collaboration, sharing, permissions
+- **OOS-01**: [PROMOTED to in-scope in v3.0.0 — see US-11, US-12] Multi-user collaboration, sharing, permissions
 - **OOS-02**: Cross-device sync, cloud storage
 - **OOS-03**: Mobile application, PWA
 - **OOS-04**: AI features (auto-categorization, summaries, suggestions)
 - **OOS-05**: External integrations (calendar, Slack, GitHub, email)
-- **OOS-06**: Push notifications, reminders
+- **OOS-06**: [PARTIALLY promoted in v3.0.0] In-app notifications are now in scope (US-16); push/device notifications and reminders remain out of scope.
 - **OOS-07**: File attachments on tasks
 - **OOS-08**: Subtasks (task nesting)
 - **OOS-09**: Custom views, saved filters
 - **OOS-10**: Custom theming beyond dark/light mode
 - **OOS-11**: Automations (if X then Y)
 - **OOS-12**: Plugin or extension system
+- **OOS-13**: Email notifications
+- **OOS-14**: Push/device notifications and reminders
+- **OOS-15**: Presence indicators and activity/audit feed
+- **OOS-16**: Anonymous/guest access and public share links
+- **OOS-17**: Organizations / multi-tenancy beyond the single team, and non-Google SSO / additional identity providers
 
 ---
 
 ## 9. Slicing Strategy
 
-The MVP is delivered through 12 sequential vertical slices, each independently shippable. See `specs/001-task-capture` through `specs/012-appearance-theming`. Slicing rationale follows constitution Principles I (Keyboard-First), III (Instant Response), and VIII (Test-First) — small slices keep feedback loops tight and constitution-compliance verifiable per increment.
+The MVP is delivered through 18 sequential vertical slices, each independently shippable. See `specs/001-accounts-and-auth` through `specs/018-appearance-theming`. Slicing rationale follows constitution Principles I (Keyboard-First), III (Instant Response), and VIII (Test-First) — small slices keep feedback loops tight and constitution-compliance verifiable per increment.
 
-Cross-cutting requirements are realized (not merely referenced) in every slice to which their scope applies: UI accessibility (FR-031, FR-042–FR-047) in every slice that renders UI, and resilience (FR-049, FR-050, FR-051) in every slice that modifies data. The full out-of-scope boundary (OOS-01–OOS-12) is confirmed in every slice.
+Cross-cutting requirements are realized (not merely referenced) in every slice to which their scope applies: UI accessibility (FR-031, FR-042–FR-047) in every slice that renders UI, and resilience (FR-049, FR-050, FR-051) in every slice that modifies data. The full out-of-scope boundary (OOS-01–OOS-17) is confirmed in every slice.
 
 High-level mapping (slice → coverage):
-- 001 task-capture — keyboard capture, single task list, core navigation/done/inline-rename/delete, server-side persistence, accessibility & resilience foundation
-- 002 natural-language-dates — Polish natural-language due-date parsing and parser-failure UX
-- 003 project-management — projects with one-level nesting, archive, Inbox definition, move-to-project
-- 004 daily-planning — Today & Upcoming views, priorities, full task editor, the mouse-free daily loop
-- 005 labels — reusable many-to-many labels and the label selector
-- 006 project-board-kanban — project Kanban board with status columns, groupable project list
-- 007 cycles — 2-week cycles, assignment, metrics, rollover, deletion guards
-- 008 recurring-tasks — recurrence rules and next-instance generation
-- 009 command-palette-search — Ctrl+K fuzzy search across tasks/projects/labels/actions, view filter
-- 010 undo — 30-second undo window for all destructive actions
-- 011 data-export-import — JSON/CSV export, TaskFlow/Todoist import with mapping preview
-- 012 appearance-theming — dark/light modes following the OS color scheme
+- 001 accounts-and-auth
+- 002 task-capture — keyboard capture, single task list, core navigation/done/inline-rename/delete, server-side persistence, accessibility & resilience foundation
+- 003 natural-language-dates — Polish natural-language due-date parsing and parser-failure UX
+- 004 project-management — projects with one-level nesting, archive, Inbox definition, move-to-project
+- 005 daily-planning — Today & Upcoming views, priorities, full task editor, the mouse-free daily loop
+- 006 labels — reusable many-to-many labels and the label selector
+- 007 project-sharing-membership
+- 008 task-assignment
+- 009 comments-mentions
+- 010 project-board-kanban — project Kanban board with status columns, groupable project list
+- 011 cycles — 2-week cycles, assignment, metrics, rollover, deletion guards
+- 012 recurring-tasks — recurrence rules and next-instance generation
+- 013 command-palette-search — Ctrl+K fuzzy search across tasks/projects/labels/actions, view filter
+- 014 undo — 30-second undo window for all destructive actions
+- 015 data-export-import — JSON/CSV export, TaskFlow/Todoist import with mapping preview
+- 016 real-time-collaboration
+- 017 notifications
+- 018 appearance-theming — dark/light modes following the OS color scheme
 
 Detailed per-ID mapping is maintained in each slice's spec.md Provenance section.
