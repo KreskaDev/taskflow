@@ -1,0 +1,159 @@
+openapi: '3.1.0'
+info:
+  title: TaskFlow API
+  version: 0.1.0
+  description: TaskFlow REST API. Slice 001 establishes auth endpoints and the error contract.
+
+servers:
+  - url: http://localhost:4311
+    description: Internal (Docker network / development)
+
+paths:
+  /api/users/ensure:
+    post:
+      operationId: ensureUser
+      tags: [internal]
+      summary: Create or match a user from Google identity
+      description: >
+        Called by the BFF during OAuth callback. Creates a new User if the
+        Google subject ID is unknown; returns the existing User if found.
+        Updates profile fields on every call.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnsureUserRequest'
+      responses:
+        '200':
+          description: User ensured (created or matched)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+
+  /api/users/me:
+    get:
+      operationId: getCurrentUser
+      tags: [users]
+      summary: Get the current user's profile
+      responses:
+        '200':
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+    delete:
+      operationId: deleteAccount
+      tags: [users]
+      summary: Delete the current user's account
+      description: >
+        Initiates irreversible account deletion with erasure cascade.
+        Sets deleted_at, invalidates all sessions, dispatches cascade event.
+      responses:
+        '204':
+          description: Account deleted
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+
+components:
+  schemas:
+    EnsureUserRequest:
+      type: object
+      required: [googleSubjectId, email, displayName]
+      properties:
+        googleSubjectId:
+          type: string
+          description: Google's `sub` claim
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+        avatarUrl:
+          type: string
+          format: uri
+
+    UserProfile:
+      type: object
+      required: [id, email, displayName, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+        avatarUrl:
+          type: string
+          format: uri
+        createdAt:
+          type: string
+          format: date-time
+
+    ProblemDetails:
+      type: object
+      description: RFC 9457 ProblemDetails — the canonical error envelope for all non-2xx responses (ADR-0009).
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: Error type URI
+        title:
+          type: string
+          description: Human-readable summary
+        status:
+          type: integer
+          description: HTTP status code
+        detail:
+          type: string
+          description: Human-readable explanation
+        instance:
+          type: string
+          format: uri
+          description: URI identifying the specific occurrence
+        errorCode:
+          type: string
+          enum:
+            - validation_failed
+            - unauthenticated
+            - forbidden
+            - not_found
+            - not_admitted
+            - conflict_lww
+            - last_owner
+            - internal_error
+          description: Stable machine-readable error code
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: Field-level validation errors (field path -> messages)
+
+  responses:
+    Unauthenticated:
+      description: Missing or invalid identity token
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: BFF-minted short-lived HMAC-SHA256 JWT (internal Docker network only)
+
+security:
+  - bearerAuth: []
