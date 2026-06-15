@@ -1,6 +1,6 @@
 # ADR-0001 — TaskFlow technical foundation
 
-**Status:** Accepted (2026-06-14); Decision 1 (single-user, no auth, no owner/org/role fields) superseded by ADR-0003/ADR-0004 under constitution v3.0.0 (collaborative multi-user). The stack decisions (2–10) remain in force.
+**Status:** Accepted (2026-06-14); Decision 1 (single-user, no auth, no owner/org/role fields) superseded by ADR-0003/ADR-0004 under constitution v3.0.0 (collaborative multi-user). The stack decisions (2–10) remain in force. Decision 6 (messaging transport) amended 2026-06-15 under constitution v4.0.0 — RabbitMQ is demoted from day-one transport to opt-in (see Decision 6 and Notes).
 **Supersedes:** the offline-only, local-first desktop assumption of constitution v1.1.0
 **Drives:** constitution v2.0.0 amendment and the product-vision technical-requirement updates
 
@@ -27,7 +27,11 @@ small set of requirements (FR-041, SC-004, etc.) are no longer accurate and must
 5. **Backend:** C# / ASP.NET Core with **full tactical DDD** — aggregate roots, value
    objects, domain events, repositories, and a CQRS command/query split.
 6. **Messaging & CQRS dispatch:** **Wolverine** for command/query handling and the
-   transactional outbox, with **RabbitMQ** as the message transport from day one.
+   transactional outbox, over a message transport that is **Wolverine durable
+   Postgres-backed local queues by default; RabbitMQ only when a real cross-process
+   consumer exists** (amended 2026-06-15 under constitution v4.0.0 — see Notes). Wolverine
+   keeps the transport swappable, so introducing RabbitMQ later is a low-cost, reversible
+   change.
 7. **Write persistence:** **EF Core** (code-first migrations) over **PostgreSQL**;
    aggregates are state-stored. Migrations are the schema source of truth.
 8. **Read side:** CQRS read projections (query handlers → DTOs) optimized for the view
@@ -66,8 +70,14 @@ small set of requirements (FR-041, SC-004, etc.) are no longer accurate and must
 
 ## Notes
 
-- **RabbitMQ was included against a YAGNI caution.** For a single-user, single-service app
-  there is no current cross-process consumer; Wolverine's durable Postgres-backed local
-  queues would cover the only async need in scope (FR-009 deferred recurrence). RabbitMQ was
-  adopted deliberately for an anticipated multi-service future; Wolverine keeps the transport
-  swappable, so this choice is reversible at low cost.
+- **RabbitMQ was originally included against a YAGNI caution; that caution is now resolved
+  in favour of local queues by default (amended 2026-06-15, constitution v4.0.0).** For the
+  current single-service deployment there is no real cross-process consumer, so **Wolverine's
+  durable Postgres-backed local queues are the default transport** — they cover the only async
+  need in scope (FR-009 deferred recurrence, a server-side Wolverine scheduled job). RabbitMQ
+  is adopted **only when a real cross-process consumer actually exists** (e.g. a genuine
+  second service), not pre-emptively for an anticipated multi-service future. Because
+  Wolverine keeps the transport swappable, deferring RabbitMQ — and introducing it later if a
+  consumer appears — is a low-cost, reversible decision. The constitution's Architecture &
+  Stack section and the remediation decision ledger both record this demotion; deployment
+  treats RabbitMQ as internal-only and present only if used.

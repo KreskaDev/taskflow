@@ -33,18 +33,19 @@ Cross-cutting (realized in this slice):
 - FR-049 (error message + recovery action)
 - FR-050 (structured error logging)
 - FR-051 (auto-backup before migration — infrastructure in place)
+- FR-101 (ARIA-live for server-initiated updates/toasts + dialog focus contract for the command palette)
 
-Access control (realized in this slice — Tier B):
-- FR-065 (every query scoped to data the caller owns or has membership access to — per-user isolation)
-- FR-066 (access to shared-project data requires membership)
+Access control (realized in this slice — dispatch by visibility):
+- FR-065 (authorization dispatched by the containing resource's visibility — ownership for personal/unprojected, membership+role for shared-project)
+- FR-066 (access to shared-project data requires current membership; createdBy/assignee are provenance only)
 - FR-067 (each operation requires sufficient role: viewer=read, editor=write, owner=manage)
 - FR-068 (authorization deny-by-default, enforced at the API/handler layer for every read and write)
 - SC-013 (authorization enforced on 100% of data operations; deny cases covered by integration tests)
 
-This slice's search/query handlers ENFORCE these checks at the handler level (they do not merely reference them): the command palette's fuzzy-search and the `/` view-filter run through access-scoped query handlers, so a caller's result set is restricted to tasks, projects, and labels they own (FR-065 per-user isolation) or can reach through shared-project membership (FR-066) at a sufficient role (FR-067), deny-by-default (FR-068). Items the caller may not access are never returned as results.
+This slice's search/query handlers ENFORCE these checks at the handler level (they do not merely reference them): the command palette's fuzzy-search and the `/` view-filter run through a server search endpoint whose authorization is dispatched by each candidate's visibility — personal/unprojected items authorize on ownership (`createdBy`/`ownerId`) scoped to the caller (FR-065), shared-project items on current `ProjectMembership` plus a sufficient role (FR-066, FR-067), deny-by-default (FR-068). This is not a conjunction of tiers, and `createdBy`/assignee confer no standalone access. Items the caller may not access are never returned as results, and on a leave/remove/unshare access-loss event the caller's result set is invalidated and refetched so a now-inaccessible item can never surface (FR-095).
 
 MVP boundary confirmed:
-- OOS-01..OOS-17 (full MVP out-of-scope confirmation)
+- OOS-01..OOS-19 (full MVP out-of-scope confirmation)
 
 Depends on:
 - Slice 004 (project-management) — provides the projects the palette searches and navigates to (US-04.AS-05), and the command-palette/dedicated-action surface through which "Create Project" is exposed as a searchable action (US-04.AS-04)
@@ -77,7 +78,7 @@ User presses `Ctrl+K` to open a command palette that provides fuzzy search acros
 6. **(US-04.AS-06) Given** the command palette is open, **When** user presses Esc, **Then** the palette closes and focus returns to the previous view.
 7. **(US-04.AS-07) Given** the app has 10,000+ tasks, **When** user types in the command palette, **Then** results appear in under 50ms.
 
-> Access-scoping note: every result above is access-scoped. The palette only surfaces tasks, projects, and labels the current user owns (FR-065 per-user isolation) or can reach through shared-project membership at a sufficient role (FR-066, FR-067), enforced deny-by-default at the query-handler layer (FR-068). A task or project the caller cannot access never appears as a result, and selecting a result never navigates the caller into data they lack access to. The matches in US-04.AS-02 and US-04.AS-05 are drawn from the caller's accessible working set, not the whole team's data.
+> Access-scoping note: every result above is access-scoped. Authorization is dispatched by each candidate's visibility — the palette surfaces personal/unprojected tasks, projects, and labels the current user owns (`createdBy`/`ownerId`, FR-065) and shared-project items the user can reach through current `ProjectMembership` at a sufficient role (FR-066, FR-067), enforced deny-by-default at the server search endpoint (FR-068). This is not a Tier-conjunction, and `createdBy`/assignee are provenance only — they grant no standalone access. A task or project the caller cannot access never appears as a result, and selecting a result never navigates the caller into data they lack access to. The matches in US-04.AS-02 and US-04.AS-05 are drawn from the caller's accessible working set, not the whole team's data; the 10,000+ tasks of US-04.AS-07 are that per-user authorization-scoped accessible working set, not a flat global list.
 
 ---
 
@@ -120,19 +121,20 @@ Accessibility (per Constitution Principle II):
 - **FR-045**: Custom keyboard shortcuts MUST NOT collide with native assistive-technology bindings.
 - **FR-046**: No content may be accessible only via hover — all tooltips and popovers MUST have a keyboard/focus-triggered equivalent.
 - **FR-047**: Animations MUST respect the `prefers-reduced-motion` user preference; when reduced motion is active, transitions MUST be instant or under 100ms.
+- **FR-101**: Server-initiated updates and toasts MUST be conveyed to assistive technology via an appropriate ARIA live region without stealing focus, and confirmation/command-palette dialogs MUST follow the dialog focus contract (set initial focus, trap focus, dismiss on Esc, return focus to the invoker on close).
 
 Error Handling & Data Integrity (per Constitution Principle VII):
 - **FR-049**: All errors MUST be presented to the user with a clear message and an actionable recovery suggestion. No operation may fail silently.
 - **FR-050**: Errors MUST be logged with structured context (severity level, operation context, and error details) for debugging purposes.
 - **FR-051**: Before any data migration, the system MUST automatically create a backup of user data. The user MUST be able to restore from this backup.
 
-Access Control (Tier B — per Constitution Principle IX; enforced in this slice's search/query handlers):
-- **FR-065**: Every query MUST be scoped to data the caller owns or has membership access to (per-user isolation).
-- **FR-066**: Access to a shared project's data MUST require membership in that project.
-- **FR-067**: Each operation MUST require sufficient role (viewer=read, editor=write, owner=manage); insufficient role MUST be denied.
+Access Control (dispatch by visibility — per Constitution Principle IX; enforced in this slice's search/query handlers):
+- **FR-065**: Authorization MUST be dispatched by the containing resource's visibility (not a conjunction of tiers): personal/unprojected data authorizes on ownership (`createdBy`/`ownerId`) with queries scoped to the caller; shared-project entities authorize on current `ProjectMembership` + role. Every query MUST be scoped accordingly (per-user isolation).
+- **FR-066**: Access to a shared project's data MUST require current membership in that project. `createdBy` and assignee are provenance only and confer NO standalone access; on leave/remove/unshare a user MUST lose ALL access to that project's data regardless of authorship or assignment.
+- **FR-067**: Each operation on a shared-project resource MUST require sufficient role (viewer=read, editor=write, owner=manage); insufficient role MUST be denied.
 - **FR-068**: Authorization MUST be deny-by-default and enforced at the API/handler layer for every read and write.
 
-These are enforced at the handler level, not merely referenced: the fuzzy-search and `/` view-filter both execute through access-scoped query handlers, so a caller's palette and filter results contain only items they own (FR-065) or can reach through shared-project membership (FR-066) at a sufficient role (FR-067), deny-by-default (FR-068). Inaccessible tasks, projects, and labels are excluded from results.
+These are enforced at the handler level, not merely referenced: the fuzzy-search and `/` view-filter both execute through the server search endpoint, whose authorization is dispatched per candidate's visibility — a caller's palette and filter results contain only personal/unprojected items they own (FR-065) and shared-project items they can reach through current membership (FR-066) at a sufficient role (FR-067), deny-by-default (FR-068). This is not a Tier-A/Tier-B conjunction, and `createdBy`/assignee never act as a standalone grant. Inaccessible tasks, projects, and labels are excluded from results, and an access-loss event (leave/remove/unshare) invalidates and refetches the result set (FR-095) so a now-inaccessible item can never surface.
 
 ### Key Entities
 
@@ -147,16 +149,19 @@ This slice introduces no new entity and populates no entity attribute. The comma
 
 ## Constitution Compliance
 
-This slice is evaluated against constitution v3.0.0. Cross-cutting principles realized here:
+This slice is evaluated against constitution v4.0.0. Cross-cutting principles realized here:
 
 - **I. Keyboard-First**: the palette is the central keyboard-first navigation hub — opened with `Ctrl+K`, driven entirely by typing and Enter/Esc, with no mouse required. This slice completes the global-shortcut grammar (FR-027) begun in slice 002, so the full global shortcut set (`C`, `Ctrl+K`, `/`, `?`) is now consistent and composable across all views, and FR-033 surfaces each action's shortcut, keeping shortcuts discoverable.
-- **II. Accessibility (WCAG 2.1 AA)**: FR-042 (focus indicator on the search input and every result), FR-043 (ARIA roles/labels for the palette overlay and its listbox/option semantics), FR-044 (contrast ≥ 4.5:1), FR-045 (no AT-binding collisions — relevant since `Ctrl+K` and `/` join the active set), FR-046 (no hover-only content), FR-047 (prefers-reduced-motion for the overlay transition). FR-031 keeps single-key shortcuts from hijacking text entry inside the palette and the `/` filter input.
+- **II. Accessibility (WCAG 2.1 AA)**: FR-042 (focus indicator on the search input and every result), FR-043 (ARIA roles/labels for the palette overlay and its listbox/option semantics), FR-044 (contrast ≥ 4.5:1), FR-045 (no AT-binding collisions — relevant since `Ctrl+K` and `/` join the active set), FR-046 (no hover-only content), FR-047 (prefers-reduced-motion for the overlay transition). FR-031 keeps single-key shortcuts from hijacking text entry inside the palette and the `/` filter input. FR-101 governs the command palette as a dialog: opening it sets initial focus into the search input (US-04.AS-01) and traps focus while open, Esc dismisses it and returns focus to the invoking view (US-04.AS-06); the live, server-fetched result list is announced to assistive technology via a polite ARIA live region without stealing focus as the caller types.
 - **III. Instant Response**: US-04.AS-01 (palette open within 16ms) and US-04.AS-02 / US-04.AS-07 / SC-009 (results under 50ms, including at 10,000+ tasks) keep the palette within the instant-response envelope; the keypress-to-paint and virtualization performance criteria themselves are owned by slice 002. Search and navigation are read-only, so this slice initiates no optimistic mutation; the real-time reconciliation clause (server-initiated SignalR updates yielding to in-flight local edits under last-write-wins) is owned by slice 016 (real-time-collaboration) and is not exercised here, though a live remote change to an accessible item will be reflected in subsequently issued search results.
-- **V. Connected, Server-Authoritative**: this is a connected multi-user web app. Fuzzy search runs either over a client-side index built after the user's accessible data loads, or against a server search endpoint exposed by the C# API — either path meeting the under-50ms budget and either path constrained to the caller's access-scoped working set. PostgreSQL, accessed through the C# API, remains the source of truth for the tasks, projects, and labels the palette searches over; the client holds no authoritative copy.
+- **V. Connected, Server-Authoritative**: this is a connected multi-user web app. Fuzzy search runs against a server search endpoint exposed by the C# API (not a client-only index), with authorization filtering applied INSIDE the under-50ms budget over the caller's access-scoped working set; the caller's accessible-project set is resolved cheaply (cached per session) so the authorization filter stays within budget. PostgreSQL, accessed through the C# API, remains the source of truth for the tasks, projects, and labels the palette searches over; the client holds no authoritative copy.
 - **VI. Type Safety End-to-End**: palette result types (task / project / label / action) are discriminated and typed; the search query boundary is validated at runtime, and action descriptors carry their typed shortcut bindings for FR-033.
 - **VII. Data Integrity & Resilience**: search and navigation are read-only over existing data, so no data is mutated here; FR-049 (clear message + recovery) and FR-050 (structured logging) cover any palette/search failure, and FR-051 keeps the backup hook in place. Skeleton screens are permitted for the network-bound initial load of the searchable working set (Principle IV), but MUST NOT mask a result that is already available.
 - **VIII. Test-First**: each owned acceptance scenario above (US-04.AS-01..AS-07 and US-08.AS-08) is independently testable (Red-Green-Refactor), including authorization tests that a caller never receives results for tasks, projects, or labels they cannot access (FR-065..FR-068, SC-013). Because the search & command journey lands here as the fifth primary journey, SC-006 (all five journeys pass end-to-end) is reached at this slice.
-- **IX. Authentication & Authorization**: this slice authorizes its own operations deny-by-default at the query-handler layer. Its only operations are reads (fuzzy search, `/` view-filter, result navigation), so authorization reduces to scoping the result set: per-user isolation (FR-065) restricts results to data the caller owns, and for shared projects membership (FR-066) plus a sufficient role (FR-067) gates inclusion, all deny-by-default (FR-068). Because this is a Tier B slice, the handlers apply both the Tier A per-user isolation check and the Tier B membership/role check before any task, project, or label can appear as a search result or be navigated to. SC-013 covers enforcement on 100% of these read operations.
+- **IX. Authentication & Authorization**: this slice authorizes its own operations deny-by-default at the server search endpoint / query-handler layer. Its only operations are reads (fuzzy search, `/` view-filter, result navigation), so authorization reduces to scoping the result set, and that scoping is dispatched by each candidate's visibility — NOT a conjunction of tiers. Personal/unprojected items authorize on ownership (`createdBy`/`ownerId`) with the query scoped to the caller (FR-065); shared-project items authorize on current `ProjectMembership` plus a sufficient role (FR-066, FR-067); all deny-by-default (FR-068). `createdBy` and assignee are provenance only and never grant standalone access, and on leave/remove/unshare the affected caller loses ALL access to that project's items so they stop appearing as results. SC-013 covers enforcement on 100% of these read operations; SC-016 covers the allow+deny test matrix for the search/filter handlers.
+- **X. Time & Timezone**: this slice performs no date-relative computation — search and the `/` filter match on text (title, description, project/label name, action), not on Today/Upcoming membership, cycle boundaries, or recurrence. Any due dates shown in results are display-only and rendered against the single instance reference timezone `Europe/Warsaw` (FR-092); the slice introduces no new time rule of its own.
+- **XI. Privacy & Personal Data**: search must never become a back-channel to data a caller has lost access to. An access-loss event — a member leaving, being removed, a project being unshared, or an account being deleted — MUST invalidate and refetch the caller's (and, for membership loss, the removed member's) search/filter result set so a now-inaccessible task, project, or label can never surface as a result (consistent with FR-095 live-subscription re-authorization and the FR-066 revoke-all-on-leave rule). The palette holds no separate authoritative cache that could outlive a revocation.
+- **XII. Security by Default**: the palette renders untrusted user-authored content — task titles and markdown descriptions (which FR-032 searches) and label names — so every result label and snippet MUST be output-encoded/sanitized to the safe subset on render; raw HTML injection through a crafted task title, description, or label name MUST be impossible (FR-099). Search query input crossing the API boundary is validated (Principle VI); no secret is read or emitted by this slice (FR-100).
 
 No compliance gap is introduced by this slice. The palette's read-only behavior introduces no destructive action, so the Principle VII undo requirement (FR-040, owned by slice 014) does not apply here.
 
@@ -166,7 +171,7 @@ No assumptions (ASM-NN) are assigned to this slice in product-vision.md. The mul
 
 ## Out of Scope
 
-This slice confirms the full MVP out-of-scope boundary (OOS-01..OOS-17 from product-vision.md):
+This slice confirms the full MVP out-of-scope boundary (OOS-01..OOS-19 from product-vision.md):
 
 - **OOS-01**: [PROMOTED to in-scope in v3.0.0 — see US-11, US-12] Multi-user collaboration, sharing, permissions
 - **OOS-02**: Cross-device sync, cloud storage
@@ -185,5 +190,7 @@ This slice confirms the full MVP out-of-scope boundary (OOS-01..OOS-17 from prod
 - **OOS-15**: Presence indicators and activity/audit feed
 - **OOS-16**: Anonymous/guest access and public share links
 - **OOS-17**: Organizations / multi-tenancy beyond the single team, and non-Google SSO / additional identity providers
+- **OOS-18**: Pending / pre-account invitations (invites are by email resolved against existing signed-in Users only)
+- **OOS-19**: Per-user timezones (the instance uses a single reference timezone, ASM-12)
 
 Also out of scope for this slice specifically (deferred to later slices within the MVP): switching the visual theme via the command palette (FR-048) is owned by slice 018 (appearance-theming) — the palette becomes a surface for that action there, not here; the 30-second undo window for destructive actions (FR-040 / US-09) is owned by slice 014 (undo) and does not apply to this slice's read-only search and navigation. This slice covers the command palette, its fuzzy search across tasks/projects/labels/actions, action-shortcut display, result navigation/execution, and the `/` current-view filter only — all access-scoped to the caller (FR-065..FR-068). Defining the access model itself (membership and roles) is owned by slice 007 (project-sharing-membership); this slice consumes that model to scope results.

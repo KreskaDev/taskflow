@@ -13,7 +13,7 @@ TaskFlow MVP — core task management application combining Todoist simplicity w
 
 ---
 
-## 2. User Stories (US-01..US-16 + acceptance scenarios)
+## 2. User Stories (US-01..US-17 + acceptance scenarios)
 
 ### US-01 — Daily Task Capture (Priority: P1)
 
@@ -216,15 +216,15 @@ User creates, edits, archives, and organizes projects with one level of nesting 
 
 ### US-11 — Account & Sign-In (Priority: P1)
 
-A team member signs in with Google to reach their tasks and shared projects (open sign-up); can sign out; profile shows Google name/avatar.
+A team member signs in with Google to reach their tasks and shared projects; sign-in is admission-gated (allowlist / Google Workspace `hd`); can sign out; profile shows Google name/avatar.
 
 **Why this priority**: Authentication is the gate to every collaborative feature — without an identity there are no personal data, no shared projects, and no authorization. This is the foundation the multi-user product stands on.
 
-**Independent Test**: Can be tested by signing in with Google as a new visitor, verifying account creation and landing in the workspace, then signing out and confirming protected views are no longer accessible.
+**Independent Test**: Can be tested by signing in with Google as an admitted visitor, verifying account creation and landing in the workspace, confirming a non-admitted sign-in is rejected, then signing out and confirming protected views are no longer accessible.
 
 **Acceptance Scenarios**:
 
-1. **Given** a signed-out visitor, **When** they choose "Sign in with Google" and complete OAuth, **Then** a new account is created or a returning one matched, and they land in their workspace.
+1. **Given** a signed-out admitted visitor, **When** they choose "Sign in with Google" and complete OAuth, **Then** a new account is created or a returning one matched, and they land in their workspace; a non-admitted sign-in (not on the allowlist / outside the Workspace `hd`) is rejected and no account is created.
 2. **Given** a signed-in user, **When** they sign out, **Then** the session ends and protected views are no longer accessible.
 3. **Given** an unauthenticated request to any protected route/endpoint, **When** it is made, **Then** it is denied (deny-by-default) and the user is directed to sign in.
 4. **Given** a signed-in user, **When** they open their profile, **Then** their Google display name and avatar are shown.
@@ -242,7 +242,7 @@ An owner shares a personal project, invites members with roles (owner/editor/vie
 **Acceptance Scenarios**:
 
 1. **Given** an owner of a personal project, **When** they share it and invite a member, **Then** the project becomes shared and the member gains access at the assigned role.
-2. **Given** an owner, **When** they set a member's role to viewer/editor/owner, **Then** that member's permissions change accordingly.
+2. **Given** an owner, **When** they change a member's assignable role between editor and viewer (owner is reached only via the explicit FR-094 ownership-transfer command, not by promoting a member into an "owner" role), **Then** that member's permissions change accordingly.
 3. **Given** a viewer, **When** they attempt to modify a task in the shared project, **Then** the action is denied (read-only).
 4. **Given** an owner, **When** they remove a member (after confirmation), **Then** that member loses access and is unassigned from the project's tasks.
 5. **Given** a non-owner member, **When** they leave a shared project, **Then** they lose access and are unassigned from its tasks.
@@ -317,7 +317,24 @@ Members get in-app notifications when assigned, @mentioned, or when items they a
 
 ---
 
-## 3. Functional Requirements (FR-001..FR-084)
+### US-17 — Account & Data Management (Priority: P2)
+
+A signed-in user can export the data they own/can access, and can delete their account, which erases or anonymizes their personal data across the system per the defined cascade. Account deletion is irreversible and is distinct from signing out.
+
+**Why this priority**: Holding Google-derived personal data carries a privacy obligation: a user must be able to take their data out and to have it removed. This is a trust and compliance requirement (Constitution Principle XI), not part of the daily flow, so it ranks below the core loops but above optional enhancements.
+
+**Independent Test**: Can be tested by signing in, exporting one's own data and verifying scope (only owned/accessible data), then deleting the account and verifying the user can no longer sign in and that their personal data has been erased or anonymized (owned shared projects transferred or deleted, authored comments anonymized, createdBy/assignee references nulled or reassigned, notifications purged).
+
+**Acceptance Scenarios**:
+
+1. **Given** a signed-in user with tasks, projects, labels, and cycles, **When** they export their data, **Then** an export is produced scoped to the data they own or can access (not other users' private data).
+2. **Given** a signed-in user, **When** they request account deletion and confirm, **Then** their account is deleted and they can no longer sign in with it.
+3. **Given** a user who deletes their account, **When** the erasure cascade runs, **Then** their owned shared projects are transferred or deleted, their authored comments are anonymized to a tombstone identity, their createdBy/assignee references are nulled or reassigned, and their notifications are purged.
+4. **Given** a user who deletes their account, **When** the deletion completes, **Then** comments they authored that anchor a thread remain present but attributed to the anonymized tombstone identity rather than being hard-deleted.
+
+---
+
+## 3. Functional Requirements (FR-001..FR-101)
 
 ### Task Management
 - **FR-001**: System MUST allow creating a task with a mandatory title field.
@@ -327,8 +344,8 @@ Members get in-app notifications when assigned, @mentioned, or when items they a
 - **FR-005**: System MUST parse natural language date expressions in Polish ("jutro", "piatek", "za 3 dni", "po 17", "30.06") and set the due date accordingly.
 - **FR-006**: When the natural language date parser cannot interpret input, the system MUST retain the previous date value and display a red error message "nie rozpoznano" below the date field.
 - **FR-007**: System MUST support recurring tasks with the following schedules: daily, every N days, specific weekdays, monthly.
-- **FR-008**: When a recurring task instance is marked as done (on or after its due date), the system MUST automatically generate the next instance with the appropriate due date according to the recurrence rule. The new instance MUST carry forward all fields from the completed instance (title, description, priority, labels, project, assignees) except: status (reset to backlog), timestamps (new created_at, no completed_at), and cycle assignment (new instance is unassigned to any cycle — the user assigns it manually). The new instance keeps the same assignees.
-- **FR-009**: When a recurring task instance is marked as done before its due date, the system MUST NOT generate the next instance immediately. The next instance MUST be generated when the application is opened on or after the original due date (checked at application startup and periodically while running).
+- **FR-008**: When a recurring task instance is marked as done (on or after its due date), the system MUST automatically generate the next instance with the appropriate due date according to the recurrence rule. The new instance MUST carry forward all fields from the completed instance (title, description, priority, labels, project, assignees) AND the recurrence rule and its anchor, so the chain continues across successive instances (a second successor MUST be generable from the first), except: status (reset to backlog), timestamps (new created_at, no completed_at), and cycle assignment (new instance is unassigned to any cycle — the user assigns it manually). The new instance keeps the same assignees, but carried-forward assignees MUST be re-validated against current project membership (with no re-notification).
+- **FR-009**: When a recurring task instance is marked as done before its due date, the system MUST NOT generate the next instance immediately. The next instance MUST be generated by a server-side scheduled job (Wolverine) that runs on or after the original due date — not by client startup. The job MUST be idempotent (at most one successor per completed instance), and undoing the completion MUST remove the spawned successor.
 - **FR-010**: When a recurring task is cancelled, the system MUST stop generating further instances.
 
 ### Project Management
@@ -366,12 +383,12 @@ Members get in-app notifications when assigned, @mentioned, or when items they a
 - **FR-034**: Selecting a result in the command palette MUST navigate to the item or execute the action.
 
 ### Data Management
-- **FR-035**: System MUST support full data export in JSON format (lossless, all entities and fields).
+- **FR-035**: System MUST support full data export in JSON format (lossless, all entities and fields), scoped to the data the caller owns or can access (not other users' private data).
 - **FR-036**: System MUST support full data export in CSV format (human-readable).
 - **FR-037**: System MUST support import from TaskFlow JSON export with full fidelity.
 - **FR-038**: System MUST support import from Todoist CSV with best-effort mapping: projects to projects, labels to labels, priority p1 (highest) to P0 (highest), p2 to P1, p3 to P2, p4 (lowest) to P3 (lowest).
 - **FR-039**: When importing CSV with unmappable columns, the system MUST show a preview with the mapping for user acceptance before proceeding.
-- **FR-040**: System MUST provide a 30-second undo window for all destructive and irreversible actions, including but not limited to: task deletion, project deletion, bulk moves, bulk status changes, and cycle rollover operations.
+- **FR-040**: System MUST provide a 30-second undo window for all destructive and irreversible actions on task/project data, including but not limited to: task deletion (including cascade delete of a project's tasks), project deletion, bulk moves, bulk status changes, and cycle rollover operations. Undo restore is a normal optimistic write subject to last-write-wins (Principle III): it fans out over SignalR and "fully restores previous state" only in the no-concurrent-edit case — when a concurrent edit was overwritten, the overwrite MUST be surfaced (FR-049). Deleted data MUST be soft-deleted (see FR-097) so it can be restored within the window; if the parent (e.g., project) was deleted, restore falls back to Inbox/backlog with a recovery message. Only the original actor (scoped by their current role) may undo. Membership and role changes are NOT covered by this undo (FR-064).
 - **FR-041**: All task data MUST be persisted server-side in PostgreSQL through the application's own API; the client holds no authoritative copy. The application MUST depend on no third-party runtime data service — only its own API and database.
 
 ### Accessibility (per Constitution Principle II)
@@ -393,7 +410,7 @@ Members get in-app notifications when assigned, @mentioned, or when items they a
 - **FR-051**: Before any data migration, the system MUST automatically create a backup of user data. The user MUST be able to restore from this backup.
 
 ### Authentication & Authorization
-- **FR-052**: System MUST support sign-in via Google OAuth with open sign-up; first-time sign-in creates an account, returning sign-in matches the existing one.
+- **FR-052**: System MUST support sign-in via Google OAuth with admission-gated sign-up (see FR-087): first-time sign-in by an admitted user creates an account, returning sign-in matches the existing one, and non-admitted sign-ins are rejected.
 - **FR-053**: Sessions MUST be HttpOnly cookies issued and managed by the web BFF; auth tokens MUST NOT be exposed to client JavaScript.
 - **FR-054**: System MUST allow sign-out, ending the session.
 - **FR-055**: Unauthenticated requests to protected routes/endpoints MUST be denied (deny-by-default) and directed to sign-in.
@@ -402,13 +419,13 @@ Members get in-app notifications when assigned, @mentioned, or when items they a
 - **FR-058**: An owner MUST be able to convert a personal project to shared and to revert a shared project to personal (unshare).
 - **FR-059**: On unshare, all non-owner members MUST lose access and their assignments on that project's tasks MUST be cleared.
 - **FR-060**: An owner MUST be able to invite a user to a shared project and assign a role.
-- **FR-061**: System MUST support three per-shared-project roles: owner (manage members, share/unshare, delete), editor (change tasks, comment), viewer (read-only, no commenting).
-- **FR-062**: An owner MUST be able to change a member's role and remove a member; removal MUST unassign that member from the project's tasks.
+- **FR-061**: System MUST support per-shared-project roles with the owner capability set (manage members, share/unshare, delete), editor (change tasks, comment), and viewer (read-only, no commenting). Only editor and viewer are freely assignable roles; owner is the immutable `ownerId` and is NOT a freely assignable role (see FR-094). The last owner MUST NOT be removable, demotable, or able to leave (recoverable FR-049 error).
+- **FR-062**: An owner MUST be able to change a member's assignable role (editor/viewer) and remove a member; removal MUST unassign that member from the project's tasks. Ownership moves only via an explicit transfer-owner command (FR-094), never by promoting a member to an "owner" role.
 - **FR-063**: A non-owner member MUST be able to leave a shared project, losing access and being unassigned from its tasks.
 - **FR-064**: Membership and role changes (invite, role change, remove, leave, unshare) MUST require explicit confirmation and MUST NOT be covered by the 30-second data undo (FR-040).
-- **FR-065**: Every query MUST be scoped to data the caller owns or has membership access to (per-user isolation).
-- **FR-066**: Access to a shared project's data MUST require membership in that project.
-- **FR-067**: Each operation MUST require sufficient role (viewer=read, editor=write, owner=manage); insufficient role MUST be denied.
+- **FR-065**: Authorization MUST be dispatched by the containing resource's visibility (not a conjunction of tiers): personal/unprojected data authorizes on ownership (`createdBy`/`ownerId`) with queries scoped to the caller; shared-project entities authorize on current `ProjectMembership` + role. Every query MUST be scoped accordingly (per-user isolation).
+- **FR-066**: Access to a shared project's data MUST require current membership in that project. `createdBy` and assignee are provenance only and confer NO standalone access; on leave/remove/unshare a user MUST lose ALL access to that project's data regardless of authorship or assignment.
+- **FR-067**: Each operation on a shared-project resource MUST require sufficient role (viewer=read, editor=write, owner=manage); insufficient role MUST be denied.
 - **FR-068**: Authorization MUST be deny-by-default and enforced at the API/handler layer for every read and write.
 
 ### Collaboration
@@ -416,20 +433,51 @@ Members get in-app notifications when assigned, @mentioned, or when items they a
 - **FR-070**: Editors/owners MUST be able to add/remove assignees; assigning a member MUST notify them.
 - **FR-071**: System MUST provide an "Assigned to me" view listing tasks across shared projects where the current user is an assignee.
 - **FR-072**: Editors and owners MUST be able to post comments on tasks in shared projects; viewers MUST NOT be able to comment.
-- **FR-073**: A comment MUST record author and creation timestamp and support @mentions of project members.
+- **FR-073**: A comment MUST record its author as a distinct object-level grant (author and creation timestamp) and support @mentions of project members. Comment content MUST satisfy the safety rules in FR-098.
 - **FR-074**: An @mention MUST notify the mentioned member.
-- **FR-075**: A comment's author MUST be able to edit and delete their own comments.
+- **FR-075**: A comment's author — and only the author — MUST be able to edit and delete their own comments; project role (including owner) MUST NOT override this authorship grant, but loss of project membership MUST override it (a non-member loses the author right).
 
 ### Real-time & Notifications
 - **FR-076**: Changes to a shared item MUST propagate to other members' open shared views in real time (SignalR) within the fan-out budget.
 - **FR-077**: An inbound real-time update MUST NOT overwrite an in-flight local optimistic edit; it reconciles under last-write-wins after the local mutation's server-ack.
 - **FR-078**: On reconnect after a dropped connection, the client MUST re-sync the current state of visible shared views.
-- **FR-079**: System MUST generate an in-app notification when a user is assigned to a task, @mentioned, or when a task they are an assignee of changes.
-- **FR-080**: System MUST present a notification center listing the user's notifications newest-first with read/unread state.
+- **FR-079**: System MUST generate an in-app notification when a user is assigned to a task, @mentioned, or when a task they are an assignee of changes. The "changed" trigger set is closed to: status, due date, assignee, and project-move; low-signal edits (e.g., description typos) MUST NOT notify. Rapid successive changes MUST be coalesced, and a change made by the recipient themselves MUST NOT notify them (self-suppression via `actorUserId`).
+- **FR-080**: System MUST present a notification center listing the user's notifications newest-first with read/unread state. Resolving a notification's source MUST re-run deny-by-default authorization at read time (the source is a live reference, see FR-096); a source no longer accessible MUST render as "no longer available".
 - **FR-081**: When the user is online, a new notification MUST also surface as a live toast.
 - **FR-082**: Users MUST be able to mark a notification read and mark all read.
 - **FR-083**: Users MUST be able to set per-type notification preferences (enable/disable a type).
 - **FR-084**: Notifications MUST be in-app only; email and push/device notifications are out of scope.
+
+### Privacy & Account (per Constitution Principle XI)
+- **FR-085**: System MUST provide an account-deletion path with a defined erasure cascade: anonymize the user's authored comments to a tombstone identity (not hard-deleting comments that anchor a thread); null or reassign `createdBy`/assignee references on tasks; transfer or delete the user's owned shared projects; and purge the user's recipient notifications.
+- **FR-086**: System MUST state an explicit data-retention stance: backups, soft-deleted/undo-window data, comments, and notifications are retained until account deletion.
+
+### Authentication & Admission (per Constitution Principle IX)
+- **FR-087**: System MUST gate account creation by admission control — an explicit email allowlist or a Google Workspace hosted-domain (`hd`); sign-in is NOT open to any Google account, and non-admitted sign-ins MUST be rejected.
+- **FR-088**: Sessions MUST follow a documented policy: a server-enforced absolute lifetime and idle timeout, a new session id issued at OAuth completion (fixation defense), server-side invalidation on sign-out, backed by a Postgres-backed session store.
+- **FR-089**: The session cookie MUST set an explicit `SameSite` value, and every state-changing request through the BFF MUST be CSRF-protected (origin check or anti-CSRF token).
+- **FR-090**: The OAuth flow MUST use `state`, `nonce`, and PKCE and MUST validate the id_token.
+- **FR-091**: The BFF→API identity carrier MUST be integrity-protected (a signed, short-lived token over the internal network); the API port MUST NOT be externally reachable.
+
+### Time (per Constitution Principle X)
+- **FR-092**: All timestamps MUST be stored in UTC, and every date-relative computation (Today/Upcoming membership, cycle boundaries, recurrence rollover, natural-language date resolution) MUST be evaluated against a single instance reference timezone, `Europe/Warsaw`, applied identically on client and server. A due date MUST distinguish date-only from date-time via a `has_time` flag, and DST transitions MUST be handled by the timezone library, not fixed-offset arithmetic.
+
+### Error Contract (per Constitution Principle VI / ADR-0009)
+- **FR-093**: The API error contract MUST be ProblemDetails (RFC 9457) with a field-level validation extension and a stable machine-readable error-code enum, modeled by the generated TypeScript client and Zod.
+
+### Authorization hardening (per Constitution Principle IX)
+- **FR-094**: System MUST provide an explicit ownership transfer command, guarded so the last owner cannot be removed, demoted, or leave (recoverable FR-049 error).
+- **FR-095**: A membership or role change MUST immediately revoke or re-authorize the affected user's active real-time (SignalR) subscriptions — a removed member receives no further live patches and is forced to a no-access (403) re-sync.
+- **FR-096**: Resolving a notification's source MUST re-run deny-by-default authorization; the payload MUST carry no content beyond what current authorization permits, and a denied source MUST surface as "no longer available".
+- **FR-097**: Deletions that are undoable MUST be soft-deletes (a `deleted_at` tombstone), excluded from authorization-scoped queries, and reaped after the 30-second undo window elapses.
+
+### Security (per Constitution Principle XII)
+- **FR-098**: Comment content MUST be safety-bounded: a maximum length, empty comments rejected, output sanitized to a constrained safe subset (plain text + safe markdown), and an @mention stored as a typed token referencing a User id.
+- **FR-099**: User-authored content MUST be output-encoded/sanitized so raw HTML injection is impossible, and a Content-Security-Policy plus standard security response headers MUST be present in production.
+- **FR-100**: Secrets (session signing key, OAuth client secret, database/broker credentials, deploy keys) MUST be injected at runtime via environment or a secret store, never committed to the repository or baked into images, and MUST NOT appear in logs or error context.
+
+### Accessibility (per Constitution Principle II)
+- **FR-101**: Server-initiated updates and toasts MUST be conveyed to assistive technology via an appropriate ARIA live region without stealing focus, and confirmation/command-palette dialogs MUST follow the dialog focus contract (set initial focus, trap focus, dismiss on Esc, return focus to the invoker on close).
 
 ---
 
@@ -439,7 +487,7 @@ Members get in-app notifications when assigned, @mentioned, or when items they a
 - **EC-02 — Natural language date parsing failure**: When the date parser cannot interpret the user's input, the date field retains its previous value (or remains empty for new tasks) and a red error message "nie rozpoznano" appears below the field.
 - **EC-03 — Deleting a project with tasks**: User is prompted with three options: cascade delete, move to Inbox, or archive with tasks.
 - **EC-04 — Deleting an active cycle**: The system prevents this; the cycle must be closed first.
-- **EC-05 — Recurring task early completion**: If a recurring task is completed before its due date, no new instance is spawned immediately. The system generates the deferred instance on the next application startup on or after the due date, or during periodic checks while the app is running.
+- **EC-05 — Recurring task early completion**: If a recurring task is completed before its due date, no new instance is spawned immediately. The deferred instance is generated by a server-side scheduled job (Wolverine) that runs on or after the original due date, not by client startup.
 - **EC-06 — 10,000+ tasks performance**: List views use virtualization to maintain 60fps scrolling. Search returns results in under 50ms regardless of dataset size.
 - **EC-07 — Import with unmappable columns**: The import preview clearly marks unmapped columns. User can proceed (ignoring them) or cancel.
 - **EC-08 — Keyboard shortcuts in text inputs**: When a text input is focused, single-key shortcuts (C, E, 1-4, etc.) are treated as text input, not commands. Only modifier-based shortcuts (Ctrl+K, Ctrl+Enter) remain active.
@@ -450,13 +498,13 @@ Members get in-app notifications when assigned, @mentioned, or when items they a
 
 ---
 
-## 5. Success Criteria (SC-001..SC-015)
+## 5. Success Criteria (SC-001..SC-017)
 
 - **SC-001**: User can perform a complete daily workflow (capture task, review today's tasks, reprioritize, reschedule, mark done) without using the mouse at any point.
 - **SC-002**: Application reaches first contentful paint in under 1 second and time-to-interactive in under 2.5 seconds on a broadband connection from a warm backend.
 - **SC-003**: Every user action on a task (create, edit, complete, delete, move, reprioritize) paints its optimistic result within 16ms of the triggering keypress; the server reconciles or rolls back asynchronously.
 - **SC-004**: Application depends on no third-party runtime data services — only its own API and PostgreSQL database; there are no external SaaS data dependencies at runtime.
-- **SC-005**: Exporting all data to JSON and re-importing produces an identical dataset with zero data loss.
+- **SC-005**: Exporting the data the caller owns/can access to JSON and re-importing produces an identical dataset (within that owner-scoped set) with zero data loss.
 - **SC-006**: All five primary user journeys (daily capture, planning session, project work, cycle review, search & command) pass end-to-end automated tests.
 - **SC-007**: Codebase enforces strict type safety with no bypasses, per Constitution Principle VI.
 - **SC-008**: Every main view passes automated accessibility audit at WCAG 2.1 AA level.
@@ -467,24 +515,27 @@ Members get in-app notifications when assigned, @mentioned, or when items they a
 - **SC-013**: Authorization is enforced on 100% of data operations (no read/write bypasses the policy; deny cases covered by integration tests).
 - **SC-014**: A change to a shared item is reflected on other members' open shared views within ~1 second.
 - **SC-015**: The system serves ~10 concurrent users performing typical operations without perceptible degradation.
+- **SC-016**: Authorization coverage is mechanically verifiable: every data handler ships with both an allow and a deny test, and a role×operation deny matrix demonstrates that insufficient ownership/membership/role is rejected.
+- **SC-017**: Deleting an account removes or anonymizes all of the user's personal data per the FR-085 cascade (no residual personally attributable data beyond the defined tombstone identity).
 
 ---
 
-## 6. Key Entities (ENT-01..ENT-09)
+## 6. Key Entities (ENT-01..ENT-10)
 
 - **ENT-01 — Task**: The core work item. Has a title (required), description, priority (P0-P3), status (backlog/todo/in_progress/done/cancelled), due date, labels, project reference, cycle reference, recurrence rule, createdBy (the User who created it), assignees (zero or more Users; only on shared-project tasks), and system timestamps (created_at, updated_at, completed_at). New tasks default to "backlog" status. A recurring task has a linked recurrence rule that generates successor instances.
 - **ENT-02 — Project**: An organizational container for tasks. Has a name, color, icon, optional parent project reference, archived flag, ownerId (the owning User), and visibility (personal or shared). Supports one level of nesting. Contains zero or more tasks. Shared projects have a membership set.
-- **ENT-03 — Cycle**: A time-boxed period (default 2 weeks) for organizing work. Has a start date, end date, and status (active/closed/planned). Contains zero or more tasks. Only one cycle can be active at a time. A task not assigned to any cycle is considered "in the cycle backlog" (distinct from the task status "backlog" — cycle backlog refers to cycle assignment, not workflow state). Tasks remaining in a closed cycle may carry a "carried over" flag indicating they were not completed during that cycle's timeframe.
-- **ENT-04 — Label**: A tag that can be applied to multiple tasks for cross-cutting categorization. Has a name and optional color. Many-to-many relationship with tasks.
+- **ENT-03 — Cycle**: A time-boxed period (default 2 weeks) for organizing work. Has a start date, end date, and status (active/closed/planned). Contains zero or more tasks. Only one cycle can be active at a time. Cycles are team-wide (a single shared instance, ASM-10), with explicit create/activate/close/delete authorization rather than per-user ownership. A task not assigned to any cycle is considered "in the cycle backlog" (distinct from the task status "backlog" — cycle backlog refers to cycle assignment, not workflow state). Tasks remaining in a closed cycle may carry a "carried over" flag indicating they were not completed during that cycle's timeframe.
+- **ENT-04 — Label**: A tag that can be applied to multiple tasks for cross-cutting categorization. Has a name, optional color, and an `ownerId` (the owning User; labels are per-user/Tier A). Applying a label to a task follows the task's own authorization tier. Many-to-many relationship with tasks.
 - **ENT-05 — Recurrence Rule**: Defines a repeating schedule attached to a task. Specifies frequency type (daily, every N days, specific weekdays, monthly) and parameters. Used to generate the next task instance upon completion.
 - **ENT-06 — User**: Identity from Google (subject id, email, display name, avatar).
 - **ENT-07 — ProjectMembership**: Links a User to a shared Project with a role (owner/editor/viewer).
 - **ENT-08 — Comment**: Has an author User, parent task, body, @mentions, and created/edited timestamps.
-- **ENT-09 — Notification**: Has a recipient User, type (assigned/mentioned/changed), source reference, read flag, and created timestamp.
+- **ENT-09 — Notification**: Has a recipient User, type (assigned/mentioned/changed), source reference, read flag, and created timestamp. The source reference is a live reference (re-authorized on dereference, see FR-096), not a content snapshot; if the source is no longer accessible it resolves to "no longer available".
+- **ENT-10 — Undo Snapshot**: A typed pre-action snapshot / tombstone record that backs the 30-second undo window (FR-040, FR-097). Captures the state needed to restore a soft-deleted or mutated entity, records the original actor, and is reaped after the window elapses.
 
 ---
 
-## 7. Assumptions (ASM-01..ASM-11)
+## 7. Assumptions (ASM-01..ASM-13)
 
 - **ASM-01 — Multi-user team**: The application serves a small collaborating team (~10). Each user authenticates (Google) and has personal data plus access to shared projects.
 - **ASM-02 — Web platform**: The MVP targets modern desktop browsers. Native mobile apps, PWA/offline operation, and cross-device sync are explicitly out of scope.
@@ -497,19 +548,21 @@ Members get in-app notifications when assigned, @mentioned, or when items they a
 - **ASM-09 — Recurrence based on due date**: Next recurring task instance is calculated from the original due date, not the completion date, ensuring consistent scheduling.
 - **ASM-10 — Small team scale**: Small team (~10 users) on a single shared instance; not organizational multi-tenancy.
 - **ASM-11 — Google identity provider**: Google is the sole identity provider for the MVP.
+- **ASM-12 — Instance reference timezone**: The instance operates against a single reference timezone, `Europe/Warsaw`, for all date-relative computation; per-user timezones are out of scope.
+- **ASM-13 — Gated admission**: Account creation is gated (email allowlist or Google Workspace hosted-domain); the instance is not open to any Google account or to public sign-up.
 
 ---
 
-## 8. Out of Scope (OOS-01..OOS-17)
+## 8. Out of Scope (OOS-01..OOS-19)
 
 The following are explicitly excluded from this MVP iteration:
 
-- **OOS-01**: [PROMOTED to in-scope in v3.0.0 — see US-11, US-12] Multi-user collaboration, sharing, permissions
+- **OOS-01**: [PROMOTED to in-scope — see US-11, US-12] Multi-user collaboration, sharing, permissions
 - **OOS-02**: Cross-device sync, cloud storage
 - **OOS-03**: Mobile application, PWA
 - **OOS-04**: AI features (auto-categorization, summaries, suggestions)
 - **OOS-05**: External integrations (calendar, Slack, GitHub, email)
-- **OOS-06**: [PARTIALLY promoted in v3.0.0] In-app notifications are now in scope (US-16); push/device notifications and reminders remain out of scope.
+- **OOS-06**: [PARTIALLY promoted] In-app notifications are now in scope (US-16); push/device notifications and reminders remain out of scope.
 - **OOS-07**: File attachments on tasks
 - **OOS-08**: Subtasks (task nesting)
 - **OOS-09**: Custom views, saved filters
@@ -521,6 +574,8 @@ The following are explicitly excluded from this MVP iteration:
 - **OOS-15**: Presence indicators and activity/audit feed
 - **OOS-16**: Anonymous/guest access and public share links
 - **OOS-17**: Organizations / multi-tenancy beyond the single team, and non-Google SSO / additional identity providers
+- **OOS-18**: Pending / pre-account invitations (invites are by email resolved against existing signed-in Users only)
+- **OOS-19**: Per-user timezones (the instance uses a single reference timezone, ASM-12)
 
 ---
 
@@ -528,7 +583,7 @@ The following are explicitly excluded from this MVP iteration:
 
 The MVP is delivered through 18 sequential vertical slices, each independently shippable. See `specs/001-accounts-and-auth` through `specs/018-appearance-theming`. Slicing rationale follows constitution Principles I (Keyboard-First), III (Instant Response), and VIII (Test-First) — small slices keep feedback loops tight and constitution-compliance verifiable per increment.
 
-Cross-cutting requirements are realized (not merely referenced) in every slice to which their scope applies: UI accessibility (FR-031, FR-042–FR-047) in every slice that renders UI, and resilience (FR-049, FR-050, FR-051) in every slice that modifies data. The full out-of-scope boundary (OOS-01–OOS-17) is confirmed in every slice.
+Cross-cutting requirements are realized (not merely referenced) in every slice to which their scope applies: UI accessibility (FR-031, FR-042–FR-047, FR-101) in every slice that renders UI, resilience (FR-049, FR-050, FR-051) in every slice that modifies data, and access control (FR-065–FR-068) on every read/write. The full out-of-scope boundary (OOS-01–OOS-19) is confirmed in every slice.
 
 High-level mapping (slice → coverage):
 - 001 accounts-and-auth
