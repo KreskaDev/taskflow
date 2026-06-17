@@ -31,6 +31,17 @@ public sealed record EnsureUser
 /// Handles <see cref="EnsureUser"/>. Authentication is enforced upstream by the deny-by-default
 /// authorization middleware (T019); this handler owns the create-or-refresh logic only.
 /// </summary>
+/// <remarks>
+/// <para><b>Admission trust boundary</b>: the <i>admission</i> decision (allowlist / Workspace
+/// <c>hd</c> + <c>email_verified</c>, FR-087) is made by the BFF before it calls this endpoint; the
+/// API does not re-check it. This is sound under the threat model: the API port is internal-only
+/// (FR-091) and the BFF↔API carrier is signed with a shared key, so any holder of that key could mint
+/// an arbitrary <c>sub</c> regardless. If the API ever becomes reachable beyond the BFF, admission
+/// must move (or be duplicated) here.</para>
+/// <para><b>Known limitation</b>: the <c>email</c> column is UNIQUE, so two Google identities sharing
+/// an email (or a profile email-change colliding with another row) surface as a recoverable sign-in
+/// error rather than a merge. Cross-account email reconciliation is out of US1 scope.</para>
+/// </remarks>
 public static class EnsureUserHandler
 {
     public static async Task<UserProfile> Handle(EnsureUser command, IUserRepository users, CancellationToken cancellationToken)
