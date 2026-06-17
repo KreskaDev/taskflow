@@ -68,3 +68,27 @@ export async function fetchProfile(userId: string): Promise<UserProfile | null> 
   }
   return (await response.json()) as UserProfile;
 }
+
+/**
+ * Hard-deletes the current user's account (FR-049, SC-017). The carrier `sub` is the TaskFlow id
+ * (me-scoped); the API returns 204 on success, so `response.ok` is the success signal. The API's
+ * hard-delete cascades to the BFF's `sessions` rows (ON DELETE CASCADE) — the caller clears the
+ * cookie but never touches the session table.
+ */
+export async function deleteAccount(userId: string): Promise<boolean> {
+  const token = await mintCarrierToken({ sub: userId });
+
+  try {
+    const response = await fetch(new URL("/api/users/me", apiBase()), {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    return response.ok;
+  } catch {
+    // A transport failure reaching the internal API is a recoverable delete failure (FR-049): return
+    // false so the route redirects to /settings?error=delete_failed rather than throwing a 500. (A
+    // missing JWT_SIGNING_KEY still throws from mintCarrierToken above — a config fault, not a
+    // recoverable user error.)
+    return false;
+  }
+}

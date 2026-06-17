@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useSession } from "@/hooks/useSession";
+import { DeleteAccountDialog } from "@/components/ui/DeleteAccountDialog";
 
 /**
  * Settings / profile (T045, US-11.AS-04). Displays the Google display name and avatar from the
@@ -10,9 +12,23 @@ import { useSession } from "@/hooks/useSession";
 export default function SettingsPage() {
   const { data, isLoading } = useSession();
 
+  // A failed account deletion (T052) redirects here with `?error=delete_failed`; surface it as a
+  // recoverable, announced message (FR-049). Read client-side from the URL to keep this a plain
+  // client page (no useSearchParams Suspense boundary needed).
+  const [deleteFailed, setDeleteFailed] = useState(false);
+  useEffect(() => {
+    setDeleteFailed(new URLSearchParams(window.location.search).get("error") === "delete_failed");
+  }, []);
+
   return (
     <section aria-labelledby="settings-heading" className="tf-settings">
       <h1 id="settings-heading">Settings</h1>
+
+      {deleteFailed ? (
+        <p className="tf-settings__error" role="alert">
+          Account deletion failed. Please try again.
+        </p>
+      ) : null}
 
       {isLoading ? (
         <p className="tf-settings__status" role="status">
@@ -36,6 +52,7 @@ export default function SettingsPage() {
             <dt>Email</dt>
             <dd className="tf-profile__email">{data.user.email}</dd>
           </dl>
+          <DeleteAccountDialog />
         </div>
       ) : (
         <p className="tf-settings__status" role="status">

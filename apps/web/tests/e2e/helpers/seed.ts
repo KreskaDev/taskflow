@@ -95,6 +95,25 @@ export async function userExistsByGoogleSub(googleSubjectId: string): Promise<bo
   }
 }
 
+/**
+ * Returns the TaskFlow UserId for a Google subject id, or null if no row exists. Unlike
+ * `userExistsByGoogleSub` this exposes the id, so a delete-roundtrip spec can prove the re-created
+ * account is a NEW id (not a restored row).
+ */
+export async function getUserIdByGoogleSub(googleSubjectId: string): Promise<string | null> {
+  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  await client.connect();
+  try {
+    const result = await client.query<{ id: string }>(
+      `SELECT id FROM users WHERE google_subject_id = $1`,
+      [googleSubjectId],
+    );
+    return result.rows[0]?.id ?? null;
+  } finally {
+    await client.end();
+  }
+}
+
 /** Points the fake IdP at the identity the NEXT browser sign-in will mint. */
 export async function setNextIdentity(identity: {
   sub: string;
