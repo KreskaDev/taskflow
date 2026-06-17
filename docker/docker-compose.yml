@@ -27,7 +27,10 @@ services:
         condition: service_healthy
     environment:
       ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
-      JWT_SIGNING_KEY: ${JWT_SIGNING_KEY}
+      # The API reads the shared HMAC key from config key `Jwt:SigningKey` (env `Jwt__SigningKey`);
+      # the single `.env` JWT_SIGNING_KEY var feeds it here and the BFF's token.ts (web service) below.
+      # (Verified by the US1 E2E, which boots the real API with exactly this env var.)
+      Jwt__SigningKey: ${JWT_SIGNING_KEY}
       ASPNETCORE_URLS: http://0.0.0.0:4311
     ports:
       - "127.0.0.1:4311:4311" # internal-only; public traffic never reaches the API directly
