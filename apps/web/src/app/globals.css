@@ -145,6 +145,11 @@ body {
   margin: 0;
 }
 
+.tf-settings__error {
+  color: #b42318;
+  margin: 0 0 0.75rem;
+}
+
 .tf-signin-button {
   text-decoration: none;
   display: inline-block;
@@ -201,6 +206,17 @@ body {
 
 .tf-profile__fields dd {
   margin: 0 0 0.5rem;
+}
+
+.tf-delete-account {
+  margin-top: 1rem;
+}
+
+.tf-dialog__actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
 }
 
 /* Reduced motion: transitions instant or <100ms (Constitution II). */
