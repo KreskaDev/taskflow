@@ -67,4 +67,14 @@ public sealed class GetCurrentUserTests : IntegrationTestBase
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
+
+    [Fact]
+    public async Task Deny_expired_jwt_is_rejected_401()
+    {
+        // A carrier with a valid signature/issuer/audience but past its lifetime must be rejected by
+        // ValidateLifetime — the proxy mints 60-second carriers, so an expired one is never trusted.
+        using var response = await SendAsync(HttpMethod.Get, MePath, TestJwtHelper.Expired(Guid.NewGuid().ToString()));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
 }

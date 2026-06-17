@@ -83,9 +83,12 @@ export async function GET(request: NextRequest): Promise<Response> {
     response.cookies.delete(OAUTH_TX_COOKIE);
     return response;
   } catch (error) {
-    if (error instanceof OAuthError) {
-      return backToSignin(request, "oauth_failed");
+    // FR-049: any callback failure (OAuth, code exchange, id_token validation, ensure, or session
+    // creation) is surfaced as a recoverable sign-in error rather than a 500 white page. Unexpected
+    // (non-OAuth) failures are logged server-side — message only, never the token/cookie (FR-050).
+    if (!(error instanceof OAuthError)) {
+      console.error("OAuth callback failed unexpectedly:", error instanceof Error ? error.message : error);
     }
-    throw error;
+    return backToSignin(request, "oauth_failed");
   }
 }

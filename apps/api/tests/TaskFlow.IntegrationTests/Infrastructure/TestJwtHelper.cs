@@ -32,6 +32,11 @@ public static class TestJwtHelper
 
         // Fixed reference instant avoids a clock dependency; lifetime is relative to it.
         var issuedAt = DateTime.UtcNow;
+        var expires = issuedAt.Add(lifetime);
+
+        // notBefore must be strictly before expires. For an already-expired token (negative lifetime),
+        // back-date notBefore a further minute so the token is well-formed but past its lifetime.
+        var notBefore = lifetime < TimeSpan.Zero ? expires.AddMinutes(-1) : issuedAt;
 
         var token = new JwtSecurityToken(
             issuer: BffCarrierToken.Issuer,
@@ -42,8 +47,8 @@ public static class TestJwtHelper
                 new Claim(BffCarrierToken.EmailClaim, email),
                 new Claim(BffCarrierToken.NameClaim, name),
             ],
-            notBefore: issuedAt.Add(lifetime < TimeSpan.Zero ? lifetime : TimeSpan.Zero),
-            expires: issuedAt.Add(lifetime),
+            notBefore: notBefore,
+            expires: expires,
             signingCredentials: credentials);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
