@@ -64,7 +64,7 @@ Managed by the Next.js BFF (not by the .NET API). Same Postgres database; create
 [Active] --Sign-out--> [Invalidated]
 [Active] --Absolute expiry--> [Expired] (rejected on next check)
 [Active] --Idle timeout--> [Expired] (rejected on next check)
-[Active] --Re-sign-in--> [Invalidated] (new session created = rotation)
+[Active] --Re-sign-in--> [Active] (a fresh session id is always minted = rotation / fixation defense, FR-088; prior sessions on other devices remain active — multi-device is supported)
 [Active] --Account deletion--> [Purged] (deleted with the user)
 ```
 

@@ -1,4 +1,5 @@
 using TaskFlow.Application.Authorization;
+using TaskFlow.Domain.IdentityAccess;
 
 namespace TaskFlow.Application.IdentityAccess.Queries;
 
@@ -23,6 +24,14 @@ public static class GetCurrentUserHandler
     {
         ArgumentNullException.ThrowIfNull(currentUser);
         ArgumentNullException.ThrowIfNull(users);
+
+        // The all-zeros tombstone identity is a seeded anonymization sentinel, never a real account.
+        // A carrier resolving to it is not a legitimately authenticated user (defense in depth: the
+        // proxy only ever mints sub = a real UUIDv7 session userId, so this is unreachable normally).
+        if (currentUser.Id == UserId.Tombstone)
+        {
+            throw new UnauthenticatedException("The authenticated subject is not a valid user.");
+        }
 
         var user = await users.FindByIdAsync(currentUser.Id, cancellationToken).ConfigureAwait(false);
         if (user is null)

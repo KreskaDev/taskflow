@@ -69,6 +69,17 @@ public sealed class GetCurrentUserTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Deny_the_tombstone_identity_is_rejected_401()
+    {
+        // A carrier whose sub is the all-zeros tombstone GUID must never resolve to the seeded
+        // "Deleted User" row — it is an anonymization sentinel, not an authenticatable account.
+        using var response = await SendAsync(HttpMethod.Get, MePath, TestJwtHelper.Valid(Guid.Empty.ToString()));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await response.ReadProblemAsync()).ErrorCode.Should().Be("unauthenticated");
+    }
+
+    [Fact]
     public async Task Deny_expired_jwt_is_rejected_401()
     {
         // A carrier with a valid signature/issuer/audience but past its lifetime must be rejected by
