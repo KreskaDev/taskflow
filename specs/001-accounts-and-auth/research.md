@@ -52,13 +52,13 @@
 
 **Decision**: Environment-configured via `ADMISSION_EMAILS` (comma-separated) and/or `ADMISSION_HD` (Google Workspace hosted-domain `hd`). Checked in the BFF OAuth callback before User creation.
 
-**Rationale**: Environment configuration keeps the allowlist out of the codebase and allows runtime changes via restart. The `hd` claim in Google's id_token identifies the Workspace domain. Either match (email in list OR `hd` matches) admits the user. Neither match returns a `not_admitted` ProblemDetails error. The check happens before the API is called — non-admitted users never create a User record.
+**Rationale**: Environment configuration keeps the allowlist out of the codebase and allows runtime changes via restart. The `hd` claim in Google's id_token identifies the Workspace domain. Either match (email in list OR `hd` matches) admits the user, but **only if the id_token `email_verified` claim is `true`** — an unverified email is rejected even on an allowlist match (closes the unverified-email admission bypass). Neither match, or an unverified email, returns a `not_admitted` ProblemDetails error. The check happens before the API is called — non-admitted users never create a User record. If **neither** `ADMISSION_EMAILS` nor `ADMISSION_HD` is configured, the BFF **fails fast at startup** rather than booting in an open or an all-denying state.
 
 ## R8: Account Deletion Cascade
 
-**Decision**: `AccountDeletionRequested` domain event dispatched via Wolverine outbox. In slice 001, only the User record is affected (soft-delete via `deleted_at` + all sessions invalidated). Later slices register handlers for their entities (projects: transfer/delete, comments: anonymize to tombstone, assignments: null, notifications: purge).
+**Decision**: `AccountDeletionRequested` domain event dispatched via Wolverine outbox. In slice 001, only the User record is affected: within one transaction the event is enqueued via the outbox and the User row is **hard-deleted** (no `deleted_at` soft-delete) with all its sessions purged. The freed Google identity means a later sign-in by the same account creates a brand-new empty account. Later slices register handlers for their entities (projects: transfer/delete, comments: anonymize to tombstone, assignments: null, notifications: purge).
 
-**Rationale**: Event-driven cascade is extensible — each slice owns its cleanup handler. The User's `deleted_at` is set immediately, sessions invalidated, and cascade handlers run asynchronously via the outbox. This is a deliberate, irreversible action (not covered by 30s undo).
+**Rationale**: Event-driven cascade is extensible — each slice owns its cleanup handler. The User row is removed immediately, its sessions purged, and cascade handlers run asynchronously via the outbox. This is a deliberate, irreversible action (not covered by 30s undo).
 
 ## R9: Docker, Caddy, CI/CD
 

@@ -1,0 +1,12 @@
+<Project>
+  <!-- Inherit the strict src settings from apps/api/Directory.Build.props, then relax
+       analyzer rules that are pure noise in xUnit test code. -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <!-- CA1707 underscores in test names; CA2007 ConfigureAwait; CA1515 internal visibility;
+         CA1062 public-arg null checks; CA1812 uninstantiated internal; CA1819 array properties;
+         CA1054/CA1056 URI-as-string (test DTOs mirror the JSON wire contract where avatarUrl is a string). -->
+    <NoWarn>$(NoWarn);CA1707;CA2007;CA1515;CA1062;CA1812;CA1819;CA1054;CA1056</NoWarn>
+  </PropertyGroup>
+</Project>

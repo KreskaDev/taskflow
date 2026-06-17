@@ -64,6 +64,15 @@ Entity touchpoints:
 Depends on:
 - none (foundational slice)
 
+## Clarifications
+
+### Session 2026-06-17
+
+- Q: After account deletion (irreversible), when the same Google identity signs in again, what happens? → A: A brand-new empty account is created; the old account and its data stay erased (deletion removes the account, not the right to return).
+- Q: How is the deleted user's own record handled to satisfy SC-017 (no residual PII)? → A: The User row is hard-deleted (no soft-delete `deleted_at`); its sessions are purged and the Google identity is freed. Later-slice references repoint to the separate, pre-seeded "Deleted User" tombstone via the deletion event.
+- Q: Must admission require Google's `email_verified == true`? → A: Yes — reject sign-in if `email_verified` is absent or false, even on an allowlist email match (closes the unverified-email admission bypass).
+- Q: When neither `ADMISSION_EMAILS` nor `ADMISSION_HD` is configured at boot, what happens? → A: The system fails fast at startup with a clear configuration error (no open and no silently-locked-out instance).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 11 - Account & Sign-In (Priority: P1)
@@ -87,7 +96,7 @@ A signed-in user can delete their account, which erases or anonymizes their pers
 
 **Why this priority**: Holding Google-derived personal data carries a privacy obligation (Constitution Principle XI): a user must be able to have their data removed. This is a trust and compliance requirement, not part of the daily flow, so it ranks below the core loops but above optional enhancements.
 
-**Independent Test**: Can be tested by signing in, then deleting the account and verifying the user can no longer sign in and that their personal data has been erased or anonymized (owned shared projects transferred or deleted, authored comments anonymized to a tombstone identity, `createdBy`/assignee references nulled or reassigned, recipient notifications purged). At this slice — where only the User aggregate exists — the deletion path and its cascade contract are established and tested for the User identity; later slices wire their entities into the same cascade.
+**Independent Test**: Can be tested by signing in, then deleting the account and verifying the deleted account is gone — the User record is hard-deleted, the prior session no longer works, and a later sign-in by the same Google identity yields a brand-new empty account rather than the deleted one — and that their personal data has been erased or anonymized (owned shared projects transferred or deleted, authored comments anonymized to a tombstone identity, `createdBy`/assignee references nulled or reassigned, recipient notifications purged). At this slice — where only the User aggregate exists — the deletion path and its cascade contract are established and tested for the User identity; later slices wire their entities into the same cascade.
 
 **Acceptance Scenarios** (owned by this slice):
 
@@ -103,12 +112,13 @@ A signed-in user can delete their account, which erases or anonymizes their pers
 
 ### Edge Cases
 
-- **Non-admitted sign-in**: A Google sign-in by a visitor who is not on the allowlist and is outside the Workspace `hd` is rejected; no account is created; the user is shown a clear, recoverable message (US-11.AS-01, FR-087, FR-049).
+- **Non-admitted sign-in**: A Google sign-in by a visitor who is not on the allowlist and is outside the Workspace `hd` is rejected; no account is created; the user is shown a clear, recoverable message (US-11.AS-01, FR-087, FR-049). A sign-in whose id_token `email_verified` claim is not `true` is likewise rejected even if the email matches the allowlist (FR-087).
+- **Admission unconfigured**: If neither an email allowlist (`ADMISSION_EMAILS`) nor a Workspace hosted-domain (`ADMISSION_HD`) is configured, the system fails fast at startup with a clear configuration error rather than booting in an open or an all-denying state (FR-087).
 - **Unauthenticated access**: Any request to a protected route or endpoint without a valid session is denied (deny-by-default) and the user is directed to sign in (US-11.AS-03, FR-055, FR-068).
 - **Deny-by-default per-user isolation**: Authorization is dispatched by the containing resource's visibility. For the data established here (the User's own identity and, going forward, personal/unprojected data), access authorizes on ownership and every query is scoped to the caller; `createdBy` is provenance only and never a standalone grant. Cross-user reads/writes are denied and covered by integration tests (FR-065, FR-066, SC-013, SC-016).
 - **Session expiry / sign-out invalidation**: After the absolute lifetime or idle timeout elapses, or after a server-side sign-out, the session is invalid server-side; subsequent requests with the old cookie are denied and directed to sign in (FR-088, FR-055).
 - **CSRF / cross-origin mutation**: A state-changing request through the BFF that fails the origin check or lacks a valid anti-CSRF token is rejected (FR-089).
-- **Account deletion is irreversible**: A deleted account cannot sign back in; the erasure cascade is not undoable (distinct from FR-040 data undo) (US-17.AS-02, FR-085).
+- **Account deletion is irreversible**: The deleted account and its data cannot be recovered and the erasure cascade is not undoable (distinct from FR-040 data undo). If the same Google identity signs in again later, a brand-new empty account is created — the prior account is NOT restored (US-17.AS-02, FR-085).
 
 ## Requirements *(mandatory)*
 
@@ -122,12 +132,12 @@ A signed-in user can delete their account, which erases or anonymizes their pers
 
 ### Privacy & Account Requirements (per Constitution Principle XI)
 
-- **FR-085**: System MUST provide an account-deletion path with a defined erasure cascade: anonymize the user's authored comments to a tombstone identity (not hard-deleting comments that anchor a thread); null or reassign `createdBy`/assignee references on tasks; transfer or delete the user's owned shared projects; and purge the user's recipient notifications.
+- **FR-085**: System MUST provide an account-deletion path with a defined erasure cascade: anonymize the user's authored comments to a tombstone identity (not hard-deleting comments that anchor a thread); null or reassign `createdBy`/assignee references on tasks; transfer or delete the user's owned shared projects; and purge the user's recipient notifications. The user's own User record MUST be **hard-deleted** (NOT soft-deleted): its sessions are purged and its Google identity (`google_subject_id`, email) is freed, so that a later sign-in by the same Google account creates a brand-new empty account rather than restoring the deleted one. The "Deleted User" tombstone is a separate, pre-seeded record that later-slice references repoint to; the deleted user's own row is removed, not retained.
 - **FR-086**: System MUST state an explicit data-retention stance: backups, soft-deleted/undo-window data, comments, and notifications are retained until account deletion.
 
 ### Authentication & Admission Requirements (per Constitution Principle IX)
 
-- **FR-087**: System MUST gate account creation by admission control — an explicit email allowlist or a Google Workspace hosted-domain (`hd`); sign-in is NOT open to any Google account, and non-admitted sign-ins MUST be rejected.
+- **FR-087**: System MUST gate account creation by admission control — an explicit email allowlist or a Google Workspace hosted-domain (`hd`); sign-in is NOT open to any Google account, and non-admitted sign-ins MUST be rejected. Admission MUST additionally require the Google id_token `email_verified` claim to be `true`: a sign-in whose `email_verified` is absent or `false` MUST be rejected even when the email matches the allowlist. If neither an allowlist nor a hosted-domain is configured, the system MUST fail to start (fail-closed startup guard) rather than boot in an open or an all-denying state.
 - **FR-088**: Sessions MUST follow a documented policy: a server-enforced absolute lifetime and idle timeout, a new session id issued at OAuth completion (fixation defense), server-side invalidation on sign-out, backed by a Postgres-backed session store.
 - **FR-089**: The session cookie MUST set an explicit `SameSite` value, and every state-changing request through the BFF MUST be CSRF-protected (origin check or anti-CSRF token).
 - **FR-090**: The OAuth flow MUST use `state`, `nonce`, and PKCE and MUST validate the id_token.
@@ -177,7 +187,7 @@ Error Handling & Data Integrity (per Constitution Principle VII):
 
 - **SC-013**: Authorization is enforced on 100% of data operations (no read/write bypasses the policy; deny cases covered by integration tests).
 - **SC-016**: Authorization coverage is mechanically verifiable: every data handler ships with both an allow and a deny test, and a role×operation deny matrix demonstrates that insufficient ownership/membership/role is rejected. (Established here as the foundation: the handlers introduced in this slice — sign-in/admission, profile read, account deletion — each ship an allow and a deny test, standing up the matrix that every later slice extends.)
-- **SC-017**: Deleting an account removes or anonymizes all of the user's personal data per the FR-085 cascade (no residual personally attributable data beyond the defined tombstone identity).
+- **SC-017**: Deleting an account removes or anonymizes all of the user's personal data per the FR-085 cascade (no residual personally attributable data beyond the defined tombstone identity); the user's own User record is hard-deleted, leaving no residual row.
 
 ## Constitution Compliance
 

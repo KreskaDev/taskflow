@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\TaskFlow.Application\TaskFlow.Application.csproj" />
+    <ProjectReference Include="..\TaskFlow.Infrastructure\TaskFlow.Infrastructure.csproj" />
+    <ProjectReference Include="..\TaskFlow.Domain\TaskFlow.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0" />
+    <PackageReference Include="WolverineFx.EntityFrameworkCore" Version="6.11.0" />
+    <PackageReference Include="WolverineFx.Http" Version="6.11.0" />
+    <PackageReference Include="WolverineFx.Postgresql" Version="6.11.0" />
+    <!-- Wolverine 6.x split the runtime (Roslyn) compiler into its own package; required
+         for the default dynamic TypeLoadMode. Production can switch to static codegen later. -->
+    <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.11.0" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Expose the top-level Program type to the integration test harness (WebApplicationFactory). -->
+    <InternalsVisibleTo Include="TaskFlow.IntegrationTests" />
+  </ItemGroup>
+
+</Project>

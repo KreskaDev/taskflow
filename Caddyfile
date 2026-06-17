@@ -1,0 +1,14 @@
+# Host Caddy — terminates TLS (auto Let's Encrypt) and reverse-proxies the single
+# public origin. The SignalR hub path goes straight to the API container (WebSocket
+# upgrade); everything else goes to the Next.js BFF. API :4311 is bound to 127.0.0.1.
+taskflow.example.com {
+	# SignalR hub — direct to API (Next.js cannot proxy WebSocket upgrades)
+	handle /hub/* {
+		reverse_proxy 127.0.0.1:4311
+	}
+
+	# Everything else — to the Next.js BFF
+	handle {
+		reverse_proxy 127.0.0.1:3000
+	}
+}

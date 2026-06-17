@@ -1,0 +1,215 @@
+/* Baseline global styles. Muted, Linear-inspired direction (Constitution IV);
+   the full design system arrives in later slices. */
+
+:root {
+  --tf-bg: #fbfbfd;
+  --tf-fg: #1c1c22;
+  --tf-muted: #6b6b76;
+  --tf-accent: #4f46e5;
+  --tf-border: #e2e2e8;
+  --tf-focus: #4f46e5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--tf-bg);
+  color: var(--tf-fg);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* Visible focus indicator on every focusable element (Constitution II / FR-042). */
+:focus-visible {
+  outline: 2px solid var(--tf-focus);
+  outline-offset: 2px;
+}
+
+/* Screen-reader-only utility (kept in the a11y tree, visually hidden). */
+.tf-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- Baseline primitive styles (functional, not the final design system) --- */
+
+.tf-button {
+  font: inherit;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.tf-button--primary {
+  background: var(--tf-accent);
+  color: #ffffff;
+}
+
+.tf-button--secondary {
+  background: transparent;
+  color: var(--tf-fg);
+  border-color: var(--tf-border);
+}
+
+.tf-button--danger {
+  background: #b42318;
+  color: #ffffff;
+}
+
+.tf-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(28, 28, 34, 0.45);
+  padding: 1rem;
+}
+
+.tf-dialog {
+  background: #ffffff;
+  color: var(--tf-fg);
+  border-radius: 10px;
+  padding: 1.5rem;
+  max-width: 28rem;
+  width: 100%;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+}
+
+.tf-toast {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--tf-border);
+  background: #ffffff;
+}
+
+.tf-toast--error {
+  border-color: #b42318;
+}
+
+.tf-toast--success {
+  border-color: #067647;
+}
+
+.tf-toast__dismiss {
+  font: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  line-height: 1;
+}
+
+/* --- Auth + app shell layout (functional baseline) --- */
+
+.tf-auth-layout {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.tf-signin {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: center;
+  max-width: 22rem;
+}
+
+.tf-signin__subtitle {
+  color: var(--tf-muted);
+  margin: 0;
+}
+
+.tf-signin__error {
+  color: #b42318;
+  margin: 0;
+}
+
+.tf-signin-button {
+  text-decoration: none;
+  display: inline-block;
+}
+
+.tf-app__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--tf-border);
+}
+
+.tf-app__brand {
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--tf-fg);
+}
+
+.tf-app__nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.tf-app__main {
+  padding: 1.5rem 1.25rem;
+}
+
+.tf-workspace__empty,
+.tf-settings__status {
+  color: var(--tf-muted);
+}
+
+.tf-profile {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.tf-profile__avatar {
+  border-radius: 50%;
+}
+
+.tf-profile__fields {
+  margin: 0;
+}
+
+.tf-profile__fields dt {
+  color: var(--tf-muted);
+  font-size: 0.875rem;
+}
+
+.tf-profile__fields dd {
+  margin: 0 0 0.5rem;
+}
+
+/* Reduced motion: transitions instant or <100ms (Constitution II). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

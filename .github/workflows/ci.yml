@@ -1,0 +1,117 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/kreskadev/taskflow
+
+jobs:
+  web-quality:
+    name: web lint + typecheck + unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @taskflow/web lint
+      - run: pnpm --filter @taskflow/web typecheck
+      - run: pnpm --filter @taskflow/web test
+
+  api-quality:
+    name: api build + test (xUnit + Testcontainers)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet restore apps/api/TaskFlow.sln
+      # Analyzers-as-errors enforced via Directory.Build.props (Constitution VI).
+      - run: dotnet build apps/api/TaskFlow.sln -c Release --no-restore
+      # Testcontainers uses the Docker daemon available on GitHub runners.
+      - run: dotnet test apps/api/TaskFlow.sln -c Release --no-build
+
+  openapi-sync:
+    name: openapi client in sync
+    runs-on: ubuntu-latest
+    needs: [api-quality]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: pnpm install --frozen-lockfile
+      # Regenerate the typed client from the live contract and fail on drift.
+      - name: Regenerate + diff OpenAPI client
+        run: |
+          dotnet run --project apps/api/src/TaskFlow.Api --no-launch-profile &
+          API_PID=$!
+          npx --yes wait-on http://localhost:4311/openapi/v1.json -t 60000
+          pnpm --filter @taskflow/web gen:api
+          kill $API_PID || true
+          git diff --exit-code apps/web/src/lib/api/generated/
+
+  build-push:
+    name: build + push images
+    runs-on: ubuntu-latest
+    needs: [web-quality, api-quality, openapi-sync]
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build + push api
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.api
+          push: true
+          tags: ${{ env.IMAGE_PREFIX }}-api:${{ github.sha }}
+      - name: Build + push web
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.web
+          push: true
+          tags: ${{ env.IMAGE_PREFIX }}-web:${{ github.sha }}
+
+  deploy:
+    name: deploy (main only)
+    runs-on: ubuntu-latest
+    needs: [build-push]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd /opt/taskflow
+            export IMAGE_TAG=${{ github.sha }}
+            ./scripts/backup.sh                       # pre-migration backup (Constitution VII)
+            docker compose -f docker/docker-compose.yml pull
+            docker compose -f docker/docker-compose.yml run --rm api dotnet TaskFlow.Api.dll --migrate
+            ./scripts/restore-test.sh "$(ls -t /var/backups/taskflow/*.dump | head -1)"
+            docker compose -f docker/docker-compose.yml up -d
