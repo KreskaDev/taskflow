@@ -16,6 +16,7 @@ apps/web/src/lib/api/generated/.gen-tmp/
 coverage/
 playwright-report/
 test-results/
+apps/web/tests/e2e/.e2e-state.json
 .pnpm-store/
 
 # --- .NET (apps/api) ---
