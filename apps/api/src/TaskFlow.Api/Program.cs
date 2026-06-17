@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using TaskFlow.Api.Authentication;
 using TaskFlow.Api.Middleware;
+using TaskFlow.Api.OpenApi;
 using TaskFlow.Application.Authorization;
 using TaskFlow.Application.IdentityAccess;
 using TaskFlow.Domain.IdentityAccess.Events;
@@ -88,7 +89,9 @@ builder.Host.UseWolverine(opts =>
 });
 
 // --- Built-in .NET 9 OpenAPI document at /openapi/v1.json (R5) ---
-builder.Services.AddOpenApi();
+// The document transformer restores the curated contract's ProblemDetails schema + operationIds +
+// 401 responses so the generated TS client keeps compiling (Constitution VI; see the transformer).
+builder.Services.AddOpenApi(options => options.AddDocumentTransformer<TaskFlowDocumentTransformer>());
 builder.Services.AddWolverineHttp();
 
 // No CORS: the API is single-origin (only the BFF on the internal Docker network calls it).

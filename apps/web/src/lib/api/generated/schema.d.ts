@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/api/internal/auth-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GET_api_internal_auth_check
+         * @description GET_api_internal_auth_check
+         */
+        get: operations["GET_api_internal_auth_check"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/users/ensure": {
         parameters: {
             query?: never;
@@ -14,8 +34,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Create or match a user from Google identity
-         * @description Called by the BFF during OAuth callback. Creates a new User if the Google subject ID is unknown; returns the existing User if found. Updates profile fields on every call.
+         * POST_api_users_ensure
+         * @description POST_api_users_ensure
          */
         post: operations["ensureUser"];
         delete?: never;
@@ -31,13 +51,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get the current user's profile */
+        /**
+         * GET_api_users_me
+         * @description GET_api_users_me
+         */
         get: operations["getCurrentUser"];
         put?: never;
         post?: never;
         /**
-         * Delete the current user's account
-         * @description Initiates irreversible account deletion with erasure cascade. Hard-deletes the User row, purges all sessions, dispatches the cascade event.
+         * DELETE_api_users_me
+         * @description DELETE_api_users_me
          */
         delete: operations["deleteAccount"];
         options?: never;
@@ -49,66 +72,52 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        EnsureUserRequest: {
-            /** @description Google's `sub` claim */
-            googleSubjectId: string;
-            /** Format: email */
-            email: string;
-            displayName: string;
-            /** Format: uri */
-            avatarUrl?: string;
-        };
-        UserProfile: {
-            /** Format: uuid */
-            id: string;
-            /** Format: email */
-            email: string;
-            displayName: string;
-            /** Format: uri */
-            avatarUrl?: string;
-            /** Format: date-time */
-            createdAt: string;
-        };
         /** @description RFC 9457 ProblemDetails — the canonical error envelope for all non-2xx responses (ADR-0009). */
         ProblemDetails: {
             /**
              * Format: uri
-             * @description Error type URI
+             * @description Error type URI.
              */
             type: string;
-            /** @description Human-readable summary */
+            /** @description Human-readable summary. */
             title: string;
-            /** @description HTTP status code */
-            status: number;
-            /** @description Human-readable explanation */
-            detail?: string;
             /**
-             * Format: uri
-             * @description URI identifying the specific occurrence
+             * Format: int32
+             * @description HTTP status code.
              */
+            status: number;
+            /** @description Human-readable explanation. */
+            detail?: string | null;
+            /** @description URI identifying the specific occurrence. */
             instance?: string;
             /**
-             * @description Stable machine-readable error code
+             * @description Stable machine-readable error code.
              * @enum {string}
              */
-            errorCode?: "validation_failed" | "unauthenticated" | "forbidden" | "not_found" | "not_admitted" | "conflict_lww" | "last_owner" | "internal_error";
-            /** @description Field-level validation errors (field path -> messages) */
+            errorCode: "validation_failed" | "unauthenticated" | "not_admitted" | "forbidden" | "not_found" | "conflict_lww" | "last_owner" | "internal_error";
+            /** @description Field-level validation errors (field path -> messages). */
             errors?: {
                 [key: string]: string[];
-            };
+            } | null;
+        };
+        EnsureUser: {
+            googleSubjectId: string;
+            email: string;
+            displayName: string;
+            avatarUrl?: string | null;
+        };
+        IResult: Record<string, never>;
+        UserProfile: {
+            /** Format: uuid */
+            id: string;
+            email: string;
+            displayName: string;
+            avatarUrl?: string | null;
+            /** Format: date-time */
+            createdAt: string;
         };
     };
-    responses: {
-        /** @description Missing or invalid identity token */
-        Unauthenticated: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["ProblemDetails"];
-            };
-        };
-    };
+    responses: never;
     parameters: never;
     requestBodies: never;
     headers: never;
@@ -116,6 +125,35 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    GET_api_internal_auth_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IResult"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     ensureUser: {
         parameters: {
             query?: never;
@@ -125,11 +163,11 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["EnsureUserRequest"];
+                "application/json": components["schemas"]["EnsureUser"];
             };
         };
         responses: {
-            /** @description User ensured (created or matched) */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -138,7 +176,24 @@ export interface operations {
                     "application/json": components["schemas"]["UserProfile"];
                 };
             };
-            401: components["responses"]["Unauthenticated"];
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
         };
     };
     getCurrentUser: {
@@ -150,7 +205,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Current user profile */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -159,7 +214,24 @@ export interface operations {
                     "application/json": components["schemas"]["UserProfile"];
                 };
             };
-            401: components["responses"]["Unauthenticated"];
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
         };
     };
     deleteAccount: {
@@ -171,14 +243,24 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Account deleted */
+            /** @description No Content */
             204: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": unknown;
+                };
             };
-            401: components["responses"]["Unauthenticated"];
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
         };
     };
 }
