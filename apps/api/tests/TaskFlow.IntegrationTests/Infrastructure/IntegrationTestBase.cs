@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Logging;
 using Testcontainers.PostgreSql;
 
 namespace TaskFlow.IntegrationTests.Infrastructure;
@@ -44,6 +45,11 @@ public abstract class IntegrationTestBase : IAsyncLifetime
                 b.UseSetting("ConnectionStrings:postgres", _postgres.GetConnectionString());
                 b.UseSetting("Jwt:SigningKey", SigningKey);
                 b.UseEnvironment("Development");
+
+                // The default Windows EventLog logger provider intermittently throws `OpenForWrite`
+                // during host disposal (a teardown race surfacing as a flaky DisposeAsync failure).
+                // Tests never read logs, so clear all providers — this makes the suite deterministic.
+                b.ConfigureLogging(logging => logging.ClearProviders());
             });
 
         // Forces host construction → EF Migrate + Wolverine resource setup run now.

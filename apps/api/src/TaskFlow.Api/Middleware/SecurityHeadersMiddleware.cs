@@ -1,7 +1,8 @@
 namespace TaskFlow.Api.Middleware;
 
 /// <summary>
-/// Adds the standard security response headers in production (FR-099, Constitution XII).
+/// Adds the standard security response headers (FR-099, Constitution XII) to every API response,
+/// in all environments (wired unconditionally in <c>Program.cs</c>).
 /// The API serves only JSON to the internal BFF (no HTML, no browser-executed content),
 /// so the CSP is maximally locked down (<c>default-src 'none'</c>). The user-facing CSP
 /// for rendered pages is owned by the Next.js BFF.
