@@ -1,0 +1,7 @@
+# EF Core scaffolds these migration + snapshot files. They are generated code:
+# exclude them from the repo's strict analyzers (Directory.Build.props treats
+# warnings as errors with AnalysisLevel latest-all). Never hand-edit generated
+# code to satisfy analyzers — carve it out here instead.
+[*.cs]
+generated_code = true
+dotnet_analyzer_diagnostic.severity = none

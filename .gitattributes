@@ -1,0 +1,8 @@
+* text=auto eol=lf
+
+# Binary / generated assets — leave untouched
+*.png binary
+*.jpg binary
+*.ico binary
+*.pfx binary
+*.snk binary

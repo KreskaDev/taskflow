@@ -5,6 +5,28 @@ desktop.ini
 *~
 .idea/
 .vscode/
+.vs/
+
+# --- Node / Next.js (apps/web) ---
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+apps/web/src/lib/api/generated/.gen-tmp/
+coverage/
+playwright-report/
+test-results/
+.pnpm-store/
+
+# --- .NET (apps/api) ---
+bin/
+obj/
+*.user
+*.suo
+[Tt]est[Rr]esults/
+
+# --- Logs ---
+*.log
 
 # Spec Kit scratch / working artifacts
 .specify/memory/.scratch/

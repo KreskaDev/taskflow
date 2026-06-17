@@ -1,0 +1,256 @@
+---
+description: "Task list for feature implementation"
+---
+
+# Tasks: Accounts & Auth (001)
+
+**Input**: Design documents from `specs/001-accounts-and-auth/`
+
+**Prerequisites**: plan.md ✅, spec.md ✅, research.md ✅, data-model.md ✅, contracts/openapi.yaml ✅
+
+**Tests**: REQUIRED (not optional) for this slice. Constitution Principle VIII (Test-First) and SC-016 mandate that every data handler ships **both an allow and a deny test**; the spec's "User Scenarios & Testing" section is mandatory. All test tasks below MUST be written Red-first (failing) before their implementation tasks (Red-Green-Refactor).
+
+**Organization**: Tasks are grouped by user story to enable independent implementation and testing. This is a foundational slice: Phase 1 (Setup) and Phase 2 (Foundational) bootstrap the entire monorepo and the auth/authz/OpenAPI/deploy primitives every later slice builds on, so they are large by necessity.
+
+## Format: `[ID] [P?] [Story?] Description with file path`
+
+- **[P]**: Can run in parallel (different files, no dependency on an incomplete task)
+- **[Story]**: `[US1]` = US-11 Account & Sign-In; `[US2]` = US-17 Account Deletion. Setup / Foundational / Polish tasks carry **no** story label.
+- Paths are taken verbatim from `plan.md` → Project Structure.
+
+---
+
+## Phase 1: Setup (Shared Infrastructure)
+
+**Purpose**: Bootstrap the monorepo skeleton, toolchains, container/deploy primitives. No application logic.
+
+- [X] T001 Create the monorepo directory structure per plan.md (`apps/web/`, `apps/api/`, `docker/`, `scripts/`, `.github/workflows/`) at repository root
+- [X] T002 [P] Add root `.gitattributes` (`* text=auto eol=lf`), update `.gitignore` for the monorepo (`.env`, `node_modules`, `bin/`, `obj/`, `.next/`, test artifacts), and add `pnpm-workspace.yaml` (`packages: ['apps/web']`)
+- [X] T003 [P] Author `.env.example` documenting every env var with no secret values (`POSTGRES_*`, `GOOGLE_CLIENT_ID/SECRET`, `JWT_SIGNING_KEY`, `SESSION_SECRET`, `ADMISSION_EMAILS`, `ADMISSION_HD`, `APP_URL`, `API_INTERNAL_URL`, `SESSION_ABSOLUTE_LIFETIME_HOURS`, `SESSION_IDLE_TIMEOUT_HOURS`) per quickstart.md
+- [X] T004 [P] Scaffold the Next.js 15 app in `apps/web` (App Router) with strict `apps/web/tsconfig.json` (`strict: true`, no implicit `any`), `apps/web/next.config.ts`, and `apps/web/package.json` (React 19, TanStack Query v5, Zod 3, openapi-fetch, openapi-typescript, jose, pg, date-fns, date-fns-tz)
+- [X] T005 [P] Configure web tooling: `apps/web/vitest.config.ts`, `apps/web/playwright.config.ts`, and ESLint/Prettier with lint+typecheck scripts in `apps/web/package.json`
+- [X] T006 [P] Scaffold the .NET solution `apps/api/TaskFlow.sln` with four projects (`TaskFlow.Api`, `TaskFlow.Domain`, `TaskFlow.Application`, `TaskFlow.Infrastructure`) and `apps/api/Directory.Build.props` (`<Nullable>enable</Nullable>`, `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`, `<AnalysisLevel>latest-all</AnalysisLevel>`); add ASP.NET Core 9, Wolverine + Wolverine.Http + Wolverine.EntityFrameworkCore, Npgsql.EntityFrameworkCore.PostgreSQL, Microsoft.AspNetCore.OpenApi, FluentValidation package refs
+- [X] T007 [P] Scaffold the test projects `apps/api/tests/TaskFlow.UnitTests/TaskFlow.UnitTests.csproj` and `apps/api/tests/TaskFlow.IntegrationTests/TaskFlow.IntegrationTests.csproj` (xUnit, Testcontainers.PostgreSql, FluentAssertions) and wire them into the solution
+- [X] T008 [P] Author the container stack: `docker/docker-compose.yml` (postgres 17, api, web), `docker/docker-compose.dev.yml` (build-from-source + bind mounts), `docker/Dockerfile.web` (multi-stage deps→build→runtime), `docker/Dockerfile.api` (multi-stage restore→build→publish→runtime); bind API port to `127.0.0.1` only
+- [X] T009 [P] Author the host `Caddyfile` (TLS via Let's Encrypt; `handle /hub/*` → `127.0.0.1:4311`, `handle` → `127.0.0.1:3000`) per plan.md
+- [X] T010 [P] Author the CI workflow `.github/workflows/ci.yml` with the staged pipeline skeleton: lint+typecheck → test → openapi-sync (regenerate+diff, fail on drift) → build+push GHCR (immutable git-SHA tag) → deploy (main only, SSH→Hetzner: pg_dump → compose pull → EF migrate → restore-test → compose up)
+- [X] T011 [P] Author backup infrastructure `scripts/backup.sh` (pg_dump wrapper for pre-migration + scheduled) and `scripts/restore-test.sh` (restore into throwaway DB, assert integrity) per Constitution VII / FR-051
+
+**Checkpoint**: Monorepo builds empty; toolchains, containers, CI skeleton, and backup scripts exist.
+
+---
+
+## Phase 2: Foundational (Blocking Prerequisites)
+
+**Purpose**: Core domain, persistence, authorization, OAuth/session/proxy plumbing, OpenAPI pipeline, test harness, and error/security baseline. **No user story can begin until this phase is complete.**
+
+**⚠️ CRITICAL**: Blocks all of Phase 3 and Phase 4.
+
+### Domain & Persistence
+
+- [X] T012 [P] Domain primitives `apps/api/src/TaskFlow.Domain/Common/AggregateRoot.cs` and `DomainEvent.cs`
+- [X] T013 [P] Strongly-typed `apps/api/src/TaskFlow.Domain/IdentityAccess/UserId.cs` (UUIDv7, application-generated)
+- [X] T014 User aggregate root `apps/api/src/TaskFlow.Domain/IdentityAccess/User.cs` (ENT-06: `google_subject_id` immutable; `email`/`display_name`/`avatar_url` refreshed from Google profile; **no soft-delete flag — account deletion hard-deletes the row**, per spec Clarifications 2026-06-17) — depends on T012, T013
+- [X] T015 EF Core `apps/api/src/TaskFlow.Infrastructure/Persistence/AppDbContext.cs` and `Configurations/UserConfiguration.cs` (column mappings, `timestamptz` for all temporals, UNIQUE indexes on `google_subject_id` and `email`) — depends on T014
+- [X] T016 EF Core initial migration in `apps/api/src/TaskFlow.Infrastructure/Persistence/Migrations/` that creates the `users` table + indexes **and seeds the tombstone identity row** (`id = 00000000-0000-0000-0000-000000000000`, `display_name = "Deleted User"`, per data-model.md) — schema source of truth (Constitution VI); depends on T015
+
+### Authorization Framework (deny-by-default, dispatch-by-visibility)
+
+- [X] T017 [P] Authorization contract `apps/api/src/TaskFlow.Application/Authorization/IResourceAuthorizationPolicy.cs` (dispatch-by-visibility interface)
+- [X] T018 Deny-by-default implementation `apps/api/src/TaskFlow.Application/Authorization/ResourceAuthorizationPolicy.cs` (ownership branch: `userId == currentUser.Id`, queries scoped to caller; shared-project branch stubbed for slice 007) — depends on T017
+- [X] T019 Wolverine pipeline `apps/api/src/TaskFlow.Application/Authorization/AuthorizationMiddleware.cs` enforcing deny-by-default on every command/query handler (FR-068) — depends on T018 — _**VERIFIED 3 ways** (2026-06-17): (1) no-JWT `POST /api/users/ensure` → exactly 401 + our RFC 9457 envelope + **no row written** (the catastrophic-200 case is excluded), via the message pipeline since endpoints only delegate to the bus; (2) direct `IMessageBus.InvokeAsync` with no principal throws `UnauthenticatedException` (`AuthorizationMiddlewareTests`); (3) a temporary inline (non-delegating) endpoint with no JWT also returned 401, proving the added HTTP-layer gate weaves universally. Required two foundational fixes surfaced by the weave: `opts.Discovery.IncludeAssembly` (handlers live in TaskFlow.Application, not the entry assembly) and making `HttpContextCurrentUser` public (Wolverine codegen inlines the `ICurrentUser` dependency; service location is disallowed). Added `MapWolverineEndpoints(o => o.AddMiddleware(...))` as a uniform HTTP backstop + `DurabilityMode.Solo` (single-node)._
+
+### API Host, Error & Security Middleware
+
+- [X] T020 RFC 9457 error envelope `apps/api/src/TaskFlow.Api/Middleware/ProblemDetailsMiddleware.cs` with the stable `errorCode` enum from contracts/openapi.yaml (`unauthenticated`, `not_admitted`, `forbidden`, `validation_failed`, `not_found`, `conflict_lww`, `last_owner`, `internal_error`) — ADR-0009
+- [X] T021 [P] `apps/api/src/TaskFlow.Api/Middleware/SecurityHeadersMiddleware.cs` — CSP + standard security response headers for production (FR-099)
+- [X] T022 API host wiring `apps/api/src/TaskFlow.Api/Program.cs`: Wolverine (durable Postgres local queues + transactional outbox), EF Core/Npgsql, JWT bearer auth validating the BFF HMAC-SHA256 carrier, built-in OpenAPI at `/openapi/v1.json`, the middleware pipeline (T019/T020/T021), and **no CORS** (single origin); run EF migrations on startup — depends on T015, T019, T020, T021 — _runtime-verified: host boots, serves `/openapi/v1.json`, migration+tombstone applied (FoundationSmokeTests). Required `WolverineFx.RuntimeCompilation` (6.x split-out)._
+- [X] T023 OpenAPI client pipeline: `apps/web/package.json` `gen:api` script running `openapi-typescript` from `/openapi/v1.json` into `apps/web/src/lib/api/generated/` (committed), plus the `apps/web/src/lib/api/client.ts` openapi-fetch wrapper; CI diff-gate fails on drift — **requires the API contract to build first**; depends on T022 — _initial `schema.d.ts` generated from the committed contract file (API has no endpoints until T039); Phase 3 regenerates from the live `/openapi/v1.json`_
+
+### BFF Foundation (Next.js)
+
+- [X] T024 [P] BFF session store `apps/web/sql/001-sessions.sql` (table DDL, FK → `users(id)` **ON DELETE CASCADE** so hard-deleting a user removes their sessions, `ix_sessions_user_id`) + `apps/web/src/lib/auth/session.ts` (pg CRUD: insert, read-by-id, touch `last_accessed_at`, invalidate) + a new `apps/web/src/instrumentation.ts` (Next.js `register()` startup hook) that runs `CREATE TABLE IF NOT EXISTS` — **FK requires the EF migration (T016) to have run first** _(also added `src/lib/db.ts` pg pool)_
+- [X] T025 [P] Europe/Warsaw timezone utility `apps/web/src/lib/timezone.ts` (date-fns-tz; UTC storage, Warsaw reference zone per ASM-12 / Constitution X)
+- [X] T026 [P] BFF→API carrier minting `apps/web/src/lib/auth/token.ts` (jose, HMAC-SHA256, 60-second expiry, claims `sub`/`email`/`name`/`iat`/`exp`) — _matches C# `BffCarrierToken` (issuer/audience/claims)_
+- [X] T027 [P] CSRF protection `apps/web/src/lib/auth/csrf.ts` (Origin-header validation for state-changing requests; pairs with `SameSite=Lax` cookie — FR-089)
+- [X] T028 Authenticated proxy route `apps/web/src/app/api/proxy/[...path]/route.ts` (read `taskflow_session` cookie → validate session in Postgres (exists/not invalidated/not expired/not idle) → touch `last_accessed_at` → mint 60s JWT → forward to `API_INTERNAL_URL`) — depends on T024, T026, T027
+
+### UI Shell, Test Harness & Error Baseline
+
+- [X] T029 [P] Base UI primitives `apps/web/src/components/ui/` (button, dialog implementing the FR-101 focus contract, toast/ARIA-live region) — a11y baseline FR-042/043/047/101 _(Button, Dialog, LiveRegion, Toast)_
+- [X] T030 [P] Root layout `apps/web/src/app/layout.tsx` (TanStack Query provider, global styles, app-level ARIA-live region) and `apps/web/src/hooks/useSession.ts` client session state _(+ `app/providers.tsx`, `app/globals.css`)_
+- [X] T031 [P] Integration test harness `apps/api/tests/TaskFlow.IntegrationTests/Infrastructure/IntegrationTestBase.cs` (WebApplicationFactory + Testcontainers-Postgres) and `TestJwtHelper.cs` (mint valid/invalid test JWTs for allow/deny tests) — _verified working via FoundationSmokeTests; TestJwtHelper exercised by T034/T035_
+- [X] T032 [P] Error baseline: structured error logging that never logs secrets (FR-050) on the API, and the client error-UX mapping (FR-049) implementing the ADR-0009 error-code → message/redirect table in `apps/web/src/lib/api/client.ts` _(API logging in `ProblemDetailsMiddleware`; client `mapError` table in `client.ts`)_
+
+**Checkpoint**: Domain + migration + tombstone seed, deny-by-default authz pipeline, API host with JWT/OpenAPI/security headers, BFF session+proxy+token plumbing, UI shell, and the integration test harness all exist. User stories can begin.
+
+> **Phase 2 status (verified 2026-06-17)**: T012–T018, T020–T032 complete; full solution builds 0/0 under strict analyzers; `FoundationSmokeTests` runtime-verify host boot + OpenAPI + migration/tombstone; web `pnpm typecheck`/`lint` clean. **T019 is written but its Wolverine middleware weaving is UNVERIFIED** (no handler existed to weave it into yet).
+>
+> **⚠️ Phase 2 → Phase 3 carry-forwards (do these FIRST in Phase 3, before building US1 on top):**
+> 1. **Make T034's no-JWT deny test the very first thing after the first endpoint (T039) exists.** Assert THREE independent things: (a) request is *rejected at all* (proves `AuthorizationMiddleware.Before` actually wove — note `Before(ICurrentUser)` has no message-type first param, which the Wolverine docs imply may be required; adding the first endpoint is what triggers its codegen); (b) status is **401, not 500** (a 500 means the middleware didn't fire and `currentUser.Id` threw `InvalidOperationException` in the handler); (c) the body is **our RFC 9457 envelope (ADR-0009), not Wolverine.Http's own** exception/result handling. **There is no auth backstop**: Program.cs has no `RequireAuthorization()` / fallback policy, so the entire no-JWT→401 guarantee rests solely on this middleware. If any leg fails, that is a **Phase-2 foundational fix**, not a Phase-3 task. Known fallback: apply `RequireAuthorization()` to the Wolverine.Http endpoint group as the hard authentication gate + a `JwtBearerEvents` handler emitting our ProblemDetails, keeping `AuthorizationMiddleware` as the ownership-dispatch layer.
+> 2. **JWT contract has 3 implementations; C# tests only cover 2.** API validation (C#) + `TestJwtHelper` (C#) agree via T034/T035, but the real production minter is `token.ts` (TS/jose). Ensure the T036/T048 E2E round-trips a **real** `token.ts`→proxy→**real API** token (not a mocked API), or a key-encoding/claim-shape mismatch stays invisible until production sign-in.
+> 3. **Regenerate `apps/web/src/lib/api/generated/schema.d.ts` from the live `/openapi/v1.json`** once endpoints exist (T039). The committed copy came from the YAML file; expect representation diffs (nullable/format/operationId) — the CI diff-gate rewriting it is expected, not a failure.
+
+---
+
+## Phase 3: User Story 1 - Account & Sign-In (Priority: P1) 🎯 MVP
+
+**Goal**: An admitted team member signs in with Google (admission-gated), lands in their isolated empty workspace, sees their Google profile, can sign out; unauthenticated and non-admitted access is denied.
+
+**Independent Test**: Sign in with Google as an admitted account → account created, land in empty workspace (AS-01); sign in as a non-admitted account → rejected, no account created (AS-01); sign out → protected views inaccessible (AS-02); hit a protected route with no session → redirected to sign-in (AS-03); open profile → Google name + avatar shown (AS-04).
+
+> **MVP note**: This is the MVP increment, but because slice 001 is foundational, shipping US1 still requires all of Phase 1 + Phase 2. That breadth is inherent to the first slice, not a defect.
+
+### Tests for User Story 1 (write FIRST, ensure they FAIL) ⚠️
+
+- [X] T033 [P] [US1] Unit test `apps/api/tests/TaskFlow.UnitTests/Domain/IdentityAccess/UserTests.cs` — aggregate invariants (immutable `google_subject_id`; profile fields refresh on re-sign-in) — _14 tests green (characterization: `User.cs` exists from T014)_
+- [X] T034 [P] [US1] Integration test `apps/api/tests/TaskFlow.IntegrationTests/IdentityAccess/EnsureUserTests.cs` — **allow** (valid JWT → create-then-match, profile refreshed; a `google_subject_id` with no existing row → fresh account created) **and deny** (missing/invalid JWT → 401) (SC-016) — _green; deny also asserts no row is created_
+- [X] T035 [P] [US1] Integration test `apps/api/tests/TaskFlow.IntegrationTests/IdentityAccess/GetCurrentUserTests.cs` — **allow** (valid JWT → 200 + profile) **and deny** (no JWT → 401; JWT whose `sub` references a no-longer-existent / hard-deleted user → 401) (SC-013, SC-016) — _green_
+- [ ] T036 [P] [US1] E2E `apps/web/tests/e2e/auth.spec.ts` covering AS-01 admitted sign-in (account created, empty workspace), AS-01 non-admitted denied — not on allowlist / outside `hd`, or `email_verified` not true (recoverable message, no account), AS-02 sign-out, AS-03 unauthenticated → redirect to sign-in, AS-04 profile name+avatar shown
+
+### Implementation for User Story 1
+
+- [X] T037 [P] [US1] `EnsureUser` command + handler `apps/api/src/TaskFlow.Application/IdentityAccess/Commands/EnsureUser.cs` (create-or-match by `google_subject_id`; refresh profile fields; a previously-deleted identity has no row → creates a fresh empty account, per spec Clarifications 2026-06-17) — _also added `IUserRepository` (Application seam) + `UserRepository` (Infrastructure) + `UserProfile` DTO; handler reads `googleSubjectId` from the body, never `currentUser.Id`_
+- [X] T038 [P] [US1] `GetCurrentUser` query + handler `apps/api/src/TaskFlow.Application/IdentityAccess/Queries/GetCurrentUser.cs` (return profile; 401/not-found when the user row no longer exists — hard-deleted accounts have no row) — _throws `UnauthenticatedException` (→401) when the carrier's `sub` maps to no row_
+- [X] T039 [US1] Wolverine.Http endpoints `apps/api/src/TaskFlow.Api/Endpoints/UserEndpoints.cs` — `POST /api/users/ensure` and `GET /api/users/me` per contracts/openapi.yaml — depends on T037, T038 — _thin adapters delegating via `IMessageBus.InvokeAsync` so T019 weaves; `UserEndpoints` must be public (CA1515 suppressed — Wolverine.Http discovery)_
+- [~] T040 [P] [US1] BFF OAuth helpers `apps/web/src/lib/auth/oauth.ts` (PKCE, `state`, `nonce`, code exchange, id_token validation incl. extracting the `email_verified` and `hd` claims for the admission gate — FR-090) — _**implemented + partially verified**: 8 Vitest unit tests green for the deterministic surface (PKCE = base64url-S256 of verifier, state/nonce, authorization-URL construction, and the encrypted `taskflow_oauth` transaction seal/open round-trip incl. tamper/wrong-secret rejection). Added the advisor-flagged OAuth **transaction-state** seam (seal `{state,nonce,codeVerifier}` into a SameSite=Lax cookie), a module-scoped JWKS singleton, and issuer-array support. **`exchangeCodeForTokens` + `validateIdToken` (network/JWKS paths) are runtime-pending the fake-IdP E2E (T036).**_
+- [X] T041 [P] [US1] BFF admission gate `apps/web/src/lib/auth/admission.ts` (`ADMISSION_EMAILS` and/or `ADMISSION_HD` from id_token `hd`; **require id_token `email_verified === true`**; neither match OR unverified email → `not_admitted`; **expose a startup config check that fails fast (throws) when neither `ADMISSION_EMAILS` nor `ADMISSION_HD` is configured**, wired into `apps/web/src/instrumentation.ts` (the Next.js `register()` startup hook created in T024) — FR-087). Ships a Red-first Vitest unit test `apps/web/tests/unit/admission.test.ts` covering: allowlist match, `hd` match, non-admitted rejected, unverified email rejected (even on allowlist match), and unconfigured → throws. — _11 tests green (Red-first verified); `assertAdmissionConfigured()` wired into `register()`_
+- [~] T042 [US1] BFF auth routes `apps/web/src/app/api/auth/{signin,callback,signout,session}/route.ts` — signin initiates OAuth; callback validates state/nonce/PKCE → checks admission (allowlist/`hd` + `email_verified`) → `POST /api/users/ensure` → creates rotated session (FR-088); signout invalidates session + clears cookie (FR-054); session returns current session info — depends on T028, T040, T041 — _**implemented** (incl. `lib/api/internal.ts` server-to-server `ensureUser`/`fetchProfile` minting real `token.ts` carriers; admission-before-ensure; session seeded from the ensure-response `profile.id` GUID, not the Google sub; callback validates `state` vs the sealed transaction as the OAuth CSRF defense). Typecheck + lint clean. **Runtime-pending the E2E (T036/T048).**_
+- [~] T043 [P] [US1] Sign-in surface `apps/web/src/app/(auth)/layout.tsx`, `apps/web/src/app/(auth)/signin/page.tsx`, and `apps/web/src/components/auth/SignInButton.tsx` — a11y: visible focus (FR-042), ARIA roles/labels (FR-043), contrast ≥4.5:1 (FR-044), no AT-binding collision (FR-045), no hover-only content (FR-046), single-key suppression in inputs (FR-031) — _**implemented** (anchor-based sign-in = keyboard-first/no-JS; `role="alert"` for the recoverable not-admitted/oauth-failed message). Typecheck + lint clean. **Runtime/a11y-pending the E2E (T036) + T057.**_
+- [~] T044 [P] [US1] App shell `apps/web/src/app/(app)/layout.tsx` + empty workspace home `apps/web/src/app/(app)/page.tsx` — accessible first-run empty state (EC-01), no onboarding wizard/tooltips/modal (FR Principle IV) — _**implemented** (form-POST sign-out = no-JS; quiet empty state). Typecheck + lint clean. **Runtime-pending the E2E.**_
+- [~] T045 [US1] Settings profile view `apps/web/src/app/(app)/settings/page.tsx` — display Google name + avatar, output-encoded (FR-056, FR-099) — depends on T044 — _**implemented** (client component via `useSession`; React output-encodes name/email). **Runtime-pending the E2E.**_
+- [~] T046 [US1] Deny-by-default route guard in the BFF: unauthenticated requests to `(app)` routes/proxy redirected to sign-in (FR-055) — depends on T028, T042 — _**implemented** as `apps/web/src/middleware.ts` (edge cookie-presence redirect to /signin; matcher excludes /signin, /api, _next, static). Proxy already returns 401 for no/invalid session. **Runtime-pending the E2E (AS-03).**_
+
+**Checkpoint**: US1 is fully functional and independently testable — sign-in, admission gate, session, profile, sign-out, and deny-by-default access all work end-to-end.
+
+> **Phase 3 status (in progress, 2026-06-17)** — legend: `[X]` runtime-verified · `[~]` implemented + statically verified (typecheck/lint/unit) but runtime-pending the E2E.
+> - **API side fully done & green**: T033 (14 unit), T034/T035 (9 integration allow+deny), T037/T038/T039, and **T019 proven 3 ways** (message-pipeline deny via ensure/me with no row written; direct-bus `InvokeAsync` with no principal; an inline non-delegating endpoint also gated by the added HTTP backstop). Full `dotnet test` green; integration suite stable across repeated runs after `DurabilityMode.Solo`.
+> - **BFF logic verified**: T041 admission (11 unit, Red-first) + T040 deterministic OAuth surface (8 unit). 19 Vitest green; `pnpm typecheck` + `lint` + **`next build`** all clean across all new web code (the production build validates route-handler shapes, the async `searchParams` page, server/client boundaries, the middleware matcher, and route-group resolution).
+> - **Latent T024 build bug fixed**: `next build` (never run before this phase) surfaced that `pg` was being bundled into the edge runtime via `instrumentation.ts` (fails on `fs`). Fixed by `serverExternalPackages: ["pg"]` + splitting Node-only startup into `instrumentation-node.ts` (relative dynamic import under the `NEXT_RUNTIME === "nodejs"` guard). This would otherwise have broken the Docker `web` image build and the E2E.
+> - **BFF runtime-pending (`[~]`)**: T040 network paths (`exchangeCodeForTokens`/`validateIdToken`), T042 routes, T043–T045 UI, T046 guard — written + statically clean (typecheck/lint/build), but **not yet runtime-verified**.
+>
+> **⚠️ Next action — the E2E (T036), built in two milestones (advisor-scoped to de-risk):**
+> 1. **Seeded-session E2E first (AS-02/03/04)** — closes the orientation's #1 web risk (real `token.ts` HS256 carrier ↔ API validation): ensure a user via the API, insert a session row + set the cookie, drive the browser through the **real** proxy→API. Needs only an authenticated session (Postgres + real .NET API + Next BFF), **no OAuth dance**.
+> 2. **Fake-IdP AS-01 (admitted/non-admitted sign-in)** as its own milestone — a local IdP (serving `/auth`,`/token`,`/jwks`, minting RS256 id_tokens) wired into the BFF via the `GOOGLE_*` env overrides, exercising `oauth.ts` end-to-end. This is the only path that needs the 4th process.
+>
+> Once both pass, flip the `[~]` tasks to `[X]` and run the quickstart AS-01..04 + SC-016 checkpoint.
+
+---
+
+## Phase 4: User Story 2 - Account & Data Management / Deletion (Priority: P2)
+
+**Goal**: A signed-in user can irreversibly delete their account; the erasure-cascade contract is established on the User aggregate (hard-delete of the User row + session purge + `AccountDeletionRequested` dispatched), with the tombstone identity ready for later slices to anonymize against.
+
+**Independent Test (data-handler level — genuinely independent of US1)**: Using `TestJwtHelper`, call `DELETE /api/users/me` with a valid JWT → 204, the User row hard-deleted (no residual row), sessions purged, cascade event dispatched (**allow**); call with no/invalid JWT → 401 (**deny**). **E2E flow depends on US1** (a user must be signed in to reach the delete dialog) — that dependency is stated, not hidden.
+
+### Tests for User Story 2 (write FIRST, ensure they FAIL) ⚠️
+
+- [ ] T047 [P] [US2] Integration test `apps/api/tests/TaskFlow.IntegrationTests/IdentityAccess/DeleteAccountTests.cs` — **allow** (valid JWT → 204, the User row hard-deleted with no residual row [SC-017], sessions purged, `AccountDeletionRequested` dispatched) **and deny** (no/invalid JWT → 401; cannot delete another user) (SC-016, SC-017)
+- [ ] T048 [P] [US2] E2E in `apps/web/tests/e2e/auth.spec.ts` — AS-02 delete + confirm → session ends; re-sign-in with the same Google identity yields a fresh empty account (the deleted account is NOT restored); assert the deletion-contract surfaces (cascade dispatched, tombstone present) for AS-03/AS-04
+
+### Implementation for User Story 2
+
+- [ ] T049 [P] [US2] Domain event `apps/api/src/TaskFlow.Domain/IdentityAccess/Events/AccountDeletionRequested.cs`
+- [ ] T050 [US2] `DeleteAccount` command + handler `apps/api/src/TaskFlow.Application/IdentityAccess/Commands/DeleteAccount.cs` — within one transaction: dispatch `AccountDeletionRequested` via the Wolverine outbox, then **hard-delete the User row** (irreversible); the user's BFF-owned session rows are removed automatically by the `sessions.user_id` ON DELETE CASCADE (T024), so the API never touches the session table (FR-085); excluded from 30s undo — depends on T049
+- [ ] T051 [US2] Add `DELETE /api/users/me` to `apps/api/src/TaskFlow.Api/Endpoints/UserEndpoints.cs` (204 on success, per contracts/openapi.yaml) — depends on T050, T039
+- [ ] T052 [US2] BFF: on successful account deletion, clear the session cookie — the user's session rows are already removed by the ON DELETE CASCADE when the API hard-deletes the user (T024/T050), so no explicit session-table write is needed — depends on T024
+- [ ] T053 [US2] `apps/web/src/components/auth/DeleteAccountDialog.tsx` — FR-101 dialog focus contract (initial focus, focus trap, Esc dismiss, return focus to invoker) + clear blast-radius confirmation; wire into the settings page — depends on T045
+
+**Checkpoint**: Account deletion works with allow+deny coverage; the cascade/tombstone contract is established for later slices to extend.
+
+---
+
+## Phase 5: Polish & Cross-Cutting Concerns
+
+**Purpose**: Slice-wide verification of the success criteria and cross-cutting requirements.
+
+- [ ] T054 [P] SC-016 verification: assemble the role×operation deny matrix confirming every data handler introduced here (ensureUser, getCurrentUser, deleteAccount) ships **both** an allow and a deny test; record in `specs/001-accounts-and-auth/` (e.g. a matrix note or a parametrized test summary)
+- [ ] T055 [P] SC-017 verification: confirm account deletion leaves no residual personally-attributable data beyond the tombstone identity for the User aggregate — assert the User row is hard-deleted (no residual row) and only the separate seeded tombstone remains (extend assertion in DeleteAccountTests)
+- [ ] T056 [P] FR-100 verification: confirm secrets (session signing key, OAuth client secret, DB/broker creds, deploy keys) are runtime-injected and never committed, baked into images, or written to logs/error context — scan repo, image build args, and structured logs
+- [ ] T057 [P] Accessibility pass across all auth surfaces (sign-in, empty workspace, settings, delete dialog): FR-042–047, contrast ≥4.5:1, `prefers-reduced-motion` (transitions instant/<100ms), FR-031 single-key suppression in text inputs, FR-101 ARIA-live announcements
+- [ ] T058 [P] FR-099 verification: confirm CSP + standard security headers present in the production response and that Google profile fields are output-encoded (no raw HTML injection)
+- [ ] T059 [P] FR-051 backup/restore validation: run `scripts/backup.sh` then `scripts/restore-test.sh` against a throwaway DB and assert integrity (no-op-but-present for the first migration)
+- [ ] T060 Run the `quickstart.md` validation scenarios end-to-end against the running app and confirm all rows pass
+- [ ] T061 [P] Documentation: update repo `README` / monorepo dev docs to match the bootstrapped structure and the quickstart
+
+---
+
+## Dependencies & Execution Order
+
+### Phase dependencies
+
+- **Setup (P1)** → no dependencies; start immediately.
+- **Foundational (P2)** → depends on Setup; **blocks all user stories**.
+- **US1 (P3)** → depends on Foundational; the MVP increment.
+- **US2 (P4)** → depends on Foundational; its data-handler tests are independent of US1, but its E2E flow depends on US1 sign-in.
+- **Polish (P5)** → depends on US1 + US2 (the criteria it verifies).
+
+### Critical ordering edges (must hold)
+
+- **T016 (EF migration, creates `users`) → T024 (BFF session table)** — the session FK references `users(id)`; the migration must run first.
+- **T022 (API host builds the OpenAPI contract) → T023 (TS client generation)** — the generated client requires the contract to build first.
+- T037/T038 → T039 (endpoints wire the handlers); T049 → T050 → T051 (event → handler → endpoint); T044 → T045 → T053 (shell → settings → delete dialog).
+
+### Within each user story
+
+- Tests (T033–T036, T047–T048) are written and MUST FAIL before their implementation tasks (Constitution VIII).
+- Domain/handlers before endpoints; BFF helpers before BFF routes; shell before pages.
+
+---
+
+## Parallel Opportunities
+
+- **Setup**: T002–T011 are all `[P]` (distinct files) once T001 creates the tree.
+- **Foundational**: T012/T013, T017, T021, and the BFF helper cluster T024/T025/T026/T027, plus T029/T030/T031/T032 run in parallel within their dependency limits.
+- **US1 tests**: T033, T034, T035, T036 in parallel (different files), all before implementation.
+- **US1 impl**: T037/T038 parallel; T040/T041 parallel; T043/T044 parallel.
+- **Polish**: T054–T059 and T061 are all `[P]`.
+
+### Parallel Example: User Story 1 tests (Red phase)
+
+```bash
+Task: "Unit: User aggregate invariants in apps/api/tests/TaskFlow.UnitTests/Domain/IdentityAccess/UserTests.cs"
+Task: "Integration allow+deny: EnsureUserTests.cs"
+Task: "Integration allow+deny: GetCurrentUserTests.cs"
+Task: "E2E auth.spec.ts: AS-01..AS-04"
+```
+
+---
+
+## Implementation Strategy
+
+### MVP First (US1)
+
+1. Phase 1 Setup → 2. Phase 2 Foundational (CRITICAL — blocks everything) → 3. Phase 3 US1 → **STOP and validate** US1 independently (quickstart AS-01..AS-04 + SC-016 allow/deny) → deploy/demo.
+
+### Incremental Delivery
+
+Setup + Foundational → US1 (MVP, test + deploy) → US2 (test + deploy) → Polish/verification pass. Each increment is independently testable and adds value without breaking the prior one.
+
+---
+
+## Traceability (artifact → task coverage)
+
+**Endpoints (contracts/openapi.yaml)** — each ships handler + allow + deny test:
+- `ensureUser` → T037 (impl) · T039 (route) · T034 (allow+deny)
+- `getCurrentUser` → T038 (impl) · T039 (route) · T035 (allow+deny)
+- `deleteAccount` → T050 (impl) · T051 (route) · T047 (allow+deny)
+
+**Acceptance scenarios**:
+- US-11.AS-01 → T036, T034; US-11.AS-02 → T036, T042; US-11.AS-03 → T036, T046; US-11.AS-04 → T036, T045
+- US-17.AS-02 → T048, T047, T050; US-17.AS-03 → T047, T055 (tombstone/cascade contract); US-17.AS-04 → T048, T016 (tombstone seed)
+
+**Success criteria**: SC-013 → T035 (deny) + T019 (deny-by-default pipeline); SC-016 → T034/T035/T047 + T054 (matrix); SC-017 → T047, T055.
+
+**Entity / data-model**: ENT-06 User → T014/T015/T016; tombstone seed → T016; Session → T024.
+
+**Key requirements**: FR-052→T037/T042; FR-053→T024/T042; FR-054→T042; FR-055→T046; FR-056→T045; FR-085→T050; FR-086→T032/T011 (retention stance documented in `.env.example`/research); FR-087→T041; FR-088→T024/T042; FR-089→T027; FR-090→T040; FR-091→T026/T028/T022; FR-099→T021/T058; FR-100→T056; FR-065/066/067/068→T017/T018/T019; FR-031/042–047/101→T029/T043/T044/T057; FR-049→T032; FR-050→T032; FR-051→T011/T059.
+
+---
+
+## Notes
+
+- This `tasks.md` is a planning document only. **No code is written under `apps/**` until `/speckit-implement`.**
+- `[P]` = different files, no incomplete dependency. `[Story]` label present on US phases only.
+- Verify every test fails before implementing (Red-Green-Refactor).
+- Commit after each task or logical group; never commit secrets (public repo).

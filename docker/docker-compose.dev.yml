@@ -1,0 +1,22 @@
+# Dev overrides: build images from source and expose Postgres to the host for local tooling.
+# Usage: docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml up
+services:
+  postgres:
+    ports:
+      - "5432:5432" # exposed locally for psql / migrations from the host
+
+  api:
+    image: taskflow-api:dev
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+
+  web:
+    image: taskflow-web:dev
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.web
+    environment:
+      NODE_ENV: production

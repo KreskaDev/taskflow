@@ -152,7 +152,7 @@ apps/
     │   │   └── IdentityAccess/
     │   │       ├── Commands/
     │   │       │   ├── EnsureUser.cs       # Command + handler: create or match user
-    │   │       │   └── DeleteAccount.cs    # Command + handler: soft-delete + cascade event
+    │   │       │   └── DeleteAccount.cs    # Command + handler: hard-delete row + cascade event
     │   │       └── Queries/
     │   │           └── GetCurrentUser.cs   # Query + handler: return profile
     │   └── TaskFlow.Infrastructure/

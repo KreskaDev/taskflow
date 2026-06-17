@@ -54,7 +54,7 @@ paths:
       summary: Delete the current user's account
       description: >
         Initiates irreversible account deletion with erasure cascade.
-        Sets deleted_at, invalidates all sessions, dispatches cascade event.
+        Hard-deletes the User row, purges all sessions, dispatches the cascade event.
       responses:
         '204':
           description: Account deleted

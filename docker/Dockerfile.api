@@ -1,0 +1,20 @@
+# syntax=docker/dockerfile:1
+# Multi-stage build for the ASP.NET Core API (net9.0). Build context = repo root.
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /src
+COPY global.json ./
+COPY apps/api/ ./apps/api/
+RUN dotnet restore apps/api/TaskFlow.sln
+RUN dotnet publish apps/api/src/TaskFlow.Api/TaskFlow.Api.csproj \
+    -c Release -o /app --no-restore
+
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
+# curl for the container healthcheck (compose hits /health).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY --from=build /app ./
+EXPOSE 4311
+ENV ASPNETCORE_URLS=http://0.0.0.0:4311
+ENTRYPOINT ["dotnet", "TaskFlow.Api.dll"]

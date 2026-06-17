@@ -58,14 +58,14 @@ Ref: `specs/001-accounts-and-auth/spec.md` acceptance scenarios.
 | Scenario | Steps | Expected |
 |---|---|---|
 | **US-11.AS-01** Admitted sign-in | Open app -> "Sign in with Google" -> complete OAuth with admitted account | Account created, land in empty workspace |
-| **US-11.AS-01** Non-admitted denied | Sign in with account NOT on allowlist/HD | Rejection message, no User created |
+| **US-11.AS-01** Non-admitted denied | Sign in with account NOT on allowlist/HD, or whose id_token `email_verified` is not true | Rejection message, no User created |
 | **US-11.AS-02** Sign-out | Click sign-out | Session ended, protected routes inaccessible |
 | **US-11.AS-03** Unauthenticated denied | Access protected route without session | Redirect to sign-in |
 | **US-11.AS-04** Profile display | Open profile/settings while signed in | Google name + avatar shown |
-| **US-17.AS-02** Account deletion | Settings -> Delete Account -> confirm dialog | Session ended, user record has `deleted_at`, re-sign-in fails |
+| **US-17.AS-02** Account deletion | Settings -> Delete Account -> confirm dialog | Session ended, user record hard-deleted (no residual row); re-sign-in with the same Google identity creates a fresh empty account |
 | **SC-016** Allow test | `GET /api/users/me` with valid JWT | 200 + profile |
 | **SC-016** Deny test | `GET /api/users/me` without JWT | 401 |
-| **SC-016** Deleted deny | `GET /api/users/me` with JWT for deleted user | 401 |
+| **SC-016** Deleted deny | `GET /api/users/me` with JWT for a hard-deleted (no-longer-existent) user | 401 |
 
 ## OpenAPI Client Regeneration
 

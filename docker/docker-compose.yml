@@ -1,0 +1,62 @@
+name: taskflow
+
+# Production stack: postgres + api + web. PostgreSQL is internal-only; api is bound to
+# 127.0.0.1 (not externally reachable, FR-091); host Caddy terminates TLS and proxies web + hub.
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # No published ports — reachable only on the internal compose network.
+
+  api:
+    image: ghcr.io/kreskadev/taskflow-api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      JWT_SIGNING_KEY: ${JWT_SIGNING_KEY}
+      ASPNETCORE_URLS: http://0.0.0.0:4311
+    ports:
+      - "127.0.0.1:4311:4311" # internal-only; public traffic never reaches the API directly
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:4311/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    image: ghcr.io/kreskadev/taskflow-web:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      API_INTERNAL_URL: http://api:4311
+      APP_URL: ${APP_URL}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      JWT_SIGNING_KEY: ${JWT_SIGNING_KEY}
+      SESSION_SECRET: ${SESSION_SECRET}
+      ADMISSION_EMAILS: ${ADMISSION_EMAILS}
+      ADMISSION_HD: ${ADMISSION_HD}
+      SESSION_ABSOLUTE_LIFETIME_HOURS: ${SESSION_ABSOLUTE_LIFETIME_HOURS:-168}
+      SESSION_IDLE_TIMEOUT_HOURS: ${SESSION_IDLE_TIMEOUT_HOURS:-24}
+    ports:
+      - "127.0.0.1:3000:3000" # host Caddy proxies the public origin to this
+
+volumes:
+  pgdata:

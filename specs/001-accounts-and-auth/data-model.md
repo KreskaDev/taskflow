@@ -15,7 +15,6 @@ The identity anchor for the entire system. Every later entity's `createdBy`, `ow
 | `avatar_url` | `text` | NULL | From Google profile; updated on re-sign-in |
 | `created_at` | `timestamptz` | NOT NULL, DEFAULT now() | UTC |
 | `updated_at` | `timestamptz` | NOT NULL, DEFAULT now() | UTC |
-| `deleted_at` | `timestamptz` | NULL | Set on account deletion (irreversible) |
 
 **Indexes**:
 - `ix_users_google_subject_id` — UNIQUE on `google_subject_id`
@@ -24,7 +23,8 @@ The identity anchor for the entire system. Every later entity's `createdBy`, `ow
 **Domain rules**:
 - `google_subject_id` is immutable after creation
 - `email`, `display_name`, `avatar_url` are updated from Google profile on each sign-in
-- A user with `deleted_at IS NOT NULL` is excluded from all authorization queries
+- Account deletion is a **hard-delete**: the User row is removed entirely (there is no soft-delete flag), its sessions are purged, and the freed Google identity means a later sign-in by the same account creates a brand-new empty account (per spec Clarifications 2026-06-17)
+- Admission (enforced in the BFF before User creation) requires the Google id_token `email_verified` claim to be `true`; `email_verified` is checked, not stored
 
 **Tombstone identity**: A well-known seeded row (`id = 00000000-0000-0000-0000-000000000000`, `display_name = "Deleted User"`) used by later slices' cascade handlers to anonymize `createdBy`/assignee/comment-author references on account deletion.
 
@@ -35,14 +35,14 @@ Managed by the Next.js BFF (not by the .NET API). Same Postgres database; create
 | Field | Type | Constraints | Notes |
 |---|---|---|---|
 | `id` | `uuid` (UUIDv4) | PK | Cryptographically random session token |
-| `user_id` | `uuid` | FK -> users(id), NOT NULL | |
+| `user_id` | `uuid` | FK -> users(id) ON DELETE CASCADE, NOT NULL | Cascade removes the user's sessions when the user row is hard-deleted |
 | `created_at` | `timestamptz` | NOT NULL, DEFAULT now() | Session start |
 | `last_accessed_at` | `timestamptz` | NOT NULL, DEFAULT now() | Updated on each valid request |
 | `expires_at` | `timestamptz` | NOT NULL | Absolute expiry (default: created_at + 7d) |
 | `is_invalidated` | `boolean` | NOT NULL, DEFAULT false | Set on sign-out |
 
 **Indexes**:
-- `ix_sessions_user_id` on `user_id` (for bulk invalidation on account deletion)
+- `ix_sessions_user_id` on `user_id` (supports the ON DELETE CASCADE and per-user lookups)
 
 **Idle timeout**: Computed as `last_accessed_at + idle_timeout > now()` (default 24h); not stored.
 
@@ -53,7 +53,7 @@ Managed by the Next.js BFF (not by the .NET API). Same Postgres database; create
 ```
 [Non-existent] --EnsureUser (first sign-in)--> [Active]
 [Active] --EnsureUser (returning sign-in)--> [Active] (profile refreshed)
-[Active] --DeleteAccount--> [Deleted] (deleted_at set, sessions invalidated, cascade dispatched)
+[Active] --DeleteAccount--> [Removed] (row hard-deleted, sessions purged, cascade event dispatched)
 ```
 
 ### Session Lifecycle
@@ -65,7 +65,7 @@ Managed by the Next.js BFF (not by the .NET API). Same Postgres database; create
 [Active] --Absolute expiry--> [Expired] (rejected on next check)
 [Active] --Idle timeout--> [Expired] (rejected on next check)
 [Active] --Re-sign-in--> [Invalidated] (new session created = rotation)
-[Active] --Account deletion--> [Invalidated]
+[Active] --Account deletion--> [Purged] (deleted with the user)
 ```
 
 ## Migration Plan
@@ -76,7 +76,7 @@ Creates the `users` table and seeds the tombstone identity. This is the schema s
 
 ### BFF Session Table (Next.js)
 
-Created on BFF startup via `CREATE TABLE IF NOT EXISTS`. FK to `users(id)` requires the EF Core migration to have run first. Startup order in Docker Compose handles this (`web` depends on `api`; `api` runs migrations on startup).
+Created on BFF startup via `CREATE TABLE IF NOT EXISTS`. FK to `users(id)` requires the EF Core migration to have run first. Startup order in Docker Compose handles this (`web` depends on `api`; `api` runs migrations on startup). The FK is declared `ON DELETE CASCADE` so hard-deleting a user removes their session rows without the .NET API touching the BFF-owned `sessions` table.
 
 ### Cleanup
 
