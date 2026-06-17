@@ -8,7 +8,9 @@ import { setNextIdentity, userExistsByGoogleSub } from "./helpers/seed";
  * PKCE verification — plus the admission gate (FR-087) before any account is created.
  */
 
-const ADMITTED_EMAIL = process.env.ADMISSION_EMAILS as string;
+// ADMISSION_EMAILS is a comma-separated allowlist; AS-01 signs in as the first admitted address
+// (the delete-roundtrip spec consumes the second entry).
+const ADMITTED_EMAIL = (process.env.ADMISSION_EMAILS as string).split(",")[0]!.trim();
 
 test.describe("US1 sign-in via OAuth (AS-01)", () => {
   test("AS-01: an admitted, email-verified account signs in → account created, lands in workspace", async ({

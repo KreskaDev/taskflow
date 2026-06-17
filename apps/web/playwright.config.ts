@@ -23,7 +23,7 @@ const E2E_ENV: Record<string, string> = {
   APP_URL: "http://localhost:3000",
   // Admission must be configured or the BFF fails fast at startup (FR-087). The seeded-session
   // milestone admits this address; the fake-IdP milestone reuses it for the admitted-sign-in case.
-  ADMISSION_EMAILS: "admitted@taskflow.test",
+  ADMISSION_EMAILS: "admitted@taskflow.test,delete-roundtrip@taskflow.test",
   ASPNETCORE_URLS: "http://localhost:4311",
   ASPNETCORE_ENVIRONMENT: "Development",
   // Fake-IdP wiring for the AS-01 sign-in milestone (oauth.ts honours these overrides). The IdP

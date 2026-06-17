@@ -32,4 +32,12 @@ public static class UserEndpoints
         ArgumentNullException.ThrowIfNull(bus);
         return bus.InvokeAsync<UserProfile>(new GetCurrentUser());
     }
+
+    /// <summary>Irreversibly erase the current caller's own account (204 No Content).</summary>
+    [WolverineDelete("/api/users/me")]
+    public static Task DeleteAccount(IMessageBus bus)
+    {
+        ArgumentNullException.ThrowIfNull(bus);
+        return bus.InvokeAsync(new DeleteAccount());
+    }
 }

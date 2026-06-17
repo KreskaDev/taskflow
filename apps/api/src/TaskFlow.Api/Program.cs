@@ -7,6 +7,7 @@ using TaskFlow.Api.Authentication;
 using TaskFlow.Api.Middleware;
 using TaskFlow.Application.Authorization;
 using TaskFlow.Application.IdentityAccess;
+using TaskFlow.Domain.IdentityAccess.Events;
 using TaskFlow.Infrastructure.Persistence;
 using Wolverine;
 using Wolverine.EntityFrameworkCore;
@@ -62,15 +63,28 @@ builder.Host.UseWolverine(opts =>
     opts.Policies.AutoApplyTransactions();
     opts.Policies.UseDurableLocalQueues();
 
+    // Make AccountDeletionRequested routable: an unrouted Wolverine publish is silently dropped
+    // (no outbox row, nothing tracked). The durable local queue gives the event an outbox-backed
+    // destination so the publish enrolls in the DeleteAccount handler's transaction (atomic with the
+    // User-row hard-delete). UseDurableLocalQueues (above) makes this queue outbox-backed.
+    opts.PublishMessage<AccountDeletionRequested>().ToLocalQueue("account-deletion");
+
     // Single-node deployment (one VPS, ~10 users): Solo durability skips the distributed
     // leader-election/agent machinery, giving faster, cleaner startup/shutdown (also avoids a
     // background-agent logger race during WebApplicationFactory teardown in integration tests).
     opts.Durability.Mode = DurabilityMode.Solo;
 
-    // Deny-by-default authentication on EVERY handler (FR-068). Verified at runtime
+    // Deny-by-default authentication on EVERY command/query handler (FR-068). Verified at runtime
     // by the Phase 3 deny tests — a green build does not prove Wolverine wove it.
     // (typeof overload: AuthorizationMiddleware is a static class.)
-    opts.Policies.AddMiddleware(typeof(AuthorizationMiddleware));
+    //
+    // EXEMPTION: AccountDeletionRequested is processed off the durable local queue, where there is no
+    // HttpContext, so ICurrentUser.IsAuthenticated is false and AuthorizationMiddleware.Before would
+    // throw → retry → dead-letter. Exclude only that event's no-op handler from the auth policy; every
+    // real command/query (including DeleteAccount, whose message type differs) keeps deny-by-default.
+    opts.Policies.AddMiddleware(
+        typeof(AuthorizationMiddleware),
+        chain => chain.MessageType != typeof(AccountDeletionRequested));
 });
 
 // --- Built-in .NET 9 OpenAPI document at /openapi/v1.json (R5) ---
