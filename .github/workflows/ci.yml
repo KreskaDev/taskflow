@@ -79,10 +79,15 @@ jobs:
           ConnectionStrings__postgres: Host=localhost;Port=5432;Database=taskflow;Username=taskflow;Password=taskflow
           Jwt__SigningKey: ci-openapi-sync-signing-key-0123456789abcdef
           ASPNETCORE_URLS: http://localhost:4311
+          # Match how the committed client was generated (the doc is env-independent, but this removes
+          # any drift variable from the git-diff gate).
+          ASPNETCORE_ENVIRONMENT: Development
         run: |
           dotnet run --project apps/api/src/TaskFlow.Api --no-launch-profile &
           API_PID=$!
-          npx --yes wait-on http://localhost:4311/openapi/v1.json -t 60000
+          # `http-get://` forces a GET — the OpenAPI minimal endpoint only handles GET, so a default
+          # wait-on HEAD request would 405 and never see the document.
+          npx --yes wait-on http-get://localhost:4311/openapi/v1.json -t 60000
           pnpm --filter @taskflow/web gen:api
           kill $API_PID || true
           git diff --exit-code apps/web/src/lib/api/generated/
