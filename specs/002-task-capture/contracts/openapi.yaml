@@ -1,0 +1,424 @@
+openapi: '3.1.0'
+info:
+  title: TaskFlow API
+  version: 0.2.0
+  description: >
+    TaskFlow REST API. Slice 002 adds the Task Capture surface (create, list,
+    rename, toggle-done, reorder, soft-delete) on top of the slice-001 auth
+    foundation and the shared ProblemDetails error contract (RFC 9457 / ADR-0009).
+
+servers:
+  - url: http://localhost:4311
+    description: Internal (Docker network / development)
+
+paths:
+  /api/tasks:
+    get:
+      operationId: listTasks
+      tags: [tasks]
+      summary: List the caller's own non-deleted tasks
+      description: >
+        Returns the authenticated caller's tasks (ownership-scoped: createdBy =
+        caller), excluding soft-deleted rows, ordered by the persisted `position`
+        ascending then `id` (newest-first seed per FR-102). Deny-by-default
+        (FR-068); no pagination — the client virtualizes (SC-010/SC-011).
+      responses:
+        '200':
+          description: The caller's ordered, non-deleted tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaskResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+
+  /api/tasks/{id}:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    put:
+      operationId: createTask
+      tags: [tasks]
+      summary: Create a task (idempotent insert-if-not-exists by client id)
+      description: >
+        Insert-if-not-exists keyed on the client-generated UUIDv7 `{id}` (FR-001).
+        A PUT to an id that already exists and belongs to the caller is an
+        idempotent retry — it returns the existing row UNCHANGED (it does NOT
+        replace; all edits go through the rename/status/position commands under
+        the optimistic-concurrency `version` rule). A PUT to an id owned by a
+        different user, or reusing a soft-deleted (tombstoned) id, is rejected as
+        not_found (404) to avoid an enumeration oracle. Returns 200 on both the
+        first insert and an idempotent hit.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskRequest'
+      responses:
+        '200':
+          description: Task created, or existing row returned on idempotent retry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+    delete:
+      operationId: deleteTask
+      tags: [tasks]
+      summary: Soft-delete a task
+      description: >
+        Soft-deletes the caller's task (sets `deleted_at`; the row is excluded
+        from all authorization-scoped reads, FR-097). A server-side reaper
+        hard-deletes the tombstone after the 30-second window (no client
+        involvement; the user-facing undo toast is slice 014). Soft-delete is
+        version-free and idempotent: a caller re-deleting their OWN
+        already-tombstoned row is the idempotent no-op 204 (NOT 404 — the 404
+        posture applies only to foreign/absent ids). Optimistic-concurrency does NOT
+        apply here (removing a row whose content changed underneath is safe), so
+        there is no 409 path — this is intentionally distinct from the edit
+        (rename/status/position) verbs.
+      responses:
+        '204':
+          description: >
+            Task soft-deleted (idempotent — a re-delete of the caller's own
+            tombstone also returns 204).
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/tasks/{id}/title:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    patch:
+      operationId: renameTask
+      tags: [tasks]
+      summary: Rename a task (optimistic concurrency)
+      description: >
+        Sets the task title (non-empty after trimming, ≤ 500 chars, FR-001).
+        Carries the caller's last-seen `version`; a stale `version` is rejected
+        with 409 `version_conflict` (the client refetches and reapplies its
+        intent). Ownership-scoped (createdBy = caller). Stamps `updated_at`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RenameTaskRequest'
+      responses:
+        '200':
+          description: Task renamed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /api/tasks/{id}/status:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    patch:
+      operationId: setTaskDone
+      tags: [tasks]
+      summary: Toggle a task's done/backlog status (optimistic concurrency)
+      description: >
+        Sets the DESIRED status (not a blind server-side flip, so the write is
+        idempotent under optimistic retry, SC-003). `done` stamps `completed_at`
+        = now; `backlog` clears `completed_at` (FR-003/FR-004). The request
+        accepts only `done` | `backlog` this slice, though the response exposes
+        the full FR-003 enum for forward-compat. Carries `version`; a stale
+        `version` → 409 `version_conflict`. Ownership-scoped.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetTaskStatusRequest'
+      responses:
+        '200':
+          description: Task status updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /api/tasks/{id}/position:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    patch:
+      operationId: reorderTask
+      tags: [tasks]
+      summary: Reorder a task (optimistic concurrency)
+      description: >
+        Sets the task's new `position` — a client-computed lexicographic rank
+        string (FR-102). The server validates the rank format and ownership and is
+        the sole writer under the `version` guard; it does NOT generate ranks. A
+        reorder is a normal optimistic write reconciled under the same
+        optimistic-concurrency rule: a stale `version` → 409 `version_conflict`,
+        on which the client refetches and recomputes the rank from fresh neighbors
+        (intent-based reapply). Ownership-scoped.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReorderTaskRequest'
+      responses:
+        '200':
+          description: Task reordered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+components:
+  parameters:
+    TaskId:
+      name: id
+      in: path
+      required: true
+      description: The task's client-generated UUIDv7 identifier.
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    CreateTaskRequest:
+      type: object
+      description: >
+        Create payload. The task `id` is carried in the route ({id}), not the
+        body. `title` and `position` are client-authoritative on create.
+      required: [title, position]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Task title; non-empty after trimming, ≤ 500 chars (FR-001).
+        position:
+          type: string
+          minLength: 1
+          description: >
+            Client-computed lexicographic rank string (fractional-indexing
+            alphabet; compared byte-ordinally under COLLATE "C"). Seeded
+            newest-first (between(null, head)) so the new task sorts to the top.
+            Required — the server validates but never generates ranks.
+
+    RenameTaskRequest:
+      type: object
+      required: [title, version]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: New task title; non-empty after trimming, ≤ 500 chars.
+        version:
+          type: integer
+          format: int32
+          description: The caller's last-seen optimistic-concurrency token.
+
+    SetTaskStatusRequest:
+      type: object
+      required: [status, version]
+      properties:
+        status:
+          type: string
+          enum: [backlog, done]
+          description: >
+            The DESIRED status (not a blind flip). `done` stamps `completed_at`;
+            `backlog` clears it. Only these two targets are accepted this slice.
+        version:
+          type: integer
+          format: int32
+          description: The caller's last-seen optimistic-concurrency token.
+
+    ReorderTaskRequest:
+      type: object
+      required: [position, version]
+      properties:
+        position:
+          type: string
+          minLength: 1
+          description: >
+            New client-computed lexicographic rank string (see CreateTaskRequest).
+            The server validates format + ownership and is the sole writer.
+        version:
+          type: integer
+          format: int32
+          description: The caller's last-seen optimistic-concurrency token.
+
+    TaskResponse:
+      type: object
+      description: >
+        The lean Task read model. Excludes `deleted_at` (soft-deleted rows are
+        never returned) and all reserved forward-compat columns (description,
+        priority, due date, labels, projectId, assignees) populated by later
+        slices. `createdBy` is omitted (always the caller).
+      required: [id, title, status, position, version, createdAt, updatedAt, completedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: The client-generated UUIDv7 identifier.
+        title:
+          type: string
+          maxLength: 500
+        status:
+          type: string
+          enum: [backlog, todo, in_progress, done, cancelled]
+          description: >
+            Full FR-003 status enum (forward-compat). Only `backlog` and `done`
+            are reachable in this slice.
+        position:
+          type: string
+          description: >
+            Persisted lexicographic rank string; the canonical ascending sort key
+            (ORDER BY position, id). The client computes the next reorder's rank
+            (between()) from in-memory neighbor ranks.
+        version:
+          type: integer
+          format: int32
+          description: >
+            Optimistic-concurrency token; incremented on every mutating write.
+            The client echoes it on rename/status/position writes; a stale value
+            → 409 version_conflict.
+        createdAt:
+          type: string
+          format: date-time
+          description: UTC creation timestamp (FR-004).
+        updatedAt:
+          type: string
+          format: date-time
+          description: UTC last-mutation timestamp (FR-004).
+        completedAt:
+          type: ['string', 'null']
+          format: date-time
+          description: >
+            UTC completion timestamp; set when status = done, cleared (null) when
+            un-completed to backlog (FR-003/FR-004).
+
+    ProblemDetails:
+      type: object
+      description: RFC 9457 ProblemDetails — the canonical error envelope for all non-2xx responses (ADR-0009).
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: Error type URI
+        title:
+          type: string
+          description: Human-readable summary
+        status:
+          type: integer
+          description: HTTP status code
+        detail:
+          type: string
+          description: Human-readable explanation
+        instance:
+          type: string
+          format: uri
+          description: URI identifying the specific occurrence
+        errorCode:
+          type: string
+          enum:
+            - validation_failed
+            - unauthenticated
+            - forbidden
+            - not_found
+            - not_admitted
+            - conflict_lww
+            - last_owner
+            - version_conflict
+            - internal_error
+          description: >
+            Stable machine-readable error code. `version_conflict` (NEW in slice
+            002) is the optimistic-concurrency REJECTION on a stale `version`
+            (HTTP 409) — distinct from `conflict_lww`, which means a
+            last-write-wins overwrite SUCCEEDED (reserved for the slice-014 undo
+            path) and must NOT be reused for this rejection semantics.
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: Field-level validation errors (field path -> messages)
+
+  responses:
+    Unauthenticated:
+      description: Missing or invalid identity token (errorCode = unauthenticated)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    NotFound:
+      description: >
+        The task does not exist, is soft-deleted, or belongs to another user
+        (errorCode = not_found). A foreign/absent/tombstoned task returns 404
+        (NOT 403) so the id space is not an enumeration oracle. 403 `forbidden`
+        is reserved for a future shared-project role-insufficiency case and is
+        NOT emitted by any task endpoint in this slice.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    VersionConflict:
+      description: >
+        The write carried a stale `version` (optimistic-concurrency conflict;
+        errorCode = version_conflict). The client refetches the current row and
+        reapplies its intent (capped at one automatic retry).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    ValidationFailed:
+      description: >
+        Request validation failed (errorCode = validation_failed) — e.g. an empty
+        (after-trim) or over-500-character title. Field-level messages are in the
+        `errors` member.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: BFF-minted short-lived HMAC-SHA256 JWT (internal Docker network only)
+
+security:
+  - bearerAuth: []
