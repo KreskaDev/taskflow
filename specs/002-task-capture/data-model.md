@@ -106,9 +106,10 @@ ctor + private ctor + static factory + `utcNow`-injected behavior methods, on
 > `VersionConflictException → 409` and `NotFoundException → 404` mapping must be added to
 > `ProblemDetailsMiddleware.Map` (today it maps only 401/403/422/500). The same regen-and-diff
 > gate lands `version_conflict` in the generated web `errorCode` union (so any reference to it
-> is type-checked), but it does NOT verify that the web `ERROR_UX` map handles every code —
-> that exhaustiveness is a manual/test discipline (a unit test over the map, which MUST be
-> added), NOT a CI-enforced gate.
+> is type-checked); `ERROR_UX` exhaustiveness over that union is enforced **at compile time** by
+> typing the map `satisfies Record<ErrorCode, ErrorUx>` (`ErrorCode` derived from the generated
+> `ProblemDetails.errorCode` union), so `tsc` — the existing TS-strict CI type-check — fails if
+> any code is unmapped (no bespoke runtime test needed).
 
 ### Reorder / `position` strategy (FR-102)
 

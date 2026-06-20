@@ -116,9 +116,10 @@ cd apps/web && pnpm gen:api
 This fetches `/openapi/v1.json` from the running API, regenerates
 `src/lib/api/generated/schema.d.ts`, and diffs against the committed version. CI fails on
 drift. The regen lands `version_conflict` in the generated `errorCode` union, so any web
-*reference* to it is type-checked. Note: the CI gate does NOT verify that the web `ERROR_UX`
-map handles every code — that exhaustiveness is enforced by a unit test over the map (which
-MUST be added), not by the type system.
+*reference* to it is type-checked. `ERROR_UX` exhaustiveness over that union is enforced **at
+compile time** by typing the map `satisfies Record<ErrorCode, ErrorUx>` (`ErrorCode` derived
+from the generated `ProblemDetails.errorCode` union), so `tsc` — the existing TS-strict CI
+type-check — fails if any code is unmapped (no bespoke runtime test needed).
 
 ## Validation Scenarios
 

@@ -652,9 +652,10 @@ THREE sync points plus the middleware:
    central ProblemDetails schema).
 4. The web `ERROR_UX` map (`apps/web/src/lib/api/client.ts`). The regen-and-diff CI gate
    lands `version_conflict` in the generated `errorCode` union — so any web *reference* to
-   it is type-checked — but it does NOT verify that `ERROR_UX` handles every code; that
-   exhaustiveness is a manual/test discipline (a unit test over the map, which MUST be
-   added), NOT a CI-enforced gate.
+   it is type-checked — and `ERROR_UX` exhaustiveness over that union is enforced **at
+   compile time** by typing the map `satisfies Record<ErrorCode, ErrorUx>` (`ErrorCode`
+   derived from the generated `ProblemDetails.errorCode` union), so `tsc` — the existing
+   TS-strict CI type-check — fails if any code is unmapped (no bespoke runtime test needed).
 
 **`TaskResponse` schema** (lean — REQUIRED to round-trip the version token, NEVER expose
 `deleted_at` or any reserved forward-compat column): `id` (uuid), `title` (string ≤500),
