@@ -11,6 +11,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0" />
     <PackageReference Include="WolverineFx.EntityFrameworkCore" Version="6.11.0" />
+    <PackageReference Include="WolverineFx.FluentValidation" Version="6.11.0" />
     <PackageReference Include="WolverineFx.Http" Version="6.11.0" />
     <PackageReference Include="WolverineFx.Postgresql" Version="6.11.0" />
     <!-- Wolverine 6.x split the runtime (Roslyn) compiler into its own package; required
