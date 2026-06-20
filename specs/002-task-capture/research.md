@@ -741,3 +741,61 @@ exists. Distinguishing 404 (absent) from 403 (foreign live) on single-item ops �
 for this slice: the foreign-live case is also treated as not-found to avoid the oracle,
 since there is no shared-resource path where a caller legitimately knows of a resource
 they may not act on.
+
+---
+
+## R18: Reorder-Chord Binding — `Alt+↑/↓` FROZEN (FR-045 / FR-102, resolves T003)
+
+**Decision (FROZEN — was the PROVISIONAL T003 blocker):** the manual-reorder shortcut is
+**`Alt+↑` / `Alt+↓`** (`Alt+ArrowUp` / `Alt+ArrowDown`), the proposed default — now
+**verified SAFE** against the target browser + screen-reader matrix (Chrome, Firefox, Edge,
+Safari on Windows + macOS; NVDA, JAWS, VoiceOver). No alternative chord is needed. The
+plan's/spec's concern conflated `Alt+Arrow` with `Alt+Left/Right` (browser back/forward);
+that binding is **horizontal only** — the **vertical** `Alt+Up/Down` pair is free of it on
+every target browser (Safari history is `Cmd+[`/`Cmd+]`, not an Option chord). This binding
+is consumed by the shortcut gate (T054), the `?` help overlay (T056), and the reorder wiring
+(T058), which are now unblocked.
+
+**Rationale:** the most authoritative precedent possible endorses this exact choice — the
+**W3C ARIA Authoring Practices Guide "Scrollable Listbox with Rearrangeable Options" example
+uses `Alt+↑`/`Alt+↓` to move options in a `role=listbox` driven by `aria-activedescendant`**
+— identical to this slice's widget (R10). **VS Code / Monaco** ships the same chord for "Move
+Line Up/Down" (`Option+↑/↓` on macOS) and it works in-browser across the matrix. Screen
+readers do not intercept it for a plain listbox: a `role=listbox` forces NVDA/JAWS into
+**focus/forms mode**, which passes keystrokes through to the app; NVDA's only `Alt+Up/Down`
+defaults are Word/Outlook-scoped (not web); VoiceOver commands are `Ctrl+Option`-prefixed, so
+bare `Option+Arrow` is not a VO command. **WCAG 2.1.4 (Character Key Shortcuts) does not apply**
+— it governs single-character shortcuts; a modifier chord is exempt — so there is no
+remap/disable obligation.
+
+**Load-bearing mitigations (MUST hold — the SAFE verdict is conditional on these; T054/T058
+implement them):**
+1. The reorder keydown handler MUST call **`preventDefault()`** while the listbox has focus —
+   on **Safari**, bare `Option+↑/↓` page-scrolls, so suppressing the native default is
+   load-bearing, not hygiene.
+2. The chord fires **only while the `role=listbox` (not a text input) has focus** — already
+   guaranteed by the R11 `activeElement` gate (T054). This avoids macOS `Option+↑/↓` paragraph
+   navigation (text-field-only) entirely.
+3. Keep the widget a **plain `role=listbox`**, NOT nested in a `role=combobox` / native
+   `<select>` — JAWS binds `Alt+Down`/`Alt+Up` to open/close a combobox, and browsers toggle a
+   native `<select>` dropdown on `Alt+↓`. Neither applies to a bare listbox; do not reintroduce
+   a combobox role on this list.
+4. Expose **`aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"`** on the option/listbox (as the APG
+   example does) for screen-reader discoverability, complementing the `?` overlay (T056).
+
+**Alternatives considered (NOT adopted — Alt+↑/↓ is APG-canonical):** `Ctrl+Shift+↑/↓` —
+collision-free but verbose; a **grab/drop mode** (Space-to-lift, arrows-to-move,
+Space/Enter-to-drop, Esc-cancel) — also APG-blessed but adds a mode + indicator and would
+collide with this slice's `Space`=toggle-done. Avoid bare `Ctrl+↑/↓` (macOS Mission
+Control/Spaces) and `Alt+←/→` (browser back/forward).
+
+**Sources:** W3C ARIA APG rearrangeable-listbox example
+(https://www.w3.org/WAI/ARIA/apg/patterns/listbox/examples/listbox-rearrangeable/) and listbox
+pattern (https://www.w3.org/WAI/ARIA/apg/patterns/listbox/); NVDA commands quick reference
+(https://download.nvaccess.org/releases/2024.4.1/documentation/keyCommands.html); Deque/WebAIM
+JAWS shortcuts (https://dequeuniversity.com/screenreaders/jaws-keyboard-shortcuts,
+https://webaim.org/resources/shortcuts/jaws); Apple VoiceOver commands
+(https://support.apple.com/guide/voiceover/general-commands-cpvokys01/mac) and Safari shortcuts
+(https://support.apple.com/guide/safari/keyboard-and-other-shortcuts-cpsh003/mac); VS Code Move
+Line Up/Down (https://code.visualstudio.com/docs/getstarted/tips-and-tricks); MDN `<select>`
+(https://developer.mozilla.org/en-US/docs/Web/HTML/Element/select).
