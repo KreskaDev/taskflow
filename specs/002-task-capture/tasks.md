@@ -40,7 +40,7 @@ web `apps/web/src/…`, web tests `apps/web/tests/…`.
 
 - [ ] T001 [P] Add web deps to `apps/web/package.json` and lockfile: `@tanstack/react-virtual` (10k-row windowing), `uuid` v11 (exposes `v7()`), `fractional-indexing` (`generateKeyBetween`) — `cd apps/web && pnpm add @tanstack/react-virtual uuid fractional-indexing`
 - [ ] T002 [P] Add `WolverineFx.FluentValidation` to `apps/api/src/TaskFlow.Api/TaskFlow.Api.csproj` — `cd apps/api/src/TaskFlow.Api && dotnet add package WolverineFx.FluentValidation`
-- [ ] T003 **[BLOCKING DECISION]** Verify the `Alt+↑/↓` reorder chord (FR-045/FR-102) against the target browser + screen-reader matrix (Alt+Left/Right = browser back/forward; some SRs bind Alt+Arrow). Either confirm `Alt+↑/↓` is safe or choose a known-safe alternative chord, then record the frozen binding in `specs/002-task-capture/research.md`. The frozen binding is consumed by the shortcut gate (T054), the help overlay (T056), and the reorder wiring (T058) — do NOT start the reorder wiring (T058) until this is frozen.
+- [x] T003 **[BLOCKING DECISION — RESOLVED]** Verified the `Alt+↑/↓` reorder chord (FR-045/FR-102) against the target browser + screen-reader matrix. **FROZEN: `Alt+↑/↓` (`Alt+ArrowUp`/`Alt+ArrowDown`) — SAFE, confirmed as the binding** (the back/forward conflict is `Alt+Left/Right` horizontal only; the vertical pair is free, and the W3C ARIA APG rearrangeable-listbox example uses this exact chord). Recorded with evidence + load-bearing mitigations in `specs/002-task-capture/research.md` **R18**. Mitigations T054/T058 MUST honor: `preventDefault()` on the listbox keydown (Safari page-scroll), chord active only on listbox focus (R11 gate), keep a plain `role=listbox` (not combobox), expose `aria-keyshortcuts`. T054/T056/T058 are now UNBLOCKED.
 
 ---
 
@@ -226,5 +226,5 @@ Setup + Foundational → US1 (capture + list, MVP, demo) → US8 (full keyboard 
 - One `['tasks']` query key throughout; snapshot the full ordering in optimistic mutations so a rolled-back delete reappears in place.
 - Title validation is enforced at BOTH trust boundaries: client Zod (T024) and server FluentValidation (T031/T046) — they must stay in lockstep (non-empty after trim, ≤ 500).
 - `COLLATE "C"` must be on the `position` column **and** its index (T012/T015) or list ordering drifts silently.
-- The `Alt+↑/↓` reorder chord is provisional until T003 freezes it — do not hardcode it earlier.
+- The `Alt+↑/↓` reorder chord is FROZEN (T003 resolved; see research.md R18) — implement it per R18's mitigations (preventDefault on listbox keydown, listbox-focus-only, plain role=listbox, aria-keyshortcuts).
 - Reaper (`ReapDeletedTask`) is server-authoritative infrastructure on the durable queue — never a REST endpoint; it must be in the auth-exclusion predicate (T018) or it dead-letters.
