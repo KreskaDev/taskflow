@@ -44,6 +44,7 @@ vi.mock("@/lib/api/client", async (importOriginal) => {
 
 // Bound after the mock so the spies are the same instances the recipes import.
 const { apiClient } = await import("@/lib/api/client");
+const putSpy = apiClient.PUT as unknown as ReturnType<typeof vi.fn>;
 const patchSpy = apiClient.PATCH as unknown as ReturnType<typeof vi.fn>;
 const deleteSpy = apiClient.DELETE as unknown as ReturnType<typeof vi.fn>;
 
@@ -130,6 +131,7 @@ function networkError(): Error {
 }
 
 beforeEach(() => {
+  putSpy.mockReset();
   patchSpy.mockReset();
   deleteSpy.mockReset();
 });
@@ -237,6 +239,102 @@ describe("createTaskMutationOptions — optimistic create recipe", () => {
     await options.onSettled?.(created, null, variables, context);
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: TASKS_KEY });
+  });
+});
+
+/**
+ * NEW (T015, RED — drives T016; US1; FR-001, research R8/R9).
+ *
+ * Pins the optimistic-CREATE due-date surface threaded through the recipe (T016): the
+ * `CreateTaskVariables` carries an OPTIONAL resolved `dueDate` (ISO string) + `dueHasTime`
+ * (boolean). The `Date → ISO string` conversion lives in the `createTask` wrapper (NOT here),
+ * so the recipe layer only ever sees the wire-shaped string. Three guarantees:
+ *   - `mutationFn` PUT body carries `dueDate`/`dueHasTime` (the wire contract).
+ *   - `onMutate` paints both onto the optimistic top row (`?? null` to satisfy `TaskResponse`).
+ *   - `onError` rolls a due-date-carrying variable back like any other create.
+ */
+describe("createTaskMutationOptions — optimistic create carries the resolved due date", () => {
+  /** Create variables resolved WITH a due date: an ISO-string instant + `has_time`. */
+  function makeDatedVariables(seed: TaskResponse[]): CreateTaskVariables {
+    const head = seed[0];
+    return {
+      id: "99999999-9999-7999-8999-999999999999",
+      title: "Kupic mleko",
+      position: between(null, head ? head.position : null),
+      dueDate: "2026-06-21T15:00:00.000Z",
+      dueHasTime: true,
+    };
+  }
+
+  it("mutationFn PUT body sends dueDate/dueHasTime alongside title + position", async () => {
+    const seed = seedTasks();
+    const queryClient = primedClient(seed);
+    const variables = makeDatedVariables(seed);
+    putSpy.mockResolvedValue({
+      data: makeTask({
+        id: variables.id,
+        title: variables.title,
+        position: variables.position,
+        dueDate: variables.dueDate,
+        dueHasTime: variables.dueHasTime,
+      }),
+      error: undefined,
+    });
+
+    const options = createTaskMutationOptions(queryClient);
+    await options.mutationFn(variables);
+
+    expect(putSpy).toHaveBeenCalledTimes(1);
+    const [path, init] = putSpy.mock.calls[0]!;
+    expect(path).toBe("/api/tasks/{id}");
+    expect((init as { params: { path: { id: string } } }).params.path.id).toBe(variables.id);
+    expect((init as { body: Record<string, unknown> }).body).toEqual({
+      title: variables.title,
+      position: variables.position,
+      dueDate: "2026-06-21T15:00:00.000Z",
+      dueHasTime: true,
+    });
+  });
+
+  it("onMutate paints dueDate/dueHasTime on the optimistic top row", async () => {
+    const seed = seedTasks();
+    const queryClient = primedClient(seed);
+    const variables = makeDatedVariables(seed);
+
+    const options = createTaskMutationOptions(queryClient);
+    await options.onMutate?.(variables);
+
+    const top = queryClient.getQueryData<TaskResponse[]>(TASKS_KEY)?.[0];
+    expect(top?.dueDate).toBe("2026-06-21T15:00:00.000Z");
+    expect(top?.dueHasTime).toBe(true);
+  });
+
+  it("onMutate paints null due fields for a dateless create (the optimistic row stays TaskResponse-shaped)", async () => {
+    const seed = seedTasks();
+    const queryClient = primedClient(seed);
+    // No dueDate/dueHasTime carried — a plain dateless capture.
+    const variables = makeVariables(seed);
+
+    const options = createTaskMutationOptions(queryClient);
+    await options.onMutate?.(variables);
+
+    const top = queryClient.getQueryData<TaskResponse[]>(TASKS_KEY)?.[0];
+    expect(top?.dueDate).toBeNull();
+    expect(top?.dueHasTime).toBeNull();
+  });
+
+  it("onError rolls back a due-date-carrying optimistic row", async () => {
+    const seed = seedTasks();
+    const queryClient = primedClient(seed);
+    const variables = makeDatedVariables(seed);
+
+    const options = createTaskMutationOptions(queryClient);
+    const context = (await options.onMutate?.(variables)) as CreateTaskContext;
+    expect(queryClient.getQueryData<TaskResponse[]>(TASKS_KEY)).toHaveLength(seed.length + 1);
+
+    options.onError?.(new Error("network down"), variables, context);
+
+    expect(queryClient.getQueryData<TaskResponse[]>(TASKS_KEY)).toEqual(seed);
   });
 });
 

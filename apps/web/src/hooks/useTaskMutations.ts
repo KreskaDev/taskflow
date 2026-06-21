@@ -6,7 +6,7 @@ import { apiClient, mapError, type ProblemDetails } from "@/lib/api/client";
 import type { components } from "@/lib/api/generated/schema";
 import { newTaskId } from "@/lib/id";
 import { between } from "@/lib/position";
-import { taskTitleSchema } from "@/lib/validation/task";
+import { createTaskSchema, taskTitleSchema } from "@/lib/validation/task";
 import { TASKS_QUERY_KEY } from "@/hooks/useTasks";
 
 type TaskResponse = components["schemas"]["TaskResponse"];
@@ -53,6 +53,10 @@ export interface CreateTaskVariables {
   id: string;
   title: string;
   position: string;
+  /** Resolved due-date instant as an ISO string (wire shape), or absent for a dateless task. */
+  dueDate?: string;
+  /** Whether the due date carries a wall-clock time (R8 pairing) — paired with `dueDate`. */
+  dueHasTime?: boolean;
 }
 
 /** Context handed from `onMutate` to `onError`/`onSettled` — the pre-mutation snapshot. */
@@ -85,10 +89,10 @@ interface OptimisticCreateOptions {
  */
 export function createTaskMutationOptions(queryClient: QueryClient): OptimisticCreateOptions {
   return {
-    mutationFn: async ({ id, title, position }: CreateTaskVariables): Promise<TaskResponse> => {
+    mutationFn: async ({ id, title, position, dueDate, dueHasTime }: CreateTaskVariables): Promise<TaskResponse> => {
       const { data, error } = await apiClient.PUT("/api/tasks/{id}", {
         params: { path: { id } },
-        body: { title, position },
+        body: { title, position, dueDate, dueHasTime },
       });
       if (error || !data) {
         const errorCode = (error as ProblemDetails | undefined)?.errorCode;
@@ -113,6 +117,8 @@ export function createTaskMutationOptions(queryClient: QueryClient): OptimisticC
         createdAt: now,
         updatedAt: now,
         completedAt: null,
+        dueDate: variables.dueDate ?? null,
+        dueHasTime: variables.dueHasTime ?? null,
       };
 
       // Newest-first: the rank already sorts before the current head, so prepend verbatim.
@@ -552,13 +558,23 @@ export function useTaskMutations() {
 
   const currentTasks = (): TaskResponse[] => queryClient.getQueryData<TaskResponse[]>(TASKS_QUERY_KEY) ?? [];
 
-  const createTask = (title: string): void => {
-    const parsedTitle = taskTitleSchema.parse(title);
+  const createTask = (input: { title: string; dueDate?: Date; dueHasTime?: boolean }): void => {
+    // Defensive boundary parse (Constitution VI) — validates the title AND the R8 due-date
+    // pairing in one schema, replacing the prior `taskTitleSchema.parse`.
+    const parsed = createTaskSchema.parse(input);
 
     const head = currentTasks()[0];
     const position = between(null, head ? head.position : null);
 
-    createMutation.mutate({ id: newTaskId(), title: parsedTitle, position });
+    // The resolved `Date` becomes the wire/optimistic ISO string here, once — the recipe
+    // layer only ever handles the string shape (matching the nullable `TaskResponse` type).
+    createMutation.mutate({
+      id: newTaskId(),
+      title: parsed.title,
+      position,
+      dueDate: parsed.dueDate?.toISOString(),
+      dueHasTime: parsed.dueHasTime,
+    });
   };
 
   const renameTask = (id: string, title: string): void => {
