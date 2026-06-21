@@ -234,6 +234,87 @@ public sealed class DeleteTaskTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Allow_owner_delete_schedules_a_ReapDeletedTask_for_that_task_via_the_durable_queue()
+    {
+        // Coverage gap (Privacy-XI erasure path): the soft-delete cases above prove 204 + tombstone,
+        // and the Reaper_* cases prove the HANDLER (by sending ReapDeletedTask directly). NOTHING else
+        // asserts the DELETE endpoint/handler actually ENQUEUES the scheduled reaper. If the publish
+        // were dropped or ReapDeletedTask were misrouted in Program.cs, every other test would still
+        // pass while prod tombstones never get reaped. This test drives a REAL DELETE and proves a
+        // reaper was scheduled for THIS task id.
+        var owner = await CreateOwnerAsync("google-sub-del-task-reap-enqueue", "deltaskreapenqueue@example.com");
+        var token = TestJwtHelper.Valid(owner.Value.ToString());
+        var (id, _) = await SeedTaskAsync(owner, "Will schedule a reap", "a0");
+
+        // Drive the real authenticated DELETE. The endpoint delegates to bus.InvokeAsync(DeleteTask),
+        // which awaits the handler to completion — including the SaveChangesAsync that commits the
+        // outbox envelope in the SAME transaction (AutoApplyTransactions) — so by the time 204 returns
+        // the scheduled reaper row is durably present and observable below.
+        using (var response = await SendAsync(HttpMethod.Delete, TaskPath(id), token))
+        {
+            response.StatusCode.Should().Be(HttpStatusCode.NoContent, "an owner soft-deleting their own LIVE task returns 204");
+        }
+
+        // The delete is tied to a real soft-delete, not a no-op idempotent path.
+        var stored = await LoadRowAsync(id);
+        stored.Should().NotBeNull("soft-delete keeps the row; only the reaper hard-deletes it");
+        stored!.DeletedAt.Should().NotBeNull("the DELETE soft-deleted the row, which is what schedules the reaper");
+
+        // ASSERTION MECHANISM — durable scheduled-storage query (NOT in-process tracking). A +30s
+        // ScheduleDelay parks the publish in Wolverine's durable scheduled storage rather than
+        // delivering it in-window, so an in-process TrackActivity session could not capture it without
+        // waiting out the delay. We assert the DURABLE truth directly: exactly one envelope for this
+        // task's ReapDeletedTask sits Scheduled in wolverine.wolverine_incoming_envelopes (the local-queue
+        // route lands scheduled messages in the INCOMING table with status 'Scheduled' + a time-to-send).
+        var scheduled = await CountScheduledReapEnvelopesAsync(id);
+        scheduled.Should().Be(1, "the DELETE must schedule exactly one ReapDeletedTask reap for this task in durable storage");
+    }
+
+    /// <summary>
+    /// Counts the durable, still-Scheduled <see cref="ReapDeletedTask"/> envelopes whose serialized body
+    /// references <paramref name="taskId"/>, by raw query against Wolverine's incoming-envelope table on
+    /// the SAME database the host uses. A +30s ScheduleDelay parks the publish here (status 'Scheduled')
+    /// rather than delivering it in-window, so this — not in-process tracking — reliably proves the
+    /// DELETE scheduled a reap. The id match is a substring check on the JSON body (the TaskId GUID), which
+    /// is unambiguous under per-test DB isolation.
+    /// </summary>
+    private async Task<int> CountScheduledReapEnvelopesAsync(Guid taskId)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var connection = db.Database.GetDbConnection();
+        await connection.OpenAsync();
+        try
+        {
+            using var command = connection.CreateCommand();
+            // encode(body,'escape') renders the printable-ASCII JSON tail of the envelope (where the
+            // serialized TaskId GUID lives) as text so we can substring-match it — do NOT "optimize"
+            // this into a raw bytea comparison.
+            command.CommandText =
+                "SELECT count(*) FROM wolverine.wolverine_incoming_envelopes " +
+                "WHERE status = 'Scheduled' " +
+                "AND message_type = @messageType " +
+                "AND encode(body, 'escape') LIKE '%' || @taskId || '%'";
+
+            var messageType = command.CreateParameter();
+            messageType.ParameterName = "messageType";
+            messageType.Value = typeof(ReapDeletedTask).FullName;
+            command.Parameters.Add(messageType);
+
+            var idParam = command.CreateParameter();
+            idParam.ParameterName = "taskId";
+            idParam.Value = taskId.ToString();
+            command.Parameters.Add(idParam);
+
+            return Convert.ToInt32(await command.ExecuteScalarAsync(), System.Globalization.CultureInfo.InvariantCulture);
+        }
+        finally
+        {
+            await connection.CloseAsync();
+        }
+    }
+
+    [Fact]
     public async Task Deny_no_jwt_is_rejected_401_with_our_envelope()
     {
         using var request = new HttpRequestMessage(HttpMethod.Delete, new Uri(TaskPath(Guid.CreateVersion7()), UriKind.Relative));
