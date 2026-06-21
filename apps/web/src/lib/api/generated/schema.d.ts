@@ -207,6 +207,9 @@ export interface components {
         CreateTaskRequest: {
             title: string;
             position: string;
+            /** Format: date-time */
+            dueDate?: string | null;
+            dueHasTime?: boolean | null;
         };
         EnsureUser: {
             googleSubjectId: string;
@@ -244,6 +247,9 @@ export interface components {
             updatedAt: string;
             /** Format: date-time */
             completedAt?: string | null;
+            /** Format: date-time */
+            dueDate?: string | null;
+            dueHasTime?: boolean | null;
         };
         UserProfile: {
             /** Format: uuid */
