@@ -1,0 +1,157 @@
+openapi: '3.1.0'
+info:
+  title: TaskFlow API
+  version: 0.3.0
+  description: >
+    TaskFlow REST API — slice 003 (Natural-Language Dates) contract DELTA.
+
+    This slice adds NO new path, NO new operation, NO new error code, and NO new
+    schema. It extends two existing schemas so a task can carry a resolved due
+    date set at capture time:
+      - CreateTaskRequest gains optional `dueDate` (UTC instant) + `dueHasTime`.
+      - TaskResponse gains `dueDate` + `dueHasTime` (present-but-null when unset).
+
+    The CLIENT parses the Polish natural-language phrase and resolves it to a
+    UTC instant against Europe/Warsaw (FR-092); the SERVER validates (well-formed
+    instant, plausible range, pairing invariant) and persists UTC — it does NOT
+    re-parse Polish text (Principle V). A validation failure surfaces as the
+    EXISTING `422 validation_failed` (no new errorCode).
+
+    Contract decision (research R8): the wire carries `{UTC instant + has_time}`
+    only — the spec's "+ UTC offset" wording is dropped as redundant under the
+    single fixed instance zone (per-user zones are OOS-19).
+
+    Everything else — all paths (PUT/GET/PATCH/DELETE /api/tasks…), the
+    ProblemDetails envelope, the errorCode enum (incl. version_conflict), and
+    every other schema — is UNCHANGED from specs/002-task-capture/contracts/openapi.yaml.
+
+servers:
+  - url: http://localhost:4311
+    description: Internal (Docker network / development)
+
+# --- CHANGED PATHS: none. The due date rides the existing PUT /api/tasks/{id}
+#     (CreateTaskRequest body) and is returned by GET /api/tasks + that PUT
+#     (TaskResponse). See slice-002 contract for the full path definitions. ---
+
+components:
+  schemas:
+
+    # ===== CHANGED: CreateTaskRequest (added dueDate + dueHasTime) =====
+    CreateTaskRequest:
+      type: object
+      description: >
+        Create payload. The task `id` is carried in the route ({id}), not the
+        body. `title` and `position` are client-authoritative on create. As of
+        slice 003 the body MAY carry a resolved due date parsed client-side from
+        a trailing Polish natural-language phrase.
+      required: [title, position]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: >
+            Task title; non-empty after trimming, ≤ 500 chars (FR-001). The
+            trailing date phrase (if any) is stripped client-side before send
+            (research R4) — the server receives the bare title.
+        position:
+          type: string
+          minLength: 1
+          description: >
+            Client-computed lexicographic rank string (fractional-indexing
+            alphabet; compared byte-ordinally under COLLATE "C"). Required — the
+            server validates but never generates ranks.
+        dueDate:
+          type: ['string', 'null']
+          format: date-time
+          description: >
+            Resolved due date as a UTC instant (ISO-8601, e.g.
+            2026-06-21T15:00:00Z), parsed CLIENT-SIDE from the trailing Polish
+            phrase against Europe/Warsaw (FR-005/FR-092). Date-only values are
+            midnight Europe/Warsaw of the resolved day, expressed in UTC (R9).
+            Null (omitted) when the title carried no date phrase. The server
+            validates the instant (well-formed + plausible range) and stores it
+            verbatim in UTC — it does NOT re-parse Polish (Principle V).
+            MUST be paired with `dueHasTime` (both present or both null).
+        dueHasTime:
+          type: ['boolean', 'null']
+          description: >
+            The `has_time` flag (FR-092): true = date-time (e.g. "po 17"),
+            false = date-only (e.g. "jutro"). MUST be non-null iff `dueDate`
+            is non-null; a mismatched pairing → 422 validation_failed.
+
+    # ===== CHANGED: TaskResponse (added dueDate + dueHasTime) =====
+    TaskResponse:
+      type: object
+      description: >
+        The lean Task read model. Excludes `deleted_at` and the remaining
+        reserved forward-compat columns (description, priority, projectId,
+        cycleId, recurrenceRule). `createdBy` is omitted (always the caller).
+        As of slice 003 it surfaces the due date.
+      # `required` lists only the non-nullable fields. The .NET generator emits
+      # nullable, non-`required` DTO init props (completedAt, dueDate, dueHasTime
+      # — all `DateTime?`/`bool?`, not C# `required`) as OPTIONAL `… | null` in the
+      # generated schema.d.ts, so they are deliberately absent here to match what
+      # `pnpm gen:api` produces (the CI regen-and-diff gate is the arbiter).
+      # ASSUMPTION: the same uniform nullability handling makes CreateTaskRequest's
+      # `dueDate`/`dueHasTime` (above) emit as OPTIONAL too — they are likewise kept
+      # out of that schema's `required` (which stays [title, position]). The
+      # request-side case isn't separately proven here (gen:api needs a live API);
+      # the CI regen-and-diff gate confirms it at implementation time.
+      required: [id, title, status, position, version, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: The client-generated UUIDv7 identifier.
+        title:
+          type: string
+          maxLength: 500
+        status:
+          type: string
+          enum: [backlog, todo, in_progress, done, cancelled]
+          description: >
+            Full FR-003 status enum (forward-compat). Only `backlog` and `done`
+            are reachable in this slice.
+        position:
+          type: string
+          description: Persisted lexicographic rank string; canonical ascending sort key (ORDER BY position, id).
+        version:
+          type: integer
+          format: int32
+          description: Optimistic-concurrency token; a stale value on a mutating write → 409 version_conflict.
+        createdAt:
+          type: string
+          format: date-time
+          description: UTC creation timestamp (FR-004).
+        updatedAt:
+          type: string
+          format: date-time
+          description: UTC last-mutation timestamp (FR-004).
+        completedAt:
+          type: ['string', 'null']
+          format: date-time
+          description: UTC completion timestamp; set when status = done, else null (FR-003/FR-004).
+        dueDate:
+          type: ['string', 'null']
+          format: date-time
+          description: >
+            Resolved due date as a UTC instant, or null when unset (FR-005/
+            FR-092). For display, convert back to Europe/Warsaw before taking
+            the wall-clock / calendar day (R9) — a naive UTC Y-M-D read lands a
+            day early for date-only values.
+        dueHasTime:
+          type: ['boolean', 'null']
+          description: >
+            The `has_time` flag: true = date-time, false = date-only, null when
+            `dueDate` is null. Drives date-only vs date-time rendering on the row.
+
+# --- UNCHANGED from slice 002 (not repeated here): ---
+#   paths:        /api/tasks (GET), /api/tasks/{id} (PUT/DELETE),
+#                 /api/tasks/{id}/title|status|position (PATCH)
+#   schemas:      RenameTaskRequest, SetTaskStatusRequest, ReorderTaskRequest,
+#                 ProblemDetails (+ errorCode enum incl. validation_failed,
+#                 version_conflict, not_found, …)
+#   The CI regen-and-diff gate (pnpm gen:api) regenerates the FULL document from
+#   TaskFlowDocumentTransformer.cs and diffs it; this delta file documents only
+#   what slice 003 changes.
