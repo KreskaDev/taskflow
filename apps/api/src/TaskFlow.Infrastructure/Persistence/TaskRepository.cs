@@ -21,6 +21,9 @@ public sealed class TaskRepository(AppDbContext db) : ITaskRepository
     public Task<TaskEntity?> FindOwnedIncludingDeletedAsync(TaskId id, UserId owner, CancellationToken cancellationToken) =>
         db.Tasks.FirstOrDefaultAsync(t => t.Id == id && t.CreatedBy == owner, cancellationToken);
 
+    public Task<TaskEntity?> FindByIdIncludingDeletedAsync(TaskId id, CancellationToken cancellationToken) =>
+        db.Tasks.FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
+
     public async Task<IReadOnlyList<TaskEntity>> ListOwnedAsync(UserId owner, CancellationToken cancellationToken) =>
         await db.Tasks
             .Where(t => t.CreatedBy == owner && t.DeletedAt == null)
@@ -35,11 +38,29 @@ public sealed class TaskRepository(AppDbContext db) : ITaskRepository
         db.Tasks.Add(task);
     }
 
+    public void Remove(TaskEntity task)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        db.Tasks.Remove(task);
+    }
+
     public async Task SaveChangesAsync(CancellationToken cancellationToken)
     {
         try
         {
             await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            // The `version` column is an EF concurrency token (TaskConfiguration), so an interleaved
+            // write that changed it between this handler's version-compare and its commit produces a
+            // 0-rows-affected UPDATE → DbUpdateConcurrencyException. Translate that EF-specific signal
+            // into the Application-layer VersionConflictException (→ 409) at the persistence seam, so
+            // the rename/status/reorder handlers stay free of any EF dependency (clean-architecture
+            // dependency direction; mirrors the DuplicateTaskIdException translation below). This is the
+            // interleaved-race backstop the in-handler version compare cannot close on its own (R4).
+            throw new VersionConflictException(
+                "The task was modified by another request; reload and retry.", ex);
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
