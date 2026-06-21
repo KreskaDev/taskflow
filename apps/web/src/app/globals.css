@@ -271,6 +271,8 @@ body {
 }
 
 .tf-task-row__title {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -279,6 +281,20 @@ body {
 .tf-task-row--done .tf-task-row__title {
   color: var(--tf-muted);
   text-decoration: line-through;
+}
+
+/*
+ * Due-date label (T018): a small, always-visible text affordance (FR-046, no hover-only)
+ * pinned to the trailing edge. Full-strength foreground for contrast (FR-044, ≥4.5:1) —
+ * the date text carries the meaning, never color alone.
+ */
+.tf-task-row__due {
+  margin-left: auto;
+  flex: 0 0 auto;
+  color: var(--tf-fg);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* Inline-rename editor (T058): fills the title slot so editing stays in place. */
