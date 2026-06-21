@@ -15,10 +15,11 @@ namespace TaskFlow.Domain.TaskManagement;
 /// <para><see cref="CreatedBy"/> is immutable (set in the ctor, never reassigned).
 /// <see cref="CompletedAt"/> is set iff <c>status = done</c>. <see cref="SoftDelete"/>
 /// is idempotent.</para>
-/// <para>The seven reserved nullable columns (<c>Description</c>, <c>Priority</c>,
-/// <c>DueDate</c>, <c>DueHasTime</c>, <c>ProjectId</c>, <c>CycleId</c>,
-/// <c>RecurrenceRule</c>) are mapped but unused this slice — populated by their owning
-/// slices so no later migration is needed.</para>
+/// <para><see cref="DueDate"/> and <see cref="DueHasTime"/> are written at create time
+/// this slice (slice 003). The remaining reserved nullable columns (<c>Description</c>,
+/// <c>Priority</c>, <c>ProjectId</c>, <c>CycleId</c>, <c>RecurrenceRule</c>) are mapped
+/// but unused this slice — populated by their owning slices so no later migration is
+/// needed.</para>
 /// </remarks>
 public sealed class Task : AggregateRoot<TaskId>
 {
@@ -32,7 +33,7 @@ public sealed class Task : AggregateRoot<TaskId>
         Position = null!;
     }
 
-    private Task(TaskId id, UserId createdBy, string title, string position, DateTime utcNow)
+    private Task(TaskId id, UserId createdBy, string title, string position, DateTime utcNow, DateTime? dueDate, bool? dueHasTime)
     {
         Id = id;
         CreatedBy = createdBy;
@@ -42,6 +43,8 @@ public sealed class Task : AggregateRoot<TaskId>
         Version = 0;
         CreatedAt = utcNow;
         UpdatedAt = utcNow;
+        DueDate = dueDate;
+        DueHasTime = dueHasTime;
     }
 
     /// <summary>The creating <see cref="User"/> (FR-002). Immutable; doubles as the ownership key.</summary>
@@ -77,10 +80,10 @@ public sealed class Task : AggregateRoot<TaskId>
     /// <summary>Reserved (slice 005) — priority P0–P3. Mapped but unused this slice.</summary>
     public string? Priority { get; private set; }
 
-    /// <summary>Reserved (slice 003/005) — due date. Mapped but unused this slice.</summary>
+    /// <summary>Due-date UTC instant (slice 003). Written at create time by <see cref="Create(TaskId, UserId, string, string, DateTime, DateTime?, bool?)"/>; null for no due date.</summary>
     public DateTime? DueDate { get; private set; }
 
-    /// <summary>Reserved (slice 003/005) — the <c>DueDate.has_time</c> flag. Mapped but unused this slice.</summary>
+    /// <summary>The <c>DueDate.has_time</c> flag (slice 003). Written at create time by <see cref="Create(TaskId, UserId, string, string, DateTime, DateTime?, bool?)"/>; null for no due date.</summary>
     public bool? DueHasTime { get; private set; }
 
     /// <summary>Reserved (slice 004) — owning project. Mapped but unused this slice.</summary>
@@ -92,18 +95,35 @@ public sealed class Task : AggregateRoot<TaskId>
     /// <summary>Reserved (slice 012) — recurrence rule (jsonb). Mapped but unused this slice.</summary>
     public string? RecurrenceRule { get; private set; }
 
-    /// <summary>Creates a new task. The id and position are client-supplied (FR-001).</summary>
+    /// <summary>Creates a new task with no due date. The id and position are client-supplied (FR-001).</summary>
     /// <param name="id">Client-generated identity.</param>
     /// <param name="createdBy">The creating user; immutable ownership key (FR-002).</param>
     /// <param name="title">The task title; trimmed-non-empty and ≤ 500 chars.</param>
     /// <param name="position">Client-authoritative fractional rank string.</param>
     /// <param name="utcNow">The current UTC time (injected for testability).</param>
     public static Task Create(TaskId id, UserId createdBy, string title, string position, DateTime utcNow)
+        => Create(id, createdBy, title, position, utcNow, dueDate: null, dueHasTime: null);
+
+    /// <summary>
+    /// Creates a new task, optionally with a resolved due date. The id and position are
+    /// client-supplied (FR-001). Creation is not a mutation, so <see cref="Version"/> stays 0.
+    /// </summary>
+    /// <param name="id">Client-generated identity.</param>
+    /// <param name="createdBy">The creating user; immutable ownership key (FR-002).</param>
+    /// <param name="title">The task title; trimmed-non-empty and ≤ 500 chars.</param>
+    /// <param name="position">Client-authoritative fractional rank string.</param>
+    /// <param name="utcNow">The current UTC time (injected for testability).</param>
+    /// <param name="dueDate">The resolved due-date UTC instant, or null for no due date.</param>
+    /// <param name="dueHasTime">The <c>DueDate.has_time</c> flag, or null for no due date.
+    /// The pairing invariant (both set or both null) is enforced upstream by the
+    /// <c>CreateTaskValidator</c> (T007, per R11/R8); the aggregate sets whatever the
+    /// validated command supplies.</param>
+    public static Task Create(TaskId id, UserId createdBy, string title, string position, DateTime utcNow, DateTime? dueDate, bool? dueHasTime)
     {
         var normalizedTitle = NormalizeTitle(title);
         ArgumentException.ThrowIfNullOrWhiteSpace(position);
 
-        return new Task(id, createdBy, normalizedTitle, position, utcNow);
+        return new Task(id, createdBy, normalizedTitle, position, utcNow, dueDate, dueHasTime);
     }
 
     /// <summary>Replaces the title (FR-001) with a trimmed-non-empty, ≤ 500 char value.</summary>

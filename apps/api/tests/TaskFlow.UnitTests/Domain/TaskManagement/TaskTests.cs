@@ -58,6 +58,40 @@ public sealed class TaskTests
         task.Title.Should().Be(title);
     }
 
+    [Fact]
+    public void Create_with_a_date_time_due_sets_due_date_and_due_has_time_true_without_bumping_version()
+    {
+        var due = new DateTime(2026, 6, 21, 15, 0, 0, DateTimeKind.Utc);
+
+        var task = Task.Create(TaskId.From(Guid.NewGuid()), UserId.New(), "Kupic mleko", "a0", CreatedInstant, due, dueHasTime: true);
+
+        task.DueDate.Should().Be(due);
+        task.DueHasTime.Should().BeTrue();
+        task.Version.Should().Be(0, "creation is not a mutation and never bumps version");
+    }
+
+    [Fact]
+    public void Create_with_a_date_only_due_sets_due_date_and_due_has_time_false_without_bumping_version()
+    {
+        var due = new DateTime(2026, 6, 23, 22, 0, 0, DateTimeKind.Utc);
+
+        var task = Task.Create(TaskId.From(Guid.NewGuid()), UserId.New(), "Raport jutro", "a0", CreatedInstant, due, dueHasTime: false);
+
+        task.DueDate.Should().Be(due);
+        task.DueHasTime.Should().BeFalse();
+        task.Version.Should().Be(0, "creation is not a mutation and never bumps version");
+    }
+
+    [Fact]
+    public void Create_without_a_due_leaves_both_due_date_and_due_has_time_null_and_version_zero()
+    {
+        var task = Task.Create(TaskId.From(Guid.NewGuid()), UserId.New(), "Write the spec", "a0", CreatedInstant);
+
+        task.DueDate.Should().BeNull();
+        task.DueHasTime.Should().BeNull();
+        task.Version.Should().Be(0, "creation is not a mutation and never bumps version");
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
