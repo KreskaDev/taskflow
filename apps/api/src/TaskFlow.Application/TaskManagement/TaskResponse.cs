@@ -37,6 +37,12 @@ public sealed record TaskResponse
     /// <summary>UTC completion timestamp; set iff <c>status = done</c>, else null (FR-003/FR-004).</summary>
     public DateTime? CompletedAt { get; init; }
 
+    /// <summary>The resolved due-date UTC instant (FR-092, R8), or null for no due date.</summary>
+    public DateTime? DueDate { get; init; }
+
+    /// <summary>The <c>DueDate.has_time</c> flag (R2/R8); null when <see cref="DueDate"/> is null.</summary>
+    public bool? DueHasTime { get; init; }
+
     /// <summary>Projects a <see cref="TaskEntity"/> aggregate to its lean wire model (mirrors <c>UserProfile.From</c>).</summary>
     public static TaskResponse From(TaskEntity task)
     {
@@ -51,6 +57,8 @@ public sealed record TaskResponse
             CreatedAt = task.CreatedAt,
             UpdatedAt = task.UpdatedAt,
             CompletedAt = task.CompletedAt,
+            DueDate = task.DueDate,
+            DueHasTime = task.DueHasTime,
         };
     }
 
