@@ -3,11 +3,26 @@
 import { type CSSProperties, useState } from "react";
 
 import type { TaskResponse } from "@/hooks/useTasks";
+import { formatInReferenceZone } from "@/lib/timezone";
 import { taskTitleSchema } from "@/lib/validation/task";
 
 /** Stable, deterministic option id derived from the task id (research R18). */
 export function taskOptionId(taskId: string): string {
   return `task-option-${taskId}`;
+}
+
+/**
+ * Formats a stored due-date UTC instant for display in the reference zone (R9). The
+ * instant is interpreted in Europe/Warsaw by {@link formatInReferenceZone} — passing the
+ * raw UTC `Date` straight in (do NOT pre-convert with `toReferenceZone`, which would shift
+ * twice), so a date-only `due_date` (midnight-Warsaw → UTC) recovers the correct calendar
+ * day rather than landing a day early. Tokens are locale-neutral and numeric, mirroring the
+ * two-digit `DD.MM` capture grammar: `dd.MM.yyyy HH:mm` when `dueHasTime`, `dd.MM.yyyy`
+ * otherwise (zero-padded day for symmetry with the zero-padded month).
+ */
+function formatDueDate(dueDate: string, dueHasTime: boolean | null | undefined): string {
+  const instant = new Date(dueDate);
+  return formatInReferenceZone(instant, dueHasTime ? "dd.MM.yyyy HH:mm" : "dd.MM.yyyy");
 }
 
 interface TaskRowProps {
@@ -39,7 +54,10 @@ interface TaskRowProps {
  * A single listbox option (T038 baseline, controlled selection T055, operate affordances
  * T058). `role="option"` with a STABLE `id` derived from the task id so the listbox's
  * `aria-activedescendant` can address it even across virtualizer mount/unmount, and an
- * accessible name equal to the task title (FR-043). `aria-selected` reflects the active
+ * accessible name equal to the task title — plus, for a due-bearing row, a visually-hidden
+ * "termin:" qualifier in front of the date so it is announced as a labelled due date rather
+ * than as a bare trailing number; the decorative status glyph is excluded from the name
+ * (`aria-hidden`) (FR-043). `aria-selected` reflects the active
  * option and is the ONLY selection signal — the visible indicator is styled on it, not on
  * `:focus`, because focus lives on the stable container (research R10).
  *
@@ -83,6 +101,18 @@ export function TaskRow({
       ) : (
         <span className="tf-task-row__title">{task.title}</span>
       )}
+      {!isRenaming && task.dueDate ? (
+        // Visible, always-rendered text label (FR-046: no hover-only affordance). The
+        // calendar day/time is the meaning — never color alone (FR-044) — and it carries no
+        // keybinding. The pairing invariant (R8) makes a truthy `dueDate` a sufficient guard.
+        // The leading `tf-sr-only` "termin:" is concatenated into the option's accessible
+        // name so the date is announced as a labelled due date, not a bare trailing number
+        // (FR-043); the visible date text node stays visible for sighted users.
+        <span className="tf-task-row__due">
+          <span className="tf-sr-only">termin: </span>
+          {formatDueDate(task.dueDate, task.dueHasTime)}
+        </span>
+      ) : null}
     </div>
   );
 }
