@@ -209,6 +209,34 @@ describe("parseTaskInput — guards (no date, no error)", () => {
   });
 });
 
+describe("parseTaskInput — diacritic normalization (R2 NFD strip)", () => {
+  // Exercises the normalize() strip directly: real Polish diacritics (NOT pre-stripped ASCII)
+  // must collapse to the ASCII keyword table so a user typing natural Polish still matches. A
+  // no-op strip would leave "piątek"/"środa" unmatched → the phrase silently stays in the title.
+  it('weekday with diacritics ("piątek") → next Friday, stripped (T002 NFD-strip)', () => {
+    const r = parseTaskInput("Spotkanie piątek", NOW);
+    expect(r.title).toBe("Spotkanie");
+    expect(r.dueDate?.toISOString()).toBe("2026-06-25T22:00:00.000Z");
+    expect(formatInReferenceZone(r.dueDate!, "yyyy-MM-dd")).toBe("2026-06-26");
+    expect(r.dueHasTime).toBe(false);
+  });
+
+  it('weekday with diacritics ("środa") → next Wednesday, stripped', () => {
+    const r = parseTaskInput("Zadanie środa", NOW);
+    expect(r.title).toBe("Zadanie");
+    // now = Sunday 2026-06-21 → next środa is 2026-06-24.
+    expect(formatInReferenceZone(r.dueDate!, "yyyy-MM-dd")).toBe("2026-06-24");
+    expect(r.dueHasTime).toBe(false);
+  });
+
+  it('uppercase + diacritics ("DZIŚ") → today date-only (lowercase + strip)', () => {
+    const r = parseTaskInput("Sprzatanie DZIŚ", NOW);
+    expect(r.title).toBe("Sprzatanie");
+    expect(r.dueDate?.toISOString()).toBe("2026-06-20T22:00:00.000Z");
+    expect(r.dueHasTime).toBe(false);
+  });
+});
+
 describe("parseTaskInput — DST boundary (FR-092)", () => {
   it("za 2 dni crossing the spring-forward (2026-03-29) maps to midnight Warsaw, not a fixed-offset slip", () => {
     // now = 2026-03-28 12:00 Warsaw (CET +01:00) == 11:00:00Z; +2 days = 2026-03-30 (CEST +02:00).
