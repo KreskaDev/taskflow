@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Dialog } from "@/components/ui/Dialog";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
@@ -8,13 +8,20 @@ import { taskTitleSchema } from "@/lib/validation/task";
 
 const TITLE_ID = "task-capture-title";
 
+interface TaskCaptureProps {
+  /** Whether the capture surface is visible — owned by the app-shell page (T058). */
+  open: boolean;
+  /** Dismiss handler — the page flips its `captureOpen` state (AS-07). */
+  onClose: () => void;
+}
+
 /**
- * The `C` capture surface (T039; US-01.AS-01/06/07, FR-031/FR-043, Constitution III).
+ * The `C` capture surface (T039/T058; US-01.AS-01/06/07, FR-031/FR-043, Constitution III).
  *
- * A document-level keydown listener opens a {@link Dialog} when the user presses an
- * unmodified `C` while NOT typing — `document.activeElement` is checked so a `C` typed
- * into an input/textarea/contenteditable is never hijacked (precursor to the US8 global
- * gate in T054; FR-031/AS-09). Ctrl/Cmd/Alt+C (copy etc.) are likewise ignored.
+ * CONTROLLED (T058): the surface owns no `open` state and registers NO key listener of its
+ * own — the global shortcut gate ({@link useGlobalShortcuts}, T054) owns the bare `C` (and
+ * its FR-031/AS-09 text-field suppression) and drives `open`/`onClose` from the page. This
+ * removes the duplicate `C` listener that previously lived here.
  *
  * The surface is mounted statically with NO network or lazy import on the `C` path: the
  * Dialog grants its FIRST focusable child (the single title `<input>`) initial focus
@@ -24,39 +31,14 @@ const TITLE_ID = "task-capture-title";
  * the Dialog focus contract — cancels, creates nothing, and restores focus to the
  * invoking element (AS-07).
  */
-export function TaskCapture() {
-  const [open, setOpen] = useState(false);
+export function TaskCapture({ open, onClose }: TaskCaptureProps) {
   const [title, setTitle] = useState("");
   const { createTask } = useTaskMutations();
 
-  const close = useCallback(() => {
-    setOpen(false);
+  const close = () => {
     setTitle("");
-  }, []);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "c" && event.key !== "C") return;
-      // Modifier chords (Ctrl/Cmd/Alt+C = copy etc.) are not the capture shortcut.
-      if (event.ctrlKey || event.metaKey || event.altKey) return;
-
-      // Never hijack a `C` the user is typing into an editable element (FR-031/AS-09).
-      const active = document.activeElement;
-      if (
-        active instanceof HTMLInputElement ||
-        active instanceof HTMLTextAreaElement ||
-        (active instanceof HTMLElement && active.isContentEditable)
-      ) {
-        return;
-      }
-
-      event.preventDefault();
-      setOpen(true);
-    };
-
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, []);
+    onClose();
+  };
 
   const onInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== "Enter") return;
