@@ -24,6 +24,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tasks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * PUT_api_tasks_id
+         * @description PUT_api_tasks_id
+         */
+        put: operations["PUT_api_tasks_id"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GET_api_tasks
+         * @description GET_api_tasks
+         */
+        get: operations["GET_api_tasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/users/ensure": {
         parameters: {
             query?: never;
@@ -94,11 +134,15 @@ export interface components {
              * @description Stable machine-readable error code.
              * @enum {string}
              */
-            errorCode: "validation_failed" | "unauthenticated" | "not_admitted" | "forbidden" | "not_found" | "conflict_lww" | "last_owner" | "internal_error";
+            errorCode: "validation_failed" | "unauthenticated" | "not_admitted" | "forbidden" | "not_found" | "conflict_lww" | "last_owner" | "internal_error" | "version_conflict";
             /** @description Field-level validation errors (field path -> messages). */
             errors?: {
                 [key: string]: string[];
             } | null;
+        };
+        CreateTaskRequest: {
+            title: string;
+            position: string;
         };
         EnsureUser: {
             googleSubjectId: string;
@@ -107,6 +151,21 @@ export interface components {
             avatarUrl?: string | null;
         };
         IResult: Record<string, never>;
+        TaskResponse: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            status: string;
+            position: string;
+            /** Format: int32 */
+            version: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            completedAt?: string | null;
+        };
         UserProfile: {
             /** Format: uuid */
             id: string;
@@ -141,6 +200,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IResult"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    PUT_api_tasks_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTaskRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    GET_api_tasks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"][];
                 };
             };
             /** @description Not Found */

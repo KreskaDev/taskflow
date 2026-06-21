@@ -1,0 +1,71 @@
+using TaskFlow.Domain.TaskManagement;
+using TaskEntity = TaskFlow.Domain.TaskManagement.Task;
+using TaskStatus = TaskFlow.Domain.TaskManagement.TaskStatus;
+
+namespace TaskFlow.Application.TaskManagement;
+
+/// <summary>
+/// The lean Task read model (contracts/openapi.yaml, research R15), shared by create and list.
+/// Carries EXACTLY the eight fields the BFF/UI needs — including <see cref="Version"/> so the
+/// optimistic-concurrency token round-trips (without it the 409 path can never be exercised).
+/// NEVER exposes <c>deleted_at</c> (soft-deleted rows are never returned) or any reserved
+/// forward-compat column; <c>createdBy</c> is omitted (always the caller).
+/// </summary>
+public sealed record TaskResponse
+{
+    /// <summary>The client-generated UUIDv7 identifier.</summary>
+    public required Guid Id { get; init; }
+
+    /// <summary>The task title (≤ 500 chars).</summary>
+    public required string Title { get; init; }
+
+    /// <summary>Lifecycle status — the full FR-003 enum, lowercase (only <c>backlog</c>/<c>done</c> reachable this slice).</summary>
+    public required string Status { get; init; }
+
+    /// <summary>The persisted lexicographic rank string; the canonical ascending sort key (R5).</summary>
+    public required string Position { get; init; }
+
+    /// <summary>Optimistic-concurrency token; incremented on every mutating write (R4).</summary>
+    public required int Version { get; init; }
+
+    /// <summary>UTC creation timestamp (FR-004).</summary>
+    public required DateTime CreatedAt { get; init; }
+
+    /// <summary>UTC last-mutation timestamp (FR-004).</summary>
+    public required DateTime UpdatedAt { get; init; }
+
+    /// <summary>UTC completion timestamp; set iff <c>status = done</c>, else null (FR-003/FR-004).</summary>
+    public DateTime? CompletedAt { get; init; }
+
+    /// <summary>Projects a <see cref="TaskEntity"/> aggregate to its lean wire model (mirrors <c>UserProfile.From</c>).</summary>
+    public static TaskResponse From(TaskEntity task)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        return new TaskResponse
+        {
+            Id = task.Id.Value,
+            Title = task.Title,
+            Status = ToWireStatus(task.Status),
+            Position = task.Position,
+            Version = task.Version,
+            CreatedAt = task.CreatedAt,
+            UpdatedAt = task.UpdatedAt,
+            CompletedAt = task.CompletedAt,
+        };
+    }
+
+    /// <summary>
+    /// Maps the domain status to its lowercase snake_case wire token (the full FR-003 enum,
+    /// matching the OpenAPI <c>TaskResponse.status</c> enum and the DB converter in
+    /// <c>TaskConfiguration</c> — the PascalCase member names are never encoded into the wire string).
+    /// </summary>
+    private static string ToWireStatus(TaskStatus status) => status switch
+    {
+        TaskStatus.Backlog => "backlog",
+        TaskStatus.Todo => "todo",
+        TaskStatus.InProgress => "in_progress",
+        TaskStatus.Done => "done",
+        TaskStatus.Cancelled => "cancelled",
+        _ => throw new ArgumentOutOfRangeException(nameof(status), status, "Unknown task status."),
+    };
+}
