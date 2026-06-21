@@ -36,9 +36,13 @@ export interface paths {
          * PUT_api_tasks_id
          * @description PUT_api_tasks_id
          */
-        put: operations["PUT_api_tasks_id"];
+        put: operations["createTask"];
         post?: never;
-        delete?: never;
+        /**
+         * DELETE_api_tasks_id
+         * @description DELETE_api_tasks_id
+         */
+        delete: operations["deleteTask"];
         options?: never;
         head?: never;
         patch?: never;
@@ -55,13 +59,73 @@ export interface paths {
          * GET_api_tasks
          * @description GET_api_tasks
          */
-        get: operations["GET_api_tasks"];
+        get: operations["listTasks"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{id}/title": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * PATCH_api_tasks_id_title
+         * @description PATCH_api_tasks_id_title
+         */
+        patch: operations["renameTask"];
+        trace?: never;
+    };
+    "/api/tasks/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * PATCH_api_tasks_id_status
+         * @description PATCH_api_tasks_id_status
+         */
+        patch: operations["setTaskDone"];
+        trace?: never;
+    };
+    "/api/tasks/{id}/position": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * PATCH_api_tasks_id_position
+         * @description PATCH_api_tasks_id_position
+         */
+        patch: operations["reorderTask"];
         trace?: never;
     };
     "/api/users/ensure": {
@@ -151,6 +215,21 @@ export interface components {
             avatarUrl?: string | null;
         };
         IResult: Record<string, never>;
+        RenameTaskRequest: {
+            title: string;
+            /** Format: int32 */
+            version: number;
+        };
+        ReorderTaskRequest: {
+            position: string;
+            /** Format: int32 */
+            version: number;
+        };
+        SetTaskStatusRequest: {
+            status: string;
+            /** Format: int32 */
+            version: number;
+        };
         TaskResponse: {
             /** Format: uuid */
             id: string;
@@ -213,7 +292,7 @@ export interface operations {
             };
         };
     };
-    PUT_api_tasks_id: {
+    createTask: {
         parameters: {
             query?: never;
             header?: never;
@@ -237,8 +316,48 @@ export interface operations {
                     "application/json": components["schemas"]["TaskResponse"];
                 };
             };
-            /** @description Not Found */
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The task does not exist, is soft-deleted, or belongs to another user (errorCode = not_found). */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Request validation failed (errorCode = validation_failed). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    deleteTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -246,9 +365,27 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The task does not exist, is soft-deleted, or belongs to another user (errorCode = not_found). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
         };
     };
-    GET_api_tasks: {
+    listTasks: {
         parameters: {
             query?: never;
             header?: never;
@@ -266,6 +403,15 @@ export interface operations {
                     "application/json": components["schemas"]["TaskResponse"][];
                 };
             };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -273,6 +419,192 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    renameTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameTaskRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The task does not exist, is soft-deleted, or belongs to another user (errorCode = not_found). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The write carried a stale version (optimistic-concurrency conflict; errorCode = version_conflict). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Request validation failed (errorCode = validation_failed). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    setTaskDone: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetTaskStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The task does not exist, is soft-deleted, or belongs to another user (errorCode = not_found). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The write carried a stale version (optimistic-concurrency conflict; errorCode = version_conflict). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Request validation failed (errorCode = validation_failed). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    reorderTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReorderTaskRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The task does not exist, is soft-deleted, or belongs to another user (errorCode = not_found). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The write carried a stale version (optimistic-concurrency conflict; errorCode = version_conflict). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Request validation failed (errorCode = validation_failed). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
         };

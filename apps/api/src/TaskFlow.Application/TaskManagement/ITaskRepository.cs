@@ -32,8 +32,19 @@ public interface ITaskRepository
     /// </summary>
     Task<IReadOnlyList<TaskEntity>> ListOwnedAsync(UserId owner, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Finds a task by id ALONE — NOT owner-scoped and TOMBSTONE-INCLUSIVE (no <c>deleted_at IS NULL</c>
+    /// filter). Used ONLY by the deferred-reaper (<c>ReapDeletedTask</c>), which is queue infrastructure
+    /// with no caller/owner, so it must load the candidate tombstone by its raw id to confirm the row is
+    /// still the same soft-deleted instant before hard-deleting it. Returns <c>null</c> if no row exists.
+    /// </summary>
+    Task<TaskEntity?> FindByIdIncludingDeletedAsync(TaskId id, CancellationToken cancellationToken);
+
     /// <summary>Stages a newly created task for insertion.</summary>
     void Add(TaskEntity task);
+
+    /// <summary>Stages an existing task for HARD deletion (physical row removal).</summary>
+    void Remove(TaskEntity task);
 
     /// <summary>Commits staged changes to the database.</summary>
     Task SaveChangesAsync(CancellationToken cancellationToken);

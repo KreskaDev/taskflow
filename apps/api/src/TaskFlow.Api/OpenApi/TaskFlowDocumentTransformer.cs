@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Linq;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi.Any;
@@ -45,35 +46,76 @@ internal sealed class TaskFlowDocumentTransformer : IOpenApiDocumentTransformer
         SetOperation(document, "/api/users/me", OperationType.Get, "getCurrentUser");
         SetOperation(document, "/api/users/me", OperationType.Delete, "deleteAccount");
 
+        // Task surface (slice 002, contracts/openapi.yaml). The 200/204 success bodies are auto-emitted
+        // from the endpoint signatures; here we restore the friendly operationIds and the exception-driven
+        // ProblemDetails responses (401 always, plus the documented 404/409/422 per op) that the .NET
+        // generator does not infer. deleteTask carries no 422/409 (version-free, no body); listTasks is
+        // the read with only the deny-by-default 401.
+        SetOperation(document, "/api/tasks/{id}", OperationType.Put, "createTask", 404, 422);
+        SetOperation(document, "/api/tasks", OperationType.Get, "listTasks");
+        SetOperation(document, "/api/tasks/{id}/title", OperationType.Patch, "renameTask", 404, 409, 422);
+        SetOperation(document, "/api/tasks/{id}/status", OperationType.Patch, "setTaskDone", 404, 409, 422);
+        SetOperation(document, "/api/tasks/{id}/position", OperationType.Patch, "reorderTask", 404, 409, 422);
+        SetOperation(document, "/api/tasks/{id}", OperationType.Delete, "deleteTask", 404);
+
         return Task.CompletedTask;
     }
 
-    private static void SetOperation(OpenApiDocument document, string path, OperationType method, string operationId)
+    /// <summary>
+    /// Stamps a stable <paramref name="operationId"/> on the operation at
+    /// <paramref name="path"/>/<paramref name="method"/>, plus the deny-by-default <c>401</c> and any
+    /// extra exception-driven ProblemDetails responses (<paramref name="extraProblemStatusCodes"/>, e.g.
+    /// <c>404</c>/<c>409</c>/<c>422</c>). All reference the shared <c>ProblemDetails</c> schema. No-ops if
+    /// the path is not yet in the document (so the call is safe before its endpoint is mapped).
+    /// </summary>
+    private static void SetOperation(
+        OpenApiDocument document,
+        string path,
+        OperationType method,
+        string operationId,
+        params int[] extraProblemStatusCodes)
     {
         if (document.Paths.TryGetValue(path, out var item) &&
             item.Operations.TryGetValue(method, out var operation))
         {
             operation.OperationId = operationId;
-            operation.Responses["401"] = new OpenApiResponse
+            operation.Responses["401"] = ProblemResponse("Missing or invalid identity carrier (deny-by-default).");
+
+            foreach (var statusCode in extraProblemStatusCodes)
             {
-                Description = "Missing or invalid identity carrier (deny-by-default).",
-                Content = new Dictionary<string, OpenApiMediaType>
-                {
-                    ["application/problem+json"] = new OpenApiMediaType
-                    {
-                        Schema = new OpenApiSchema
-                        {
-                            Reference = new OpenApiReference
-                            {
-                                Type = ReferenceType.Schema,
-                                Id = ProblemDetailsSchemaId,
-                            },
-                        },
-                    },
-                },
-            };
+                operation.Responses[statusCode.ToString(CultureInfo.InvariantCulture)] =
+                    ProblemResponse(ProblemDescriptions[statusCode]);
+            }
         }
     }
+
+    /// <summary>The documented purpose of each exception-driven status code stamped by the transformer.</summary>
+    private static readonly Dictionary<int, string> ProblemDescriptions = new()
+    {
+        [404] = "The task does not exist, is soft-deleted, or belongs to another user (errorCode = not_found).",
+        [409] = "The write carried a stale version (optimistic-concurrency conflict; errorCode = version_conflict).",
+        [422] = "Request validation failed (errorCode = validation_failed).",
+    };
+
+    /// <summary>A ProblemDetails-bodied response referencing the shared <c>ProblemDetails</c> schema.</summary>
+    private static OpenApiResponse ProblemResponse(string description) => new()
+    {
+        Description = description,
+        Content = new Dictionary<string, OpenApiMediaType>
+        {
+            ["application/problem+json"] = new OpenApiMediaType
+            {
+                Schema = new OpenApiSchema
+                {
+                    Reference = new OpenApiReference
+                    {
+                        Type = ReferenceType.Schema,
+                        Id = ProblemDetailsSchemaId,
+                    },
+                },
+            },
+        },
+    };
 
     private static OpenApiSchema BuildProblemDetailsSchema() => new()
     {
