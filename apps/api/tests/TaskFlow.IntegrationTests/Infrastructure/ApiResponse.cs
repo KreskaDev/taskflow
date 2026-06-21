@@ -29,7 +29,8 @@ public sealed record TaskListItem(Guid Id, string Title, string Status, string P
 /// </summary>
 public sealed record TaskBody(
     Guid Id, string Title, string Status, string Position, int Version,
-    DateTime CreatedAt, DateTime UpdatedAt, DateTime? CompletedAt);
+    DateTime CreatedAt, DateTime UpdatedAt, DateTime? CompletedAt,
+    DateTime? DueDate = null, bool? DueHasTime = null);
 
 /// <summary>
 /// Helpers for the allow/deny integration tests: read the typed bodies the API emits using the same

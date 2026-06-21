@@ -33,6 +33,8 @@ public static class TaskEndpoints
             Id = TaskId.From(id),
             Title = request.Title,
             Position = request.Position,
+            DueDate = request.DueDate,
+            DueHasTime = request.DueHasTime,
         });
     }
 

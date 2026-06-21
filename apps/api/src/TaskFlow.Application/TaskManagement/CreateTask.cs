@@ -29,20 +29,42 @@ public sealed record CreateTask
 
     /// <summary>The client-computed fractional-indexing rank string (R5).</summary>
     public required string Position { get; init; }
+
+    /// <summary>
+    /// The resolved due-date instant in UTC (FR-092, R8), or null for no due date. Paired with
+    /// <see cref="DueHasTime"/> — both null or both non-null (validated by <see cref="CreateTaskValidator"/>).
+    /// </summary>
+    public DateTime? DueDate { get; init; }
+
+    /// <summary>
+    /// The <c>DueDate.has_time</c> flag (R2/R8), or null for no due date. Paired with
+    /// <see cref="DueDate"/> — both null or both non-null (validated by <see cref="CreateTaskValidator"/>).
+    /// </summary>
+    public bool? DueHasTime { get; init; }
 }
 
 /// <summary>
 /// Validates <see cref="CreateTask"/> at the boundary (research R16): <see cref="CreateTask.Title"/>
 /// trimmed-non-empty and ≤ 500 chars, and <see cref="CreateTask.Position"/> a non-empty, well-formed
-/// fractional-indexing rank (the shared <see cref="PositionRank"/> rule, reused by reorder). A
+/// fractional-indexing rank (the shared <see cref="PositionRank"/> rule, reused by reorder). The due
+/// date (slice 003) adds three trust-boundary rules (R8/R11/R13): the <c>{DueDate, DueHasTime}</c>
+/// pairing invariant (both null or both non-null), a UTC-kind guard (a non-<c>Z</c> instant would make
+/// Npgsql throw an unhandled 500 against the <c>timestamptz</c> column — rejected as 422 instead), and a
+/// wide plausible-range sanity window (a zone-agnostic UTC comparison — no NodaTime this slice). A
 /// violation surfaces as <c>422 validation_failed</c> via the wired Wolverine FluentValidation +
-/// <c>ProblemDetailsMiddleware</c> pipeline.
+/// <c>ProblemDetailsMiddleware</c> pipeline (no new error code).
 /// </summary>
 [SuppressMessage("Design", "CA1515:Consider making public types internal",
     Justification = "Discovered + activated by Wolverine's FluentValidation middleware (mirrors slice-001 public handler/DTO posture).")]
 public sealed class CreateTaskValidator : AbstractValidator<CreateTask>
 {
     private const int MaxTitleLength = 500;
+
+    /// <summary>The earliest plausible due-date instant — a wide sanity floor, not business logic (R11).</summary>
+    private static readonly DateTime MinDue = new(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+    /// <summary>The plausible-range horizon: ~10 years beyond now (R11). A UTC comparison, zone-agnostic.</summary>
+    private const int MaxDueYearsAhead = 10;
 
     public CreateTaskValidator()
     {
@@ -53,6 +75,36 @@ public sealed class CreateTaskValidator : AbstractValidator<CreateTask>
             .WithMessage($"Title must be {MaxTitleLength} characters or fewer.");
 
         RuleFor(x => x.Position).ValidPositionRank();
+
+        // Pairing invariant (R8): both null (no due date) or both non-null. A PRESENCE check —
+        // DueHasTime=false is "present" (date-only), so compare HasValue, never truthiness.
+        RuleFor(x => x)
+            .Must(c => c.DueDate.HasValue == c.DueHasTime.HasValue)
+            .WithName(nameof(CreateTask.DueDate))
+            .WithMessage("DueDate and DueHasTime must be set together (both present or both absent).");
+
+        // UTC-kind guard (R13): the resolved instant MUST be a Z-form UTC DateTime, else 422 — a
+        // non-UTC kind would make Npgsql throw an unhandled 500 writing to the timestamptz column.
+        RuleFor(x => x.DueDate)
+            .Must(due => !due.HasValue || due.Value.Kind == DateTimeKind.Utc)
+            .WithMessage("DueDate must be a UTC instant (an ISO-8601 'Z' form).");
+
+        // Plausible-range sanity window (R11): reject corrupt/absurd instants. Zone-agnostic UTC compare.
+        RuleFor(x => x.DueDate)
+            .Must(BeWithinPlausibleRange)
+            .WithMessage("DueDate is outside the plausible range.");
+    }
+
+    private static bool BeWithinPlausibleRange(DateTime? due)
+    {
+        if (!due.HasValue || due.Value.Kind != DateTimeKind.Utc)
+        {
+            // No due date (passes) or wrong kind (the UTC-kind rule owns that failure — don't double-fail
+            // on a kind we can't meaningfully range-compare).
+            return true;
+        }
+
+        return due.Value >= MinDue && due.Value <= DateTime.UtcNow.AddYears(MaxDueYearsAhead);
     }
 }
 
@@ -104,7 +156,9 @@ public static class CreateTaskHandler
 
         // No row for this caller (absent, or owned by another user). Attempt the insert; the PK on
         // `id` is the race backstop for a concurrent same-id insert.
-        var created = TaskEntity.Create(command.Id, owner, command.Title, command.Position, DateTime.UtcNow);
+        var created = TaskEntity.Create(
+            command.Id, owner, command.Title, command.Position, DateTime.UtcNow,
+            command.DueDate, command.DueHasTime);
         tasks.Add(created);
         try
         {
