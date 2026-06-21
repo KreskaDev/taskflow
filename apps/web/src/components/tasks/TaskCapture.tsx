@@ -49,7 +49,7 @@ export function TaskCapture({ open, onClose }: TaskCaptureProps) {
     const result = taskTitleSchema.safeParse(title);
     if (!result.success) return; // Empty after trim: nothing to create — a no-op, stay open.
 
-    createTask(result.data);
+    createTask({ title: result.data });
     close();
   };
 
