@@ -129,13 +129,21 @@ ctor + private ctor + static factory + `utcNow`-injected behavior methods, on
   > reason; a linked list is rejected because ordered reads would need a recursive CTE
   > instead of one indexed `ORDER BY`.)
 
-- **Collation — `COLLATE "C"` on BOTH the column AND the index, in the same migration.**
-  EF Core: `.UseCollation("C")` on the `position` property **and** the same collation on the
-  index builder, so the migration emits `COLLATE "C"` on both. **If either is missed,
-  ordering drifts silently**: Postgres' default locale-aware collation does not sort
-  byte-ordinally, so the client (TS code-unit order) paints the correct order while the
-  server's `ORDER BY position` returns a *different* order, and the two drift. The migration
-  review MUST verify both carry `COLLATE "C"`.
+- **Collation — the `position` column MUST be `COLLATE "C"`, and every index / `ORDER BY`
+  over it MUST resolve under `"C"`.** EF Core: `.UseCollation("C")` on the `position`
+  property. **If the column collation is missed, ordering drifts silently**: Postgres' default
+  locale-aware collation does not sort byte-ordinally, so the client (TS code-unit order)
+  paints the correct order while the server's `ORDER BY position` returns a *different* order,
+  and the two drift. **A serving index over a C-collated column needs NO explicit `COLLATE
+  "C"` token of its own — a Postgres index inherits the column's collation**, so
+  `ix_tasks_created_by_position` on the C-collated `position` is itself C-ordered and the
+  planner uses it for `ORDER BY position`. *(Empirically verified on Postgres 17, 2026-06-21:
+  with the DB default `en_US.utf8`, `ORDER BY position` over the C-collated column returns
+  ASCII byte order and `EXPLAIN` shows an `Index Only Scan` on `ix_tasks_created_by_position`
+  — i.e. the index serves the C-ordered query. An explicit index collation would be redundant
+  and Npgsql does not cleanly express per-column collation on a composite-index builder.)* The
+  migration review verifies the **column** carries `COLLATE "C"`; the index correctness
+  follows from that.
 
 - **Alphabet — pinned identically on client and server.** The standard fractional-indexing
   alphabet (digits + lowercase letters) so byte order and intended order coincide exactly

@@ -27,6 +27,7 @@ internal sealed class TaskFlowDocumentTransformer : IOpenApiDocumentTransformer
     [
         "validation_failed", "unauthenticated", "not_admitted", "forbidden",
         "not_found", "conflict_lww", "last_owner", "internal_error",
+        "version_conflict",
     ];
 
     public Task TransformAsync(

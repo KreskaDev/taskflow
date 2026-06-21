@@ -3,6 +3,7 @@ using System.Text.Json;
 using FluentValidation;
 using Microsoft.Extensions.Logging;
 using TaskFlow.Application.Authorization;
+using TaskFlow.Application.Errors;
 
 namespace TaskFlow.Api.Middleware;
 
@@ -83,6 +84,8 @@ internal sealed class ProblemDetailsMiddleware(RequestDelegate next, ILogger<Pro
     {
         UnauthenticatedException => (StatusCodes.Status401Unauthorized, "unauthenticated", "Authentication required", null),
         ForbiddenException => (StatusCodes.Status403Forbidden, "forbidden", "Access denied", null),
+        NotFoundException => (StatusCodes.Status404NotFound, "not_found", "Resource not found", null),
+        VersionConflictException => (StatusCodes.Status409Conflict, "version_conflict", "Version conflict", null),
         ValidationException ve => (StatusCodes.Status422UnprocessableEntity, "validation_failed", "Validation failed", ToErrors(ve)),
         _ => (StatusCodes.Status500InternalServerError, "internal_error", "An unexpected error occurred", null),
     };

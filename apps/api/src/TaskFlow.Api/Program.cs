@@ -8,10 +8,13 @@ using TaskFlow.Api.Middleware;
 using TaskFlow.Api.OpenApi;
 using TaskFlow.Application.Authorization;
 using TaskFlow.Application.IdentityAccess;
+using TaskFlow.Application.TaskManagement;
 using TaskFlow.Domain.IdentityAccess.Events;
+using TaskFlow.Domain.TaskManagement.Events;
 using TaskFlow.Infrastructure.Persistence;
 using Wolverine;
 using Wolverine.EntityFrameworkCore;
+using Wolverine.FluentValidation;
 using Wolverine.Http;
 using Wolverine.Postgresql;
 
@@ -48,6 +51,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
 builder.Services.AddScoped<IResourceAuthorizationPolicy, ResourceAuthorizationPolicy>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 
 // --- EF Core write-side + Wolverine durable messaging (Postgres outbox/inbox) ---
 builder.Services.AddDbContextWithWolverineIntegration<AppDbContext>(o => o.UseNpgsql(connectionString));
@@ -61,6 +65,7 @@ builder.Host.UseWolverine(opts =>
 
     opts.PersistMessagesWithPostgresql(connectionString);
     opts.UseEntityFrameworkCoreTransactions();
+    opts.UseFluentValidation();
     opts.Policies.AutoApplyTransactions();
     opts.Policies.UseDurableLocalQueues();
 
@@ -69,6 +74,11 @@ builder.Host.UseWolverine(opts =>
     // destination so the publish enrolls in the DeleteAccount handler's transaction (atomic with the
     // User-row hard-delete). UseDurableLocalQueues (above) makes this queue outbox-backed.
     opts.PublishMessage<AccountDeletionRequested>().ToLocalQueue("account-deletion");
+
+    // ReapDeletedTask is published from the soft-delete handler and processed off a durable local
+    // queue (mirrors account-deletion above) to give the deferred hard-delete an outbox-backed,
+    // transactional destination instead of being silently dropped as an unrouted publish.
+    opts.PublishMessage<ReapDeletedTask>().ToLocalQueue("task-reaper");
 
     // Single-node deployment (one VPS, ~10 users): Solo durability skips the distributed
     // leader-election/agent machinery, giving faster, cleaner startup/shutdown (also avoids a
@@ -85,7 +95,8 @@ builder.Host.UseWolverine(opts =>
     // real command/query (including DeleteAccount, whose message type differs) keeps deny-by-default.
     opts.Policies.AddMiddleware(
         typeof(AuthorizationMiddleware),
-        chain => chain.MessageType != typeof(AccountDeletionRequested));
+        chain => chain.MessageType != typeof(AccountDeletionRequested)
+            && chain.MessageType != typeof(ReapDeletedTask));
 });
 
 // --- Built-in .NET 9 OpenAPI document at /openapi/v1.json (R5) ---

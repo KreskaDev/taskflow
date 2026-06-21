@@ -30,6 +30,7 @@ const ERROR_UX: Record<string, ErrorUx> = {
   validation_failed: { message: "Some fields need attention.", redirectToSignIn: false },
   not_found: { message: "We couldn't find what you were looking for.", redirectToSignIn: false },
   conflict_lww: { message: "Your change conflicted with a newer update. Review and retry.", redirectToSignIn: false },
+  version_conflict: { message: "This item was changed elsewhere. We've reloaded the latest version — review it and retry.", redirectToSignIn: false },
   last_owner: { message: "You can't remove the last owner of a shared project.", redirectToSignIn: false },
   internal_error: { message: "Something went wrong. Please try again.", redirectToSignIn: false },
 };

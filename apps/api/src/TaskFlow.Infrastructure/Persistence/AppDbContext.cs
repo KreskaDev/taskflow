@@ -13,6 +13,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 {
     public DbSet<User> Users => Set<User>();
 
+    public DbSet<TaskFlow.Domain.TaskManagement.Task> Tasks => Set<TaskFlow.Domain.TaskManagement.Task>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
