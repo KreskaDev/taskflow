@@ -1,0 +1,341 @@
+openapi: 3.1.0
+info:
+  title: TaskFlow API — slice 004 (Project Management) delta
+  version: "0.4.0"
+  description: >
+    Contract DELTA over specs/002-task-capture and specs/003-natural-language-dates.
+
+    NEW resource: **Project** (ENT-02) — create / list / edit / archive / unarchive /
+    delete, plus a project's task list. NEW task operation: **move-to-project** (`M`).
+    CHANGED: `GET /api/tasks` is narrowed to the **Inbox** (tasks with no project,
+    `project_id IS NULL`); `TaskResponse` gains a nullable `projectId`.
+
+    NO new error code — nesting violations and out-of-preset color/icon are
+    `422 validation_failed`; foreign/absent project ids are `404 not_found`;
+    stale edits are `409 version_conflict` (all existing codes; the
+    `ProblemDetails.errorCode` enum is UNCHANGED — research R12).
+
+    The C# success-body schemas auto-derive from the request/response DTOs
+    (`CreateProjectRequest`, `ProjectResponse`, `TaskResponse`, …). The OpenAPI
+    document transformer's **`ErrorCodes` array and exception-mapping are unchanged**
+    (no new errorCode), but the transformer IS extended (plan marks it MODIFY) to
+    stamp the new project operationIds + auto-insert their 401/404/409/422 responses.
+    Everything not listed here is UNCHANGED from slices 002/003.
+
+servers:
+  - url: /
+
+paths:
+  # ───────────────────────── Projects (NEW) ─────────────────────────
+  /api/projects/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    put:
+      operationId: createProject
+      tags: [Projects]
+      summary: Create a project (idempotent on the client-supplied id)
+      description: >
+        Client-generated UUIDv7 id, owner coerced to the caller, visibility defaults
+        to personal. Replaying the same id returns the existing project UNCHANGED
+        (FR-001 parity). Error split for `parentId` (research R3/R13): a parent that
+        is absent OR owned by another user → **404** (existence not disclosed, the
+        ownership posture); a parent owned by the caller but that is itself a child
+        (would create a grandchild) → **422** with a field message. A freshly-created
+        project has no children, so the project-has-children failure shape applies
+        only on edit (re-parent), not on create.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateProjectRequest" }
+      responses:
+        "200": { description: Created (or idempotent replay), content: { application/json: { schema: { $ref: "#/components/schemas/ProjectResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+    patch:
+      operationId: editProject
+      tags: [Projects]
+      summary: Edit a project's name, color, icon, and/or parent
+      description: >
+        Updates the mutable fields together (research R4). Re-parenting is supplying
+        a different `parentId`; error split (research R3/R13): an absent/foreign
+        target → **404** (existence not disclosed); a caller-owned target that is
+        itself a child, OR moving a project that has its own children → **422** with
+        a field message (AS-08/AS-09, one-level rule FR-012). Carries the optimistic
+        `version`; a stale token → 409.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EditProjectRequest" }
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { $ref: "#/components/schemas/ProjectResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/VersionConflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+    delete:
+      operationId: deleteProject
+      tags: [Projects]
+      summary: Soft-delete a project, applying task & child dispositions
+      description: >
+        Soft-delete (tombstone; reaped after the undo window). When the project has
+        tasks, `taskDisposition` is REQUIRED (FR-014/EC-03). When it has child
+        projects, `childDisposition` is REQUIRED (AS-10). `archive_with_tasks`
+        archives the project instead of deleting it (no tombstone); when combined
+        with `childDisposition=cascade` the children are **archived** too (the whole
+        subtree is archived, not deleted — research R5). A versioned mutation (NOT
+        idempotent like the task delete): it applies real disposition mutations, so a
+        stale `version` → 409 rather than a 204 replay. **Parameter convention**:
+        DELETE carries `version`/dispositions as query params (HTTP DELETE bodies are
+        poorly supported by tooling/proxies); the PATCH archive/edit operations carry
+        the equivalent fields in a request body. This verb-driven split is deliberate.
+      parameters:
+        - { name: version, in: query, required: true, schema: { type: integer }, description: Optimistic-concurrency token }
+        - { name: taskDisposition, in: query, required: false, schema: { $ref: "#/components/schemas/TaskDisposition" }, description: Required when the project has tasks }
+        - { name: childDisposition, in: query, required: false, schema: { $ref: "#/components/schemas/ChildDisposition" }, description: Required when the project has child projects }
+      responses:
+        "204": { description: Soft-deleted (or archived, for archive_with_tasks) }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/VersionConflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /api/projects:
+    get:
+      operationId: listProjects
+      tags: [Projects]
+      summary: List the caller's projects (flat; tree assembled client-side)
+      description: >
+        Owner-scoped, tombstone-excluded. Default (`archived=false`) returns ACTIVE
+        projects for the sidebar (AS-05: archived hidden). `archived=true` returns
+        the caller's archived projects so unarchive (AS-11) is reachable without the
+        slice-013 command palette (research R8). Flat list; the one-level tree is
+        assembled on the client by `parentId` (research R16).
+      parameters:
+        - { name: archived, in: query, required: false, schema: { type: boolean, default: false } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/ProjectResponse" } } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+  /api/projects/{id}/archive:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    patch:
+      operationId: archiveProject
+      tags: [Projects]
+      summary: Archive a project (reversible)
+      description: >
+        Sets the project to archived (hidden from default views, FR-013/AS-05).
+        When the project has child projects, `childDisposition` is REQUIRED (AS-10).
+        Carries `version`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ArchiveProjectRequest" }
+      responses:
+        "200": { description: Archived, content: { application/json: { schema: { $ref: "#/components/schemas/ProjectResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/VersionConflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /api/projects/{id}/unarchive:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    patch:
+      operationId: unarchiveProject
+      tags: [Projects]
+      summary: Unarchive a project (restore to default views)
+      description: >
+        Clears the archived state (AS-11). If the parent is still archived/deleted,
+        the project is restored as TOP-LEVEL (its `parentId` is nulled, research R9).
+        Carries `version`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VersionOnlyRequest" }
+      responses:
+        "200": { description: Unarchived, content: { application/json: { schema: { $ref: "#/components/schemas/ProjectResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/VersionConflict" }
+
+  /api/projects/{id}/tasks:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      operationId: listProjectTasks
+      tags: [Projects, Tasks]
+      summary: List a project's tasks (owner-scoped)
+      description: >
+        `WHERE created_by = caller AND deleted_at IS NULL AND project_id = {id}
+        ORDER BY position, id`. 404 if the project is foreign/absent (ownership
+        posture). Reuses `TaskResponse`.
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/TaskResponse" } } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ───────────────────── Tasks (CHANGED / NEW op) ─────────────────────
+  /api/tasks:
+    get:
+      operationId: listTasks
+      tags: [Tasks]
+      summary: List the caller's Inbox (CHANGED — now unprojected tasks only)
+      description: >
+        CHANGED in slice 004 — narrowed to the **Inbox**: `project_id IS NULL`
+        (FR-021). Backward-compatible — every slice-002/003 task has no project, so
+        existing data stays in the Inbox; only tasks moved to a project leave it.
+        Response shape gains `projectId` (always null here).
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/TaskResponse" } } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+  /api/tasks/{id}/project:
+    parameters:
+      - $ref: "#/components/parameters/TaskId"
+    patch:
+      operationId: moveTaskToProject
+      tags: [Tasks]
+      summary: Move a task to a project (the `M` action), or to the Inbox
+      description: >
+        Sets the task's project (US-08.AS-05). `projectId = null` moves the task to
+        the **Inbox**. The caller MUST own the task AND (when non-null) the target
+        project — else 404. Carries `version`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MoveTaskToProjectRequest" }
+      responses:
+        "200": { description: Moved, content: { application/json: { schema: { $ref: "#/components/schemas/TaskResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/VersionConflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+components:
+  parameters:
+    ProjectId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    TaskId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  schemas:
+    CreateProjectRequest:
+      type: object
+      required: [name, color, icon]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        color: { type: string, description: "Member of the preset color set (ASM-04)" }
+        icon: { type: string, description: "Member of the preset icon set (ASM-04)" }
+        parentId: { type: [string, "null"], format: uuid, description: "Top-level parent, or null for a top-level project" }
+
+    EditProjectRequest:
+      type: object
+      required: [name, color, icon, parentId, version]   # parentId REQUIRED — whole-object replace (see note)
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        color: { type: string }
+        icon: { type: string }
+        parentId:
+          type: [string, "null"]
+          format: uuid
+          description: >
+            REQUIRED — this is a whole-object replace, not a merge (research R4). The
+            edit form always sends the project's current `parentId` (its loaded value);
+            send `null` to make/keep it top-level, or a uuid to (re-)parent. Because it
+            is required, an omitted field is a 422, never a silent un-parent.
+        version: { type: integer, description: "Optimistic-concurrency token" }
+
+    ArchiveProjectRequest:
+      type: object
+      required: [version]
+      properties:
+        version: { type: integer }
+        childDisposition:
+          allOf: [{ $ref: "#/components/schemas/ChildDisposition" }]
+          description: "Required when the project has child projects (AS-10)"
+
+    VersionOnlyRequest:
+      type: object
+      required: [version]
+      properties:
+        version: { type: integer }
+
+    MoveTaskToProjectRequest:
+      type: object
+      required: [version]
+      properties:
+        projectId: { type: [string, "null"], format: uuid, description: "Target project, or null for the Inbox" }
+        version: { type: integer }
+
+    TaskDisposition:
+      type: string
+      enum: [cascade, move_to_inbox, archive_with_tasks]
+      description: "How to handle a project's tasks on delete (FR-014/EC-03)"
+
+    ChildDisposition:
+      type: string
+      enum: [cascade, orphan_to_top]
+      description: "How to handle a project's child projects on delete/archive (AS-10)"
+
+    ProjectResponse:
+      type: object
+      required: [id, name, color, icon, visibility, version, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        color: { type: string }
+        icon: { type: string }
+        parentId: { type: [string, "null"], format: uuid }
+        visibility: { type: string, enum: [personal, shared] }
+        archivedAt: { type: [string, "null"], format: date-time, description: "Null = active; non-null = archived (UTC)" }
+        version: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      description: "Never exposes ownerId (always the caller) or deletedAt."
+
+    # CHANGED — gains nullable projectId (everything else unchanged from slice 003)
+    TaskResponse:
+      type: object
+      required: [id, title, status, position, version, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        status: { type: string, enum: [backlog, todo, in_progress, done, cancelled] }
+        position: { type: string }
+        version: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        completedAt: { type: [string, "null"], format: date-time }
+        dueDate: { type: [string, "null"], format: date-time }
+        dueHasTime: { type: [boolean, "null"] }
+        projectId: { type: [string, "null"], format: uuid, description: "NEW slice 004 — owning project; null = Inbox" }
+
+  responses:
+    Unauthenticated:
+      description: Authentication required
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+    NotFound:
+      description: Resource not found (or not owned by the caller — existence not disclosed)
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+    VersionConflict:
+      description: Optimistic-concurrency token was stale; reload and retry
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+    ValidationFailed:
+      description: Validation failed (e.g. one-level nesting, out-of-preset color/icon, bad pairing)
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+
+# ProblemDetails schema + errorCode enum are UNCHANGED from slices 001/002 (research R12) —
+# referenced here for completeness; the document transformer's ErrorCodes array is NOT edited.
