@@ -32,6 +32,11 @@ obj/
 # Spec Kit scratch / working artifacts
 .specify/memory/.scratch/
 
+# Local dev / verification scratch
+.playwright-mcp/
+apps/web/.demo-idp.mjs
+slice*-*.png
+
 # Secrets / environment — NEVER commit (public repo)
 .env
 .env.*

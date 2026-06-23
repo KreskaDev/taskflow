@@ -165,6 +165,122 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
 });
 
 /**
+ * US1 Natural-Language Dates capture E2E (slice 003, T019; US-01.AS-02..AS-05 + EC-02 + the
+ * "version number is not a date" guard). Drives the SAME `C` capture surface as the slice-002
+ * specs through the REAL BFF→proxy→API write path on a seeded session — the slice-003 delta is
+ * purely client-side parsing (`lib/dates.ts`) feeding the create payload, so these prove the
+ * end-to-end behaviour: a trailing Polish date phrase is stripped from the title and paints a
+ * due-date label on the row; an impossible date attempt ("30.02") creates nothing and announces
+ * "nie rozpoznano"; a non-date trailing token ("2.0") is left in the title with no error.
+ *
+ * CLOCK NOTE: the parser runs against the REAL system clock (no `now` injection on the live
+ * `C`→Enter path — only the Vitest unit suite injects `now`). So these assertions are robust to
+ * wall-clock time: they assert the TITLE is correctly stripped and that a due-date label is
+ * VISIBLE for the resolved cases, but never assert an exact instant/time-of-day (the unit tests
+ * own exact instants). The title node is asserted SPECIFICALLY (`.tf-task-row__title`) rather
+ * than the whole row, because the row also contains the date label — a whole-row substring match
+ * would wrongly pass even if "po 17" leaked into the title.
+ */
+test.describe("US1 Natural-Language Dates (AS-02..05 capture-with-date, EC-02, version guard)", () => {
+  /** The visible title text of the top (newest-first) row — the strip-correctness probe. */
+  const topTitle = (page: Page) =>
+    page.getByRole("option").first().locator(".tf-task-row__title");
+  /** The due-date label on the top row (FR-046 visible, non-hover affordance). */
+  const topDue = (page: Page) => page.getByRole("option").first().locator(".tf-task-row__due");
+
+  // AS-02..AS-05 + the date-only/explicit-time rows: typing the full raw input and Enter creates
+  // a task whose title is the STRIPPED prefix and whose row shows a due-date label. `createTask`
+  // arms the optimistic PUT's waitForResponse before Enter, so the server write is awaited.
+  const captureCases: ReadonlyArray<{ scenario: string; input: string; title: string }> = [
+    { scenario: "AS-02 time-today (po)", input: "Kupic mleko po 17", title: "Kupic mleko" },
+    { scenario: "AS-03 tomorrow", input: "Raport jutro", title: "Raport" },
+    { scenario: "AS-04 weekday", input: "Meeting piatek", title: "Meeting" },
+    { scenario: "AS-05 relative days", input: "Zakupy za 3 dni", title: "Zakupy" },
+    { scenario: "explicit time (o HH:MM)", input: "Call o 9:30", title: "Call" },
+    { scenario: "day.month (DD.MM)", input: "Urodziny 30.06", title: "Urodziny" },
+  ];
+
+  for (const { scenario, input, title } of captureCases) {
+    test(`${scenario}: "${input}" → title "${title}" stripped + due-date label visible`, async ({
+      browser,
+    }) => {
+      const { page, context } = await signedInPage(
+        browser,
+        `dates-${title.toLowerCase().replace(/\s+/g, "-")}`,
+      );
+      await page.goto("/");
+      await expect(page.getByText(/your inbox is empty/i)).toBeVisible();
+
+      await createTask(page, input);
+
+      // Exactly one row, and its TITLE is the stripped prefix (string match = exact equality, so
+      // a leaked date phrase like "Kupic mleko po 17" would fail). This is the strip proof.
+      await expect(page.getByRole("option")).toHaveCount(1);
+      await expect(topTitle(page)).toHaveText(title);
+
+      // The resolved due date paints a visible label on the row (the end-to-end point — we do NOT
+      // assert the exact instant; the unit suite owns that against an injected clock).
+      await expect(topDue(page)).toBeVisible();
+
+      await context.close();
+    });
+  }
+
+  test('EC-02: "Spotkanie 30.02" creates NO task and announces "nie rozpoznano"; field retains value', async ({
+    browser,
+  }) => {
+    const { page, context } = await signedInPage(browser, "dates-ec02-impossible");
+    await page.goto("/");
+    await expect(page.getByText(/your inbox is empty/i)).toBeVisible();
+
+    await page.keyboard.press("c");
+    const input = page.getByRole("textbox", { name: "Task title" });
+    await expect(input).toBeFocused();
+    await input.fill("Spotkanie 30.02");
+
+    // An impossible in-range date ("30.02") is a genuine trailing date ATTEMPT that fails to
+    // resolve → NO mutation fires (so there is no PUT to wait on — waiting would hang). Enter
+    // surfaces the recoverable failure synchronously via the polite status node; that visibility
+    // is the synchronization point. Target the node by its stable id to dodge the other role=status
+    // nodes layout.tsx / the slice-002 LiveRegion mount (strict-mode ambiguity).
+    await page.keyboard.press("Enter");
+
+    const errorNode = page.locator("#task-capture-error");
+    await expect(errorNode).toBeVisible();
+    await expect(errorNode).toHaveText(/nie rozpoznano/i);
+
+    // No task was created (the inbox stays empty), and the dialog stays open with the field's value
+    // retained so the user can fix the phrase (EC-02 / FR-006).
+    await expect(page.getByRole("option")).toHaveCount(0);
+    await expect(page.getByText(/your inbox is empty/i)).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Create task" })).toBeVisible();
+    await expect(input).toHaveValue("Spotkanie 30.02");
+
+    await context.close();
+  });
+
+  test('guard: "Wersja 2.0" is created as-is with NO due-date label and NO error', async ({
+    browser,
+  }) => {
+    const { page, context } = await signedInPage(browser, "dates-guard-version");
+    await page.goto("/");
+    await expect(page.getByText(/your inbox is empty/i)).toBeVisible();
+
+    // "2.0" is NOT a date-shaped trailing token (out of clock/calendar range, R4) → the whole
+    // string is the title, no due date, no error. `createTask` proves a real server write landed.
+    await createTask(page, "Wersja 2.0");
+
+    await expect(page.getByRole("option")).toHaveCount(1);
+    await expect(topTitle(page)).toHaveText("Wersja 2.0");
+    // No due-date label rendered, and the capture surface raised no recoverable-failure message.
+    await expect(topDue(page)).toHaveCount(0);
+    await expect(page.locator("#task-capture-error")).toHaveCount(0);
+
+    await context.close();
+  });
+});
+
+/**
  * US8 Keyboard Navigation & Operate E2E (T059; US-08.AS-03/07/09 + Space/E/Del/Alt+↑↓ operate +
  * virtualization-focus). Drives the REAL listbox keyboard surface (the page-owned global gate +
  * the controlled TaskList/TaskRow) through the same seeded-session auth and the REAL BFF→proxy→API
