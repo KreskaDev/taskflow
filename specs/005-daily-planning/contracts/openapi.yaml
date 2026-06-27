@@ -1,0 +1,341 @@
+openapi: 3.1.0
+info:
+  title: TaskFlow API — slice 005 (Daily Planning) delta
+  version: "0.5.0"
+  description: >
+    Contract DELTA over specs/002-task-capture, specs/003-natural-language-dates,
+    and specs/004-project-management.
+
+    NEW read views: **Today** (`GET /api/tasks/today`) and **Upcoming**
+    (`GET /api/tasks/upcoming`) — zone-aware membership computed against
+    `Europe/Warsaw` server-side (FR-092; NodaTime introduced this slice for
+    boundary computation ONLY — no column remap, no Npgsql plugin, no migration —
+    research R1). NEW task-editor operations: **set-priority** (`PATCH
+    /api/tasks/{id}/priority`, the `1`-`4` keys), **reschedule** (`PATCH
+    /api/tasks/{id}/due-date`, the `T` key — realizes the reschedule slice 003
+    deferred), and the combined **edit** (`PATCH /api/tasks/{id}/edit`, the `E`
+    editor — atomic Ctrl+Enter save / Esc discard). CHANGED: `TaskResponse` gains
+    nullable **`priority`** and **`description`** (the two reserved fields activated
+    this slice).
+
+    NO new error code — an out-of-set priority, a bad reschedule instant
+    (pairing / non-UTC-kind / implausible range — the slice-003 rules reused), or
+    an over-long description are `422 validation_failed`; a foreign/absent/tombstoned
+    task id is `404 not_found`; a stale mutation token is `409 version_conflict`
+    (all existing codes; the `ProblemDetails.errorCode` enum is UNCHANGED — research
+    R11). The OpenAPI document transformer's **`ErrorCodes` array and
+    exception-mapping are unchanged** (no new errorCode); the transformer IS extended
+    (plan marks it MODIFY) to stamp the new operationIds + auto-insert their
+    401/404/409/422 responses.
+
+    AUTHORIZATION SCOPE (governed by research open-question #1): Today/Upcoming and
+    the editor mutations realize the **ownership** branch in full. The
+    shared-project **membership + role** branch (FR-066/FR-067) and the SC-016
+    viewer-deny / non-member-deny tests are a **named, not-yet-realized seam** — the
+    `ProjectMembership` substrate is deferred to slice 007. **No ProjectMembership or
+    shared-project schema is added to this contract** (that is slice 007's owned
+    scope; adding it here would contradict the blocker's YAGNI line).
+
+    The C# success-body schemas auto-derive from the request/response DTOs
+    (`TaskResponse`, `SetPriorityRequest`, `EditTaskRequest`, `TodayResponse`,
+    `UpcomingResponse`, …). Everything not listed here is UNCHANGED from
+    slices 002/003/004.
+
+servers:
+  - url: /
+
+paths:
+  # ───────────────────── Daily views (NEW — read) ─────────────────────
+  /api/tasks/today:
+    get:
+      operationId: getTodayTasks
+      tags: [Tasks]
+      summary: The Today view — due-today + overdue-incomplete, grouped by project
+      description: >
+        Owner-scoped (research R10; the membership arm is a not-yet-realized seam —
+        see info note). Returns the caller's tasks whose `due_date` falls on **today
+        in Europe/Warsaw** OR are **overdue incomplete** (`due_date` before the start
+        of today-Warsaw, status not done/cancelled) — "so nothing silently falls off
+        the day" (FR-022). EXCLUDES `done`/`cancelled`. Tasks with no `due_date` are
+        NOT returned (they live in the Inbox / project lists). The Warsaw day boundary
+        is computed SERVER-SIDE via the NodaTime boundary helper (research R1/R6); the
+        SQL filters a plain UTC `due_date` range (zone-free). Rows are **grouped by
+        project** (Inbox/unprojected = the `projectId: null` group) and, within each
+        group, ordered deterministically: priority (P0 first, NULL last) → due time
+        (date-only sorts as start-of-day) → createdAt → id (research R5). Each row
+        carries an **`isOverdue`** flag (Today-only, not on base `TaskResponse`).
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/TodayResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+  /api/tasks/upcoming:
+    get:
+      operationId: getUpcomingTasks
+      tags: [Tasks]
+      summary: The Upcoming view — the next 7 days, grouped by day
+      description: >
+        Owner-scoped (research R10; membership arm a seam). Returns the caller's tasks
+        whose `due_date` falls in the **next 7 calendar days in Europe/Warsaw** — the
+        window `[start of tomorrow-Warsaw, start of (today+8)-Warsaw)` (FR-023).
+        Today's tasks are NOT included (a task due tomorrow appears here, not in Today —
+        Constitution X); tasks with no `due_date` are not returned. EXCLUDES
+        `done`/`cancelled`. Boundaries are computed SERVER-SIDE via the NodaTime helper;
+        the SQL filters a plain UTC `due_date` range. Rows are **grouped by day** — the
+        group key is the task's Warsaw calendar date (`LocalDate`, `YYYY-MM-DD`),
+        computed via the zone helper (DISTINCT from `dueDate`, the UTC instant — never
+        the truncated UTC date, research R1/R3). Groups are ordered ascending by date;
+        within each day the same deterministic order as Today applies (research R5).
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/UpcomingResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+  # ───────────────── Task-editor mutations (NEW) ─────────────────
+  /api/tasks/{id}/priority:
+    parameters:
+      - $ref: "#/components/parameters/TaskId"
+    patch:
+      operationId: setTaskPriority
+      tags: [Tasks]
+      summary: Set a task's priority (the `1`-`4` keys), or clear it
+      description: >
+        Sets `priority` to a P0–P3 token (`1`→P0 … `4`→P3, P0 = highest; AS-04) or
+        `null` to clear it. One optimistic paint, one `version` round-trip (research
+        R4/R7). The caller MUST own the task — else 404 (ownership posture). An
+        out-of-set value → 422 (the closed set is validated both tiers, research R2).
+        Carries `version`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SetPriorityRequest" }
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { $ref: "#/components/schemas/TaskResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/VersionConflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /api/tasks/{id}/due-date:
+    parameters:
+      - $ref: "#/components/parameters/TaskId"
+    patch:
+      operationId: rescheduleTaskDueDate
+      tags: [Tasks]
+      summary: Reschedule a task's due date (the `T` key), or clear it
+      description: >
+        Changes the task's due date (AS-05); realizes the reschedule slice 003
+        deferred. The CLIENT parses the Polish phrase (e.g. "jutro") with the slice-003
+        parser, resolves it against Europe/Warsaw, and sends the **resolved UTC
+        instant** + the `dueHasTime` flag; the SERVER re-validates the resolved instant
+        (pairing invariant + UTC-kind + plausible range — the slice-003
+        `CreateTaskValidator` rules, reused). `dueDate`/`dueHasTime` are **both
+        non-null or both null** — a half-set pair → 422. `null`/`null` clears the due
+        date. The caller MUST own the task — else 404. Carries `version`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RescheduleDueDateRequest" }
+      responses:
+        "200": { description: Rescheduled, content: { application/json: { schema: { $ref: "#/components/schemas/TaskResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/VersionConflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /api/tasks/{id}/edit:
+    parameters:
+      - $ref: "#/components/parameters/TaskId"
+    patch:
+      operationId: editTask
+      tags: [Tasks]
+      summary: Edit a task's fields (the `E` editor — atomic save / discard)
+      description: >
+        The combined task editor (AS-06/07/08): saves title, description, priority,
+        due date, and project together, atomically on `Ctrl+Enter`; `Esc` discards
+        client-side (no request sent). **Whole-object replace** of the editable fields
+        (research R4) — every field is a REQUIRED key with a nullable value (`title`
+        required-non-null; `description`/`priority`/`dueDate`/`dueHasTime`/`projectId`
+        required-but-nullable), so an omitted field is a 422, never a silent null
+        (mirrors slice-004 `EditProjectRequest.parentId`). The same validators apply as
+        the per-field ops: priority closed-set, the due-date pairing/UTC/range rule,
+        description length; `projectId` reuses the move-to-project ownership check
+        (foreign/absent target → 404). The caller MUST own the task — else 404.
+        Carries `version`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EditTaskRequest" }
+      responses:
+        "200": { description: Saved, content: { application/json: { schema: { $ref: "#/components/schemas/TaskResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/VersionConflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+components:
+  parameters:
+    TaskId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  schemas:
+    Priority:
+      type: [string, "null"]
+      enum: [P0, P1, P2, P3, null]
+      description: >
+        Task priority token. `1`→P0 … `4`→P3 (P0 = highest urgency, AS-04);
+        `null` = unprioritized (sorts LAST in the Today/Upcoming order, research R5).
+        Closed set, validated both tiers (research R2).
+
+    SetPriorityRequest:
+      type: object
+      required: [priority, version]
+      properties:
+        priority:
+          allOf: [{ $ref: "#/components/schemas/Priority" }]
+          description: "Required key; nullable value (send null to clear)."
+        version: { type: integer, description: "Optimistic-concurrency token" }
+
+    RescheduleDueDateRequest:
+      type: object
+      required: [dueDate, dueHasTime, version]
+      properties:
+        dueDate:
+          type: [string, "null"]
+          format: date-time
+          description: >
+            The CLIENT-resolved due-date instant in UTC (`Z`-form ISO-8601), or null
+            to clear. Paired with `dueHasTime` — both non-null or both null (else 422).
+            The server re-validates (UTC-kind + plausible range) the slice-003 way.
+        dueHasTime:
+          type: [boolean, "null"]
+          description: >
+            The `DueDate.has_time` flag: true = date-time, false = date-only, null when
+            `dueDate` is null. Paired with `dueDate`.
+        version: { type: integer, description: "Optimistic-concurrency token" }
+
+    EditTaskRequest:
+      type: object
+      # All editable fields REQUIRED keys (nullable values) — whole-object replace,
+      # NOT a merge (research R4); an omitted field is a 422, never a silent null.
+      required: [title, description, priority, dueDate, dueHasTime, projectId, version]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 500, description: "Required-non-null." }
+        description:
+          type: [string, "null"]
+          maxLength: 8000
+          description: "Markdown SOURCE, stored verbatim; no renderer this slice — output-escaped on render (research R3/R12). Null = no description."
+        priority:
+          allOf: [{ $ref: "#/components/schemas/Priority" }]
+          description: "Required key; nullable value."
+        dueDate:
+          type: [string, "null"]
+          format: date-time
+          description: "Client-resolved UTC instant, or null. Paired with `dueHasTime` (both non-null or both null)."
+        dueHasTime:
+          type: [boolean, "null"]
+          description: "The has_time flag, or null. Paired with `dueDate`."
+        projectId:
+          type: [string, "null"]
+          format: uuid
+          description: "Owning project, or null for the Inbox. Reuses the move-to-project ownership check (foreign/absent → 404)."
+        version: { type: integer, description: "Optimistic-concurrency token" }
+
+    # CHANGED — gains nullable priority + description (everything else unchanged from slice 004)
+    TaskResponse:
+      type: object
+      required: [id, title, status, position, version, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        status: { type: string, enum: [backlog, todo, in_progress, done, cancelled] }
+        position: { type: string }
+        version: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        completedAt: { type: [string, "null"], format: date-time }
+        dueDate: { type: [string, "null"], format: date-time }
+        dueHasTime: { type: [boolean, "null"] }
+        projectId: { type: [string, "null"], format: uuid }
+        priority:
+          allOf: [{ $ref: "#/components/schemas/Priority" }]
+          description: "NEW slice 005 — P0–P3 token, or null = unprioritized. Nullable; NOT in required[]."
+        description:
+          type: [string, "null"]
+          description: "NEW slice 005 — markdown source (raw text), or null. Output-escaped on render (FR-099). Nullable; NOT in required[]."
+
+    # NEW — the Today read model (research R5/R6): grouped by project, rows carry isOverdue
+    TodayTaskResponse:
+      allOf:
+        - $ref: "#/components/schemas/TaskResponse"
+        - type: object
+          required: [isOverdue]
+          properties:
+            isOverdue:
+              type: boolean
+              description: "True when `due_date` is before the start of today-Warsaw (overdue incomplete). Today-only — NOT on base TaskResponse."
+
+    TodayGroup:
+      type: object
+      required: [projectId, tasks]
+      properties:
+        projectId:
+          type: [string, "null"]
+          format: uuid
+          description: "The group's owning project; null = the Inbox/unprojected group."
+        tasks:
+          type: array
+          items: { $ref: "#/components/schemas/TodayTaskResponse" }
+          description: "Ordered: priority (P0 first, null last) → due time → createdAt → id (research R5)."
+
+    TodayResponse:
+      type: object
+      required: [groups]
+      properties:
+        groups:
+          type: array
+          items: { $ref: "#/components/schemas/TodayGroup" }
+
+    # NEW — the Upcoming read model (research R5/R6): grouped by Warsaw calendar day
+    UpcomingGroup:
+      type: object
+      required: [date, tasks]
+      properties:
+        date:
+          type: string
+          format: date
+          description: "The Warsaw calendar date (LocalDate, YYYY-MM-DD) — DISTINCT from each task's UTC `dueDate` (research R1/R3)."
+        tasks:
+          type: array
+          items: { $ref: "#/components/schemas/TaskResponse" }
+          description: "Ordered: priority (P0 first, null last) → due time → createdAt → id (research R5)."
+
+    UpcomingResponse:
+      type: object
+      required: [groups]
+      properties:
+        groups:
+          type: array
+          items: { $ref: "#/components/schemas/UpcomingGroup" }
+          description: "Groups ordered ascending by `date`."
+
+  responses:
+    Unauthenticated:
+      description: Authentication required
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+    NotFound:
+      description: Resource not found (or not owned by the caller — existence not disclosed)
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+    VersionConflict:
+      description: Optimistic-concurrency token was stale; reload and retry
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+    ValidationFailed:
+      description: Validation failed (e.g. out-of-set priority, bad due-date pairing/instant, over-long description)
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+
+# ProblemDetails schema + errorCode enum are UNCHANGED from slices 001/002 (research R11) —
+# referenced here for completeness; the document transformer's ErrorCodes array is NOT edited.
