@@ -1,0 +1,425 @@
+openapi: 3.1.0
+info:
+  title: TaskFlow API — slice 007 (Project Sharing, Membership & Roles) delta
+  version: "0.7.0"
+  description: >
+    Contract DELTA over specs/004-project-management (and the intervening
+    005/006 slices, which add no project-sharing surface).
+
+    This slice is the **origin of the shared-project authorization branch**
+    (Constitution Principle IX). It makes the reserved `shared` visibility value
+    WRITABLE and introduces the **ProjectMembership** (ENT-07) surface.
+
+    NEW resource: a project's **members** — list / invite / change-role / remove,
+    plus the caller's own **leave**. NEW project operations: **share** /
+    **unshare** (flip `visibility`) and **transfer-owner** (the only legal move of
+    the immutable `ownerId`). CHANGED: `ProjectResponse` gains a nullable `role`
+    (the caller's EFFECTIVE role for the project — research R17).
+
+    ROLE VOCABULARY (research R2): the WRITABLE role on invite/change-role is
+    `MembershipRole` = `editor | viewer` only. `owner` is NEVER a writable role —
+    it is the immutable `ownerId`, reached only via **transfer-owner** (FR-094).
+    Reads surface the composed `EffectiveRole` = `owner | editor | viewer`, where
+    `owner` is derived from `ownerId` (no stored row).
+
+    NO new error code (research R16). This slice finally USES two codes
+    pre-provisioned (but unused) since slice 004:
+      • **403 `forbidden`** — a member with insufficient role (e.g. viewer→write,
+        editor→manage).
+      • **422 `last_owner`** — the last-owner guard (cannot remove / demote / leave
+        the owner; transfer ownership first).
+    and reuses existing codes: **404 `not_found`** for a non-member / foreign /
+    absent project (existence NOT disclosed across the membership boundary —
+    Constitution XII); **422 `validation_failed`** for an unknown invite email,
+    self/duplicate invite, or transfer-to-non-member; **409 `version_conflict`**
+    for a stale sharing/membership mutation (the Project `version` guards the whole
+    sharing state — research R11). The `ProblemDetails.errorCode` enum is
+    UNCHANGED (transformer `ErrorCodes` array NOT edited).
+
+    The C# success-body schemas auto-derive from the request/response DTOs
+    (`InviteMemberRequest`, `MemberResponse`, `ProjectResponse`, …). The OpenAPI
+    document transformer IS extended (plan marks it MODIFY) to stamp the new
+    operationIds + auto-insert their 401/403/404/409/422 responses; its
+    `ErrorCodes` array and exception-mapping are UNCHANGED. Everything not listed
+    here is UNCHANGED from slice 004.
+
+servers:
+  - url: /
+
+paths:
+  # ───────────────────── Project visibility (NEW behavior) ─────────────────────
+  /api/projects/{id}/share:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    patch:
+      operationId: shareProject
+      tags: [Projects, Sharing]
+      summary: Share a personal project (personal → shared)
+      description: >
+        Owner-only. Flips `visibility` from `personal` to `shared` — the FIRST
+        legal write of the `shared` value (slice-004 froze it at `personal`). A
+        freshly shared project has ZERO members; the owner is implicit via
+        `ownerId` (research R3). Members are added by separate invites. A personal
+        project has no members, so a non-owner caller resolves to **404** (the
+        ownership posture — existence not disclosed), never 403. Confirmation-gated,
+        NOT under the 30s undo (FR-064). Carries `version`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VersionOnlyRequest" }
+      responses:
+        "200": { description: Shared, content: { application/json: { schema: { $ref: "#/components/schemas/ProjectResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/VersionConflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /api/projects/{id}/unshare:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    patch:
+      operationId: unshareProject
+      tags: [Projects, Sharing]
+      summary: Unshare a project (shared → personal), removing all members
+      description: >
+        Owner-only manage operation. Flips `visibility` back to `personal` and
+        removes ALL membership rows in the same transaction (FR-058/FR-059). The
+        owner (`ownerId`) is retained and the project's TASKS are preserved; only
+        membership state and (slice 008) non-owner assignments are cleared. Every
+        former member loses ALL access immediately (research R10). Because the
+        project IS shared, a member with insufficient role (editor/viewer) →
+        **403 `forbidden`**; a non-member → **404**. Confirmation-gated with a
+        blast-radius preview, NOT under the 30s undo (FR-064). Carries `version`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VersionOnlyRequest" }
+      responses:
+        "200": { description: Unshared (now personal), content: { application/json: { schema: { $ref: "#/components/schemas/ProjectResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/VersionConflict" }
+
+  /api/projects/{id}/owner:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    patch:
+      operationId: transferProjectOwnership
+      tags: [Projects, Sharing]
+      summary: Transfer ownership to a current member (the only move of ownerId)
+      description: >
+        Owner-only (FR-094). Reassigns the otherwise-immutable `ownerId` to a
+        NAMED current member, in one transaction (research R6): (1) the new owner's
+        membership row is REMOVED (the owner has no row); (2) `ownerId` is set to
+        the target; (3) the prior owner is DEMOTED to a new `editor` membership row
+        (ADR-0003). The target MUST already be a current member — a non-member or
+        the current owner → **422 `validation_failed`**. A member caller with
+        insufficient role → **403**; a non-member caller → **404**.
+        Confirmation-gated, NOT under the 30s undo (FR-064). Carries `version`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TransferOwnershipRequest" }
+      responses:
+        "200": { description: Ownership transferred, content: { application/json: { schema: { $ref: "#/components/schemas/ProjectResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/VersionConflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  # ───────────────────────── Members (NEW resource) ─────────────────────────
+  /api/projects/{id}/members:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      operationId: listProjectMembers
+      tags: [Members]
+      summary: List a shared project's members (the composed roster)
+      description: >
+        Readable by ANY current member (viewer+). Returns the composed roster: the
+        OWNER (from `ownerId`, effective role `owner`, `isOwner=true`) UNION the
+        membership rows (`editor`/`viewer`, `isOwner=false`) — research R17. Does
+        NOT echo member emails (Constitution XI privacy). The response object also
+        surfaces the project `version` so `leave`/`change-role`/`remove`/`transfer`
+        callers carry the concurrency token without a separate fetch (research R11).
+        A non-member caller → **404** (existence not disclosed).
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/MembersResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      operationId: inviteProjectMember
+      tags: [Members]
+      summary: Invite a member by email at an assignable role
+      description: >
+        Owner-only. Takes an `email` and an assignable `role ∈ {editor, viewer}`
+        (research R2/R4). The email is resolved SERVER-SIDE against the existing
+        admitted Users (exact, case-normalized). Outcomes:
+          • Resolves to a User who is not yet a member → a membership row is created
+            at the given role (**200**).
+          • Resolves to NO admitted User → **422 `validation_failed`** on `email`
+            ("No admitted user with that email — ask them to sign in once first",
+            FR-049). NO pending/pre-account record is created (OOS-18).
+          • Resolves to the owner, or to an already-existing member → **422
+            `validation_failed`** ("already the owner" / "already a member — change
+            their role instead").
+        A member caller with insufficient role → **403**; a non-member caller →
+        **404**. The `role` schema (`MembershipRole`) admits ONLY `editor|viewer`;
+        `owner` is not a representable invite value. Confirmation-gated (FR-064).
+        Carries `version`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InviteMemberRequest" }
+      responses:
+        "200": { description: Member invited, content: { application/json: { schema: { $ref: "#/components/schemas/MemberResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/VersionConflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /api/projects/{id}/members/{userId}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/UserId"
+    patch:
+      operationId: changeProjectMemberRole
+      tags: [Members]
+      summary: Change a member's assignable role (editor ↔ viewer)
+      description: >
+        Owner-only. Sets the target member's `role` to the given assignable value
+        (`editor|viewer`; a stale UI re-sending the current value is a no-op +
+        version bump, not an error — research R5). The target MUST be a current
+        membership row. If the target is the OWNER → **422 `last_owner`** (the owner
+        is not demotable; transfer ownership instead — research R7), checked BEFORE
+        the row lookup. A target who is neither owner nor a member → **404**. A
+        member caller with insufficient role → **403**; a non-member caller →
+        **404**. `owner` is not a representable role value. Confirmation-gated
+        (FR-064). Carries `version`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChangeMemberRoleRequest" }
+      responses:
+        "200": { description: Role changed, content: { application/json: { schema: { $ref: "#/components/schemas/MemberResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/VersionConflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+    delete:
+      operationId: removeProjectMember
+      tags: [Members]
+      summary: Remove a member (owner removes another user)
+      description: >
+        Owner-only. Deletes the target member's row; the removed user loses ALL
+        access to the project's data immediately (research R10) and (slice 008) is
+        unassigned from its tasks. If the target is the OWNER → **422 `last_owner`**
+        (transfer first — research R7), checked BEFORE the row lookup. A target who
+        is neither owner nor a member → **404**. A member caller with insufficient
+        role → **403**; a non-member caller → **404**. Confirmation-gated with a
+        blast-radius preview, NOT under the 30s undo (FR-064). **Parameter
+        convention** (slice-004 posture): DELETE carries `version` as a query param
+        (HTTP DELETE bodies are poorly supported by tooling/proxies).
+      parameters:
+        - { name: version, in: query, required: true, schema: { type: integer }, description: Optimistic-concurrency token (the Project version) }
+      responses:
+        "204": { description: Member removed }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/VersionConflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /api/projects/{id}/membership:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    delete:
+      operationId: leaveProject
+      tags: [Members]
+      summary: Leave a shared project (a non-owner member removes their OWN row)
+      description: >
+        Self-service: any NON-OWNER current member deletes their OWN membership row,
+        losing ALL access immediately (research R10) and (slice 008) being
+        unassigned from the project's tasks. Distinct from remove-member by WHO is
+        authorized (self vs owner-targets-another). If the CALLER is the owner →
+        **422 `last_owner`** (the owner cannot leave; transfer ownership first —
+        research R7), checked BEFORE the row lookup (the owner has no row). A
+        non-member caller → **404**. Confirmation-gated with a blast-radius preview,
+        NOT under the 30s undo (FR-064). DELETE carries `version` as a query param
+        (slice-004 posture).
+      parameters:
+        - { name: version, in: query, required: true, schema: { type: integer }, description: Optimistic-concurrency token (the Project version) }
+      responses:
+        "204": { description: Left the project }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/VersionConflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+components:
+  parameters:
+    ProjectId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+      description: The target member's User id
+
+  schemas:
+    # ── role vocabulary ──
+    MembershipRole:
+      type: string
+      enum: [editor, viewer]
+      description: >
+        The WRITABLE role on invite/change-role (research R2). `owner` is NOT a
+        member of this enum — ownership is the immutable `ownerId`, moved only via
+        transfer-owner (FR-094). Making `owner` unrepresentable here keeps the
+        illegal "promote to owner" state out of every write payload.
+
+    EffectiveRole:
+      type: string
+      enum: [owner, editor, viewer]
+      description: >
+        The composed role surfaced by READS (research R2/R17): `owner` is derived
+        from `ownerId` (no stored row); `editor`/`viewer` come from the membership
+        row. A non-member has no effective role (resolves to a 404, never a value).
+
+    # ── requests ──
+    VersionOnlyRequest:
+      type: object
+      required: [version]
+      properties:
+        version: { type: integer, description: "Optimistic-concurrency token (the Project version)" }
+
+    InviteMemberRequest:
+      type: object
+      required: [email, role, version]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+          description: >
+            Resolved server-side against existing admitted Users (exact,
+            case-normalized). Unknown → 422 on this field (OOS-18; FR-049). Untrusted
+            input — validated/sanitized at the trust boundary (Constitution XII).
+        role:
+          allOf: [{ $ref: "#/components/schemas/MembershipRole" }]
+          description: "Assignable role for the new member (editor|viewer only)"
+        version: { type: integer, description: "Project optimistic-concurrency token" }
+
+    ChangeMemberRoleRequest:
+      type: object
+      required: [role, version]
+      properties:
+        role:
+          allOf: [{ $ref: "#/components/schemas/MembershipRole" }]
+          description: "The member's new assignable role (editor|viewer); re-sending the current value is a no-op + version bump"
+        version: { type: integer, description: "Project optimistic-concurrency token" }
+
+    TransferOwnershipRequest:
+      type: object
+      required: [userId, version]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: "The current member to make the new owner; non-member/current-owner → 422"
+        version: { type: integer, description: "Project optimistic-concurrency token" }
+
+    # ── responses ──
+    # CHANGED — ProjectResponse gains a nullable `role` (caller's effective role).
+    # All slice-004 fields unchanged; still hides ownerId and deletedAt.
+    ProjectResponse:
+      type: object
+      required: [id, name, color, icon, visibility, version, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        color: { type: string }
+        icon: { type: string }
+        parentId: { type: [string, "null"], format: uuid }
+        visibility: { type: string, enum: [personal, shared] }
+        role:
+          allOf: [{ $ref: "#/components/schemas/EffectiveRole" }]
+          description: >
+            NEW slice 007 — the CALLER's effective role for this project. For a
+            personal project the caller is always the owner (`owner`). Drives
+            client-side UI gating (viewer = read-only); NOT the security boundary
+            (server FR-068 is authoritative). Null only on legacy/edge projections.
+        archivedAt: { type: [string, "null"], format: date-time }
+        version: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      description: "Never exposes ownerId (use the members roster for owner identity) or deletedAt."
+
+    MemberResponse:
+      type: object
+      required: [userId, displayName, role, isOwner]
+      properties:
+        userId: { type: string, format: uuid }
+        displayName: { type: string, description: "Member's display name (NOT their email — Constitution XI)" }
+        role:
+          allOf: [{ $ref: "#/components/schemas/EffectiveRole" }]
+          description: "Effective role: `owner` for the project owner, else `editor`/`viewer`"
+        isOwner: { type: boolean, description: "True for the owner entry (derived from ownerId; has no membership row)" }
+
+    MembersResponse:
+      type: object
+      required: [projectId, version, members]
+      properties:
+        projectId: { type: string, format: uuid }
+        version: { type: integer, description: "The Project version — the token for leave/change-role/remove/transfer (research R11)" }
+        members:
+          type: array
+          items: { $ref: "#/components/schemas/MemberResponse" }
+          description: "Owner entry (isOwner=true) UNION the editor/viewer rows"
+
+  responses:
+    Unauthenticated:
+      description: Authentication required (401 `unauthenticated`)
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+    Forbidden:
+      description: >
+        The caller IS a member but lacks the required role for this operation
+        (403 `forbidden`) — e.g. a viewer attempting a write, or an editor
+        attempting a manage operation (FR-067). Existence is already known to the
+        member, so the honest answer is "you lack the role" (NOT a 404).
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+    NotFound:
+      description: >
+        Project not found, or the caller is a NON-MEMBER (existence not disclosed
+        across the membership boundary — 404 `not_found`; Constitution XII). Also
+        covers a change-role/remove target who is neither the owner nor a member.
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+    VersionConflict:
+      description: The Project optimistic-concurrency token was stale; reload and retry (409 `version_conflict`)
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+    ValidationFailed:
+      description: >
+        Validation failed (422). Carries one of:
+        `validation_failed` — unknown invite email, self/duplicate invite, or
+        transfer-to-non-member (the human specifics ride in the field-`errors`
+        envelope; FR-049); OR
+        `last_owner` — the last-owner guard: the owner cannot be removed, demoted,
+        or leave (recoverable — transfer ownership to another member first; R7).
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+
+# ProblemDetails schema + errorCode enum are UNCHANGED from slices 001/002/004 (research R16):
+# `forbidden` and `last_owner` were ALREADY present in the transformer's ErrorCodes array (and
+# the web ERROR_UX map) since slice 004 — this slice is their first USE, so the exhaustiveness
+# gate stays green with no edit. The document transformer's ErrorCodes array is NOT modified.
