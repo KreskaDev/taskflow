@@ -1,5 +1,6 @@
 using FluentAssertions;
 using TaskFlow.Domain.IdentityAccess;
+using ProjectId = TaskFlow.Domain.TaskManagement.ProjectId;
 using Task = TaskFlow.Domain.TaskManagement.Task;
 using TaskStatus = TaskFlow.Domain.TaskManagement.TaskStatus;
 
@@ -222,8 +223,37 @@ public sealed class TaskTests
         task.MarkDone(MutateInstant);
         task.MarkBacklog(MutateInstant);
         task.Reorder("a5", MutateInstant);
+        task.MoveToProject(ProjectId.From(Guid.NewGuid()), MutateInstant);
         task.SoftDelete(MutateInstant);
 
         task.CreatedBy.Should().Be(createdBy);
+    }
+
+    [Fact]
+    public void MoveToProject_sets_project_id_and_bumps_version_and_updated_at()
+    {
+        // slice 004 US2 (R7): assigning a project removes the task from the Inbox (FR-021).
+        var task = NewTask();
+        var projectId = ProjectId.From(Guid.NewGuid());
+
+        task.MoveToProject(projectId, MutateInstant);
+
+        task.ProjectId.Should().Be(projectId);
+        task.Version.Should().Be(1);
+        task.UpdatedAt.Should().Be(MutateInstant);
+    }
+
+    [Fact]
+    public void MoveToProject_with_null_clears_project_id_to_the_inbox_and_bumps_version()
+    {
+        // R7: a null target moves the task BACK to the Inbox (the natural inverse of FR-021).
+        var task = NewTask();
+        task.MoveToProject(ProjectId.From(Guid.NewGuid()), MutateInstant);
+
+        task.MoveToProject(null, LaterInstant);
+
+        task.ProjectId.Should().BeNull("a null target clears the project, returning the task to the Inbox");
+        task.Version.Should().Be(2, "every move is a mutation");
+        task.UpdatedAt.Should().Be(LaterInstant);
     }
 }

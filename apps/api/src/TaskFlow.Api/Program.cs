@@ -52,6 +52,7 @@ builder.Services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
 builder.Services.AddScoped<IResourceAuthorizationPolicy, ResourceAuthorizationPolicy>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();
+builder.Services.AddScoped<IProjectRepository, ProjectRepository>();
 
 // --- EF Core write-side + Wolverine durable messaging (Postgres outbox/inbox) ---
 builder.Services.AddDbContextWithWolverineIntegration<AppDbContext>(o => o.UseNpgsql(connectionString));

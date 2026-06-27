@@ -133,6 +133,81 @@ export async function setNextIdentity(identity: {
   }
 }
 
+/**
+ * A thin authenticated API client bound to ONE TaskFlow user, for SEEDING slice-004 preconditions
+ * through the REAL .NET API — the same posture as {@link ensureUser}: this is test INFRASTRUCTURE
+ * that establishes server state, NOT a substitute for the app's own UI/proxy path (the browser still
+ * drives the real BFF→proxy→API path for every assertion). It mints a short-lived carrier per call
+ * and talks to `API_INTERNAL_URL` directly.
+ *
+ * IMPORTANT — `taskFlowUserId` is the TaskFlow USER id (the GUID returned by {@link ensureUser}),
+ * NOT the Google subject id. The ownership-scoped endpoints resolve the caller from the carrier's
+ * `sub` claim, which production's BFF token mint sets to the TaskFlow user id (a GUID) — the bootstrap
+ * `/api/users/ensure` call is the ONLY path where `sub` is the Google subject id. Minting `sub` with a
+ * Google sub here would yield "No authenticated TaskFlow user id" (500), so we mint the GUID.
+ *
+ * Used by the projects E2E to: create + nest projects, create tasks, move a task into a project (the
+ * `M` mechanic's server side), and archive a project — so the spec can assert the WIRED UI surfaces
+ * (the sidebar tree, the Archived disclosure's unarchive, the narrowed Inbox) against real data,
+ * independently of the UI triggers that are not yet integrated (the T041/T028 orchestration gap).
+ */
+export function apiAs(taskFlowUserId: string): {
+  createProject: (input: { name: string; color: string; icon: string; parentId?: string | null }) => Promise<{ id: string; version: number; parentId: string | null }>;
+  createTask: (input: { title: string; position: string }) => Promise<{ id: string; version: number }>;
+  moveTask: (taskId: string, projectId: string | null, version: number) => Promise<void>;
+  archiveProject: (projectId: string, version: number, childDisposition?: "cascade" | "orphan_to_top") => Promise<void>;
+} {
+  const base = process.env.API_INTERNAL_URL as string;
+
+  async function authedFetch(path: string, init: { method: string; body?: unknown }): Promise<Response> {
+    const token = await mintCarrier({ sub: taskFlowUserId });
+    const headers: Record<string, string> = { authorization: `Bearer ${token}` };
+    let body: string | undefined;
+    if (init.body !== undefined) {
+      headers["content-type"] = "application/json";
+      body = JSON.stringify(init.body);
+    }
+    return fetch(new URL(path, base), { method: init.method, headers, body });
+  }
+
+  return {
+    async createProject(input) {
+      const id = randomUUID();
+      const res = await authedFetch(`/api/projects/${id}`, {
+        method: "PUT",
+        body: { name: input.name, color: input.color, icon: input.icon, parentId: input.parentId ?? null },
+      });
+      if (!res.ok) throw new Error(`createProject failed (${String(res.status)}): ${await res.text()}`);
+      const project = (await res.json()) as { id: string; version: number; parentId: string | null };
+      return project;
+    },
+    async createTask(input) {
+      const id = randomUUID();
+      const res = await authedFetch(`/api/tasks/${id}`, {
+        method: "PUT",
+        body: { title: input.title, position: input.position },
+      });
+      if (!res.ok) throw new Error(`createTask failed (${String(res.status)}): ${await res.text()}`);
+      const task = (await res.json()) as { id: string; version: number };
+      return task;
+    },
+    async moveTask(taskId, projectId, version) {
+      const res = await authedFetch(`/api/tasks/${taskId}/project`, {
+        method: "PATCH",
+        body: { projectId, version },
+      });
+      if (!res.ok) throw new Error(`moveTask failed (${String(res.status)}): ${await res.text()}`);
+    },
+    async archiveProject(projectId, version, childDisposition) {
+      const res = await authedFetch(`/api/projects/${projectId}/archive`, {
+        method: "PATCH",
+        body: childDisposition ? { version, childDisposition } : { version },
+      });
+      if (!res.ok) throw new Error(`archiveProject failed (${String(res.status)}): ${await res.text()}`);
+    },
+  };
+}
+
 /** Reads a session row's invalidation flag (used to assert server-side sign-out). */
 export async function isSessionInvalidated(sessionId: string): Promise<boolean | null> {
   const client = new Client({ connectionString: process.env.DATABASE_URL });

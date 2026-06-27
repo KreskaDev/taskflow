@@ -21,6 +21,10 @@ import {
   type ToggleDoneContext,
   type ToggleDoneVariables,
   toggleDoneMutationOptions,
+  // ── NEW public shape pinned by T038 (RED — these exports do not exist yet) ──
+  type MoveTaskToProjectContext,
+  type MoveTaskToProjectVariables,
+  moveTaskToProjectMutationOptions,
 } from "@/hooks/useTaskMutations";
 
 /**
@@ -756,5 +760,194 @@ describe("deleteTaskMutationOptions — optimistic remove recipe (version-free, 
     await options.onSettled?.(undefined, null, variables, context);
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: TASKS_KEY });
+  });
+});
+
+/**
+ * NEW (T038, RED — drives T039; US2; FR-021/AS-05, research R6/R7/R15/R16).
+ *
+ * Pins the optimistic MOVE-TO-PROJECT recipe `moveTaskToProjectMutationOptions(queryClient)`,
+ * mirroring the create/edit factory altitude (pure TanStack-Query options factory; no React
+ * render). A task lives in exactly ONE list cache: the Inbox is the SINGLE `['tasks']` key
+ * (project_id IS NULL, R6); a project's task list is `['projects', <projectId>, 'tasks']`
+ * (R16, the natural extension of the `['projects']` namespace). Moving a task therefore
+ * RELOCATES the row between two caches — pull from the source, re-stamp `projectId`, insert
+ * into the target — and `projectId = null` moves it back to the Inbox.
+ *
+ * Both ends ride on `variables` (`fromProjectId`/`toProjectId`, each `string | null`), so the
+ * factory is self-contained — the source/target keys are derived inside the recipe, never via
+ * a wrapper-side lookup (the wrapper is not tested here, matching every other recipe).
+ *
+ * There is NO once-only 409 reapply (that was a task-edit-specific recipe, R10) — a 409/422/
+ * network error here is a PLAIN rollback of BOTH caches + the FR-049 message surfaced through
+ * the global announcer, with the authoritative state reconciled by the `onSettled` invalidate
+ * of the two specific keys (never the bare `['projects']` prefix, which would also evict the
+ * sidebar list).
+ */
+const PROJECT_A = "33333333-3333-7333-8333-333333333333";
+const PROJECT_B = "44444444-4444-7444-8444-444444444444";
+
+/** The task-list cache key for a project, or the Inbox `['tasks']` key when `projectId` is null. */
+function listKeyFor(projectId: string | null): readonly unknown[] {
+  return projectId === null ? TASKS_KEY : (["projects", projectId, "tasks"] as const);
+}
+
+describe("moveTaskToProjectMutationOptions — optimistic cross-cache move recipe (no 409 reapply)", () => {
+  it("TaskMutationError still carries errorCode so the global announcer surfaces the friendly text", () => {
+    // The move recipe throws the structured error like the other versioned writes.
+    const err = new TaskMutationError("version_conflict", "This item was changed elsewhere.");
+    expect(err).toBeInstanceOf(Error);
+    expect(err.errorCode).toBe("version_conflict");
+  });
+
+  it("mutationFn PATCHes /api/tasks/{id}/project with { projectId, version }", async () => {
+    const seed = seedThree();
+    const queryClient = primedClient(seed);
+    const variables: MoveTaskToProjectVariables = {
+      id: seed[0]!.id,
+      fromProjectId: null,
+      toProjectId: PROJECT_A,
+      version: seed[0]!.version,
+    };
+    patchSpy.mockResolvedValue({
+      data: makeTask({ ...seed[0]!, projectId: PROJECT_A, version: seed[0]!.version + 1 }),
+      error: undefined,
+    });
+
+    const options = moveTaskToProjectMutationOptions(queryClient);
+    await options.mutationFn(variables);
+
+    expect(patchSpy).toHaveBeenCalledTimes(1);
+    const [path, init] = patchSpy.mock.calls[0]!;
+    expect(path).toBe("/api/tasks/{id}/project");
+    expect((init as { params: { path: { id: string } } }).params.path.id).toBe(seed[0]!.id);
+    expect((init as { body: { projectId: string | null; version: number } }).body).toEqual({
+      projectId: PROJECT_A,
+      version: seed[0]!.version,
+    });
+  });
+
+  it("onMutate cancels BOTH the source and the target list caches before touching them", async () => {
+    const seed = seedThree();
+    const queryClient = primedClient(seed);
+    const cancelSpy = vi.spyOn(queryClient, "cancelQueries");
+
+    const options = moveTaskToProjectMutationOptions(queryClient);
+    const variables: MoveTaskToProjectVariables = {
+      id: seed[0]!.id,
+      fromProjectId: null,
+      toProjectId: PROJECT_A,
+      version: seed[0]!.version,
+    };
+    await options.onMutate?.(variables);
+
+    expect(cancelSpy).toHaveBeenCalledWith({ queryKey: TASKS_KEY });
+    expect(cancelSpy).toHaveBeenCalledWith({ queryKey: listKeyFor(PROJECT_A) });
+  });
+
+  it("onMutate REMOVES the row from the Inbox and INSERTS it (projectId re-stamped) into the target project cache", async () => {
+    const seed = seedThree();
+    const queryClient = primedClient(seed);
+    queryClient.setQueryData(listKeyFor(PROJECT_A), []); // target project list starts empty
+    const moved = seed[1]!;
+    const variables: MoveTaskToProjectVariables = {
+      id: moved.id,
+      fromProjectId: null,
+      toProjectId: PROJECT_A,
+      version: moved.version,
+    };
+
+    const options = moveTaskToProjectMutationOptions(queryClient);
+    await options.onMutate?.(variables);
+
+    // Gone from the Inbox.
+    const inbox = queryClient.getQueryData<TaskResponse[]>(TASKS_KEY);
+    expect(inbox?.some((t) => t.id === moved.id)).toBe(false);
+    expect(inbox).toHaveLength(seed.length - 1);
+
+    // Present in the project cache, with projectId re-stamped to the target.
+    const projectList = queryClient.getQueryData<TaskResponse[]>(listKeyFor(PROJECT_A));
+    const inserted = projectList?.find((t) => t.id === moved.id);
+    expect(inserted).toBeDefined();
+    expect(inserted?.projectId).toBe(PROJECT_A);
+  });
+
+  it("onMutate moves a projected task back to the Inbox when toProjectId is null (projectId cleared)", async () => {
+    const seed = seedThree();
+    const queryClient = primedClient([]); // Inbox empty
+    const projected = makeTask({ id: seed[0]!.id, position: seed[0]!.position, projectId: PROJECT_A });
+    queryClient.setQueryData(listKeyFor(PROJECT_A), [projected]);
+    const variables: MoveTaskToProjectVariables = {
+      id: projected.id,
+      fromProjectId: PROJECT_A,
+      toProjectId: null,
+      version: projected.version,
+    };
+
+    const options = moveTaskToProjectMutationOptions(queryClient);
+    await options.onMutate?.(variables);
+
+    // Gone from the project list, back in the Inbox with projectId cleared.
+    expect(queryClient.getQueryData<TaskResponse[]>(listKeyFor(PROJECT_A))).toHaveLength(0);
+    const inbox = queryClient.getQueryData<TaskResponse[]>(TASKS_KEY);
+    const back = inbox?.find((t) => t.id === projected.id);
+    expect(back).toBeDefined();
+    expect(back?.projectId).toBeNull();
+  });
+
+  it("onError restores BOTH list caches in place (the moved row reappears in its source)", async () => {
+    const seed = seedThree();
+    const queryClient = primedClient(seed);
+    const targetSeed: TaskResponse[] = [];
+    queryClient.setQueryData(listKeyFor(PROJECT_A), targetSeed);
+    const moved = seed[1]!;
+    const variables: MoveTaskToProjectVariables = {
+      id: moved.id,
+      fromProjectId: null,
+      toProjectId: PROJECT_A,
+      version: moved.version,
+    };
+
+    const options = moveTaskToProjectMutationOptions(queryClient);
+    const context = (await options.onMutate?.(variables)) as MoveTaskToProjectContext;
+    // Sanity: the optimistic move happened.
+    expect(queryClient.getQueryData<TaskResponse[]>(TASKS_KEY)).toHaveLength(seed.length - 1);
+
+    await options.onError?.(new TaskMutationError("version_conflict", "stale"), variables, context);
+
+    // Both caches back to their pre-move snapshots.
+    expect(queryClient.getQueryData<TaskResponse[]>(TASKS_KEY)).toEqual(seed);
+    expect(queryClient.getQueryData<TaskResponse[]>(listKeyFor(PROJECT_A))).toEqual(targetSeed);
+    // No reapply: a single failed PATCH is a plain rollback.
+    expect(patchSpy).not.toHaveBeenCalled();
+  });
+
+  it("onSettled invalidates the two SPECIFIC list keys (never the bare ['projects'] prefix)", async () => {
+    const seed = seedThree();
+    const queryClient = primedClient(seed);
+    queryClient.setQueryData(listKeyFor(PROJECT_B), []);
+    const moved = seed[0]!;
+    const variables: MoveTaskToProjectVariables = {
+      id: moved.id,
+      fromProjectId: null,
+      toProjectId: PROJECT_B,
+      version: moved.version,
+    };
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const options = moveTaskToProjectMutationOptions(queryClient);
+    const context = (await options.onMutate?.(variables)) as MoveTaskToProjectContext;
+    await options.onSettled?.(
+      makeTask({ ...moved, projectId: PROJECT_B }),
+      null,
+      variables,
+      context,
+    );
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: TASKS_KEY });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: listKeyFor(PROJECT_B) });
+    // The bare ['projects'] prefix is NEVER invalidated (it prefix-matches the sidebar list).
+    const invalidatedKeys = invalidateSpy.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
+    expect(invalidatedKeys).not.toContain(JSON.stringify(["projects"]));
   });
 });

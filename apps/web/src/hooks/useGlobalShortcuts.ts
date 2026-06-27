@@ -26,6 +26,8 @@ export interface GlobalShortcutHandlers {
   onToggle?: () => void;
   /** `E` — begin inline rename of the focused task. */
   onRename?: () => void;
+  /** `M` — open the move-to-project selector for the selected task (T041; FR-021/AS-05). */
+  onMove?: () => void;
   /** `Delete` — delete the focused task. */
   onDelete?: () => void;
   /** `?` — open the shortcuts help. */
@@ -105,6 +107,13 @@ export function createGlobalShortcutsListener(
       case "E":
         event.preventDefault();
         handlers.onRename?.();
+        return;
+      case "m":
+      case "M":
+        // After the `isTextFieldFocused()` guard above, so `M` is suppressed mid-word in the
+        // capture / inline-rename input (FR-031). Opens the move-to-project selector (AS-05).
+        event.preventDefault();
+        handlers.onMove?.();
         return;
       case "ArrowUp":
         event.preventDefault();

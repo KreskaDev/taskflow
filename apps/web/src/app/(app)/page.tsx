@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { ProjectSelector } from "@/components/projects/ProjectSelector";
 import { ShortcutsHelp } from "@/components/tasks/ShortcutsHelp";
 import { TaskCapture } from "@/components/tasks/TaskCapture";
 import { TaskList } from "@/components/tasks/TaskList";
@@ -30,7 +31,7 @@ export default function WorkspaceHome() {
   const tasks = useMemo(() => data ?? [], [data]);
   const isEmpty = !isPending && !isError && tasks.length === 0;
 
-  const { renameTask, setTaskDone, reorderTask, deleteTask } = useTaskMutations();
+  const { renameTask, setTaskDone, reorderTask, deleteTask, moveTaskToProject } = useTaskMutations();
 
   // The page OWNS the entire keyboard surface state. `selectedIndex` indexes `tasks`;
   // `captureOpen`/`helpOpen` drive the two controlled overlays; `renamingId` is the id of
@@ -39,6 +40,9 @@ export default function WorkspaceHome() {
   const [captureOpen, setCaptureOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  // The id of the task whose move-to-project selector is open (or null). The selector reads the
+  // live task by id so a concurrent list change can't strand a stale row reference.
+  const [movingId, setMovingId] = useState<string | null>(null);
 
   // Keep `selectedIndex` in range as the list shrinks (delete) or grows. A fixed index would
   // otherwise dangle past the end after a delete and select nothing — clamp to the last row.
@@ -71,6 +75,14 @@ export default function WorkspaceHome() {
         const sel = tasks[selectedIndex];
         if (!sel) return;
         setRenamingId(sel.id);
+      },
+
+      // M — open the move-to-project selector for the selected task (US-08.AS-05, R7). The
+      // selector lists the Inbox + every owned project; the actual move fires on selection.
+      onMove: () => {
+        const sel = tasks[selectedIndex];
+        if (!sel) return;
+        setMovingId(sel.id);
       },
 
       // Del — soft-delete the selected task (optimistic remove + rollback-in-place; the
@@ -125,6 +137,17 @@ export default function WorkspaceHome() {
       <h1 id="workspace-heading">Your workspace</h1>
       <TaskCapture open={captureOpen} onClose={() => setCaptureOpen(false)} />
       <ShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
+      <ProjectSelector
+        open={movingId !== null}
+        onClose={() => setMovingId(null)}
+        task={tasks.find((t) => t.id === movingId)}
+        // These are Inbox rows (project_id IS NULL), so the source is the Inbox (fromProjectId=null);
+        // null target = stay/return to Inbox, a project id moves it there (R6/R7).
+        onSelect={(projectId) => {
+          if (movingId !== null) moveTaskToProject(movingId, projectId, null);
+        }}
+      />
+
       {isError ? (
         // `role="alert"` announces the load failure assertively (it's a direct response to
         // the user's own navigation), distinct from the quiet empty-inbox hint. The retry

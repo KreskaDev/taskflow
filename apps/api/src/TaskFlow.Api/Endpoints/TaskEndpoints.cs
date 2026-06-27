@@ -4,6 +4,7 @@ using TaskFlow.Application.TaskManagement.Commands;
 using TaskFlow.Application.TaskManagement.Queries;
 using Wolverine;
 using Wolverine.Http;
+using ProjectId = TaskFlow.Domain.TaskManagement.ProjectId;
 using TaskId = TaskFlow.Domain.TaskManagement.TaskId;
 
 namespace TaskFlow.Api.Endpoints;
@@ -98,6 +99,25 @@ public static class TaskEndpoints
         {
             Id = TaskId.From(id),
             Position = request.Position,
+            Version = request.Version,
+        });
+    }
+
+    /// <summary>
+    /// Move the caller's own task to a project, or to the Inbox (the <c>M</c> action, US-08.AS-05, R7) under
+    /// the optimistic-concurrency <c>version</c> guard. <c>projectId = null</c> moves the task to the Inbox.
+    /// The owner is resolved from <c>ICurrentUser</c> in the handler, which checks ownership of BOTH the task
+    /// AND the target project — either failing → 404 (never 403); a stale <c>version</c> → 409.
+    /// </summary>
+    [WolverinePatch("/api/tasks/{id}/project")]
+    public static Task<TaskResponse> Move(Guid id, MoveTaskToProjectRequest request, IMessageBus bus)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(bus);
+        return bus.InvokeAsync<TaskResponse>(new MoveTaskToProject
+        {
+            Id = TaskId.From(id),
+            ProjectId = request.ProjectId is { } projectId ? ProjectId.From(projectId) : null,
             Version = request.Version,
         });
     }

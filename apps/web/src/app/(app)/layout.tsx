@@ -1,10 +1,14 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { Sidebar } from "@/components/layout/Sidebar";
+
 /**
- * Authenticated app shell (T044). A minimal header (no onboarding wizard, tooltips, or modal
- * interruptions — Constitution IV) with navigation and a keyboard-operable sign-out. Sign-out is a
- * plain form POST to the BFF route so it works without client JavaScript (Constitution I, FR-054).
+ * Authenticated app shell (T044, slice-004 T028). A minimal header (no onboarding wizard, tooltips,
+ * or modal interruptions — Constitution IV) with navigation and a keyboard-operable sign-out, plus
+ * the left {@link Sidebar} (Inbox + the one-level project tree + an Archived disclosure, R8/R16).
+ * Sign-out is a plain form POST to the BFF route so it works without client JavaScript
+ * (Constitution I, FR-054).
  */
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
@@ -23,7 +27,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           </form>
         </nav>
       </header>
-      <main className="tf-app__main">{children}</main>
+      <div className="tf-app__body">
+        <Sidebar />
+        <main className="tf-app__main">{children}</main>
+      </div>
     </div>
   );
 }

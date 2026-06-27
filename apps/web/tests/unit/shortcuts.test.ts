@@ -45,6 +45,7 @@ function makeHandlers(): { [K in Handler]-?: ReturnType<typeof vi.fn> } & Global
     onMoveDown: vi.fn(),
     onToggle: vi.fn(),
     onRename: vi.fn(),
+    onMove: vi.fn(),
     onDelete: vi.fn(),
     onHelp: vi.fn(),
     onReorderUp: vi.fn(),
@@ -104,6 +105,8 @@ const SUPPRESSED_BARE_KEYS: ReadonlyArray<readonly [string, KeyboardEventInit]> 
   ["C", { key: "C" }],
   ["e", { key: "e" }],
   ["E", { key: "E" }],
+  ["m", { key: "m" }],
+  ["M", { key: "M" }],
   ["Space", { key: " " }],
   ["Delete", { key: "Delete" }],
   ["? (Shift+/)", { key: "?", shiftKey: true }], // Shift is NOT a bypass modifier — `?` is bare.
@@ -166,6 +169,8 @@ describe("createGlobalShortcutsListener — gate (b): bare keys dispatch outside
     ["Space -> onToggle", { key: " " }, "onToggle"],
     ["E -> onRename", { key: "e" }, "onRename"],
     ["uppercase E -> onRename", { key: "E" }, "onRename"],
+    ["M -> onMove", { key: "m" }, "onMove"],
+    ["uppercase M -> onMove", { key: "M" }, "onMove"],
     ["Delete -> onDelete", { key: "Delete" }, "onDelete"],
     ["? -> onHelp", { key: "?", shiftKey: true }, "onHelp"],
   ];

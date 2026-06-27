@@ -33,6 +33,16 @@ public sealed record TaskBody(
     DateTime? DueDate = null, bool? DueHasTime = null);
 
 /// <summary>
+/// The lean <c>ProjectResponse</c> read model (contracts/openapi.yaml, slice 004). Declared in the
+/// test assembly so the project RED specs decode the wire body WITHOUT referencing the production
+/// <c>ProjectResponse</c> DTO — the files compile and fail at runtime (the cleaner RED). NEVER carries
+/// <c>ownerId</c>/<c>deletedAt</c> (the read-model leak rule, data-model §4).
+/// </summary>
+public sealed record ProjectBody(
+    Guid Id, string Name, string Color, string Icon, Guid? ParentId, string Visibility,
+    DateTime? ArchivedAt, int Version, DateTime CreatedAt, DateTime UpdatedAt);
+
+/// <summary>
 /// Helpers for the allow/deny integration tests: read the typed bodies the API emits using the same
 /// camelCase (<see cref="JsonSerializerDefaults.Web"/>) conventions the host serializes with.
 /// </summary>
@@ -59,6 +69,20 @@ public static class ApiResponse
         ArgumentNullException.ThrowIfNull(response);
         return (await response.Content.ReadFromJsonAsync<TaskBody>(Web))
             ?? throw new InvalidOperationException("Expected a TaskResponse body but the response was empty.");
+    }
+
+    public static async Task<ProjectBody> ReadProjectAsync(this HttpResponseMessage response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        return (await response.Content.ReadFromJsonAsync<ProjectBody>(Web))
+            ?? throw new InvalidOperationException("Expected a ProjectResponse body but the response was empty.");
+    }
+
+    public static async Task<IReadOnlyList<ProjectBody>> ReadProjectsAsync(this HttpResponseMessage response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        return (await response.Content.ReadFromJsonAsync<IReadOnlyList<ProjectBody>>(Web))
+            ?? throw new InvalidOperationException("Expected a ProjectResponse array but the response was empty.");
     }
 
     public static async Task<ProblemBody> ReadProblemAsync(this HttpResponseMessage response)

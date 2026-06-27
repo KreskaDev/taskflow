@@ -43,6 +43,9 @@ public sealed record TaskResponse
     /// <summary>The <c>DueDate.has_time</c> flag (R2/R8); null when <see cref="DueDate"/> is null.</summary>
     public bool? DueHasTime { get; init; }
 
+    /// <summary>The owning project's id (slice 004, R16), or null when the task is in the Inbox (FR-021).</summary>
+    public Guid? ProjectId { get; init; }
+
     /// <summary>Projects a <see cref="TaskEntity"/> aggregate to its lean wire model (mirrors <c>UserProfile.From</c>).</summary>
     public static TaskResponse From(TaskEntity task)
     {
@@ -59,6 +62,7 @@ public sealed record TaskResponse
             CompletedAt = task.CompletedAt,
             DueDate = task.DueDate,
             DueHasTime = task.DueHasTime,
+            ProjectId = task.ProjectId?.Value,
         };
     }
 

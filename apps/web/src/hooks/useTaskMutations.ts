@@ -530,6 +530,139 @@ export function deleteTaskMutationOptions(queryClient: QueryClient): DeleteTaskO
   };
 }
 
+/* ──────────────────────── MOVE TO PROJECT (PATCH /project) ──────────────────────── */
+
+/**
+ * The task-list cache key for a project's tasks: `['projects', <projectId>, 'tasks']` — the
+ * natural extension of the `['projects']` namespace (R16). A `null` projectId is the Inbox,
+ * which is the SINGLE `['tasks']` key (project_id IS NULL, R6). Used to derive the source +
+ * target list caches the move recipe relocates a row between.
+ */
+export function projectTasksQueryKey(projectId: string): readonly ["projects", string, "tasks"] {
+  return ["projects", projectId, "tasks"] as const;
+}
+
+/** Resolves the list cache key a task lives in for the given project (or the Inbox when null). */
+function listKeyForProject(projectId: string | null): readonly unknown[] {
+  return projectId === null ? TASKS_QUERY_KEY : projectTasksQueryKey(projectId);
+}
+
+export interface MoveTaskToProjectVariables {
+  id: string;
+  /** The list the task currently lives in (`null` = the Inbox) — the source cache. */
+  fromProjectId: string | null;
+  /** The destination project (`null` moves the task back to the Inbox) — the target cache. */
+  toProjectId: string | null;
+  version: number;
+}
+
+/** Context handed from `onMutate` to `onError`/`onSettled` — both pre-move list snapshots + keys. */
+export interface MoveTaskToProjectContext {
+  sourceKey: readonly unknown[];
+  targetKey: readonly unknown[];
+  previousSource: TaskResponse[] | undefined;
+  previousTarget: TaskResponse[] | undefined;
+}
+
+interface MoveTaskToProjectOptions {
+  mutationFn: (variables: MoveTaskToProjectVariables) => Promise<TaskResponse>;
+  onMutate: (variables: MoveTaskToProjectVariables) => Promise<MoveTaskToProjectContext>;
+  onError: (
+    error: Error,
+    variables: MoveTaskToProjectVariables,
+    context: MoveTaskToProjectContext | undefined,
+  ) => Promise<void>;
+  onSettled: (
+    data: TaskResponse | undefined,
+    error: Error | null,
+    variables: MoveTaskToProjectVariables,
+    context: MoveTaskToProjectContext | undefined,
+  ) => Promise<void>;
+}
+
+/**
+ * Optimistic MOVE-TO-PROJECT recipe (T039; FR-021/AS-05, research R6/R7/R15/R16). A task lives
+ * in exactly ONE list cache, so a move RELOCATES the row ACROSS two caches: it is pulled from
+ * the source list, re-stamped with the new `projectId`, and inserted (re-sorted by `position`)
+ * into the target list — `toProjectId = null` moves it back to the Inbox. Both ends ride on
+ * `variables` so the factory is self-contained (the wrapper does no row lookup).
+ *
+ * Unlike the rename/toggle/reorder recipes there is NO once-only 409 reapply (R10) — mirroring
+ * `useProjectMutations`, a 409/422/network error is a PLAIN rollback of BOTH caches, the FR-049
+ * message surfacing through the global MutationCache announcer, with server truth reconciled by
+ * the `onSettled` invalidate of the two SPECIFIC keys (never the bare `['projects']` prefix,
+ * which prefix-matches — and would evict — the sidebar project list).
+ */
+export function moveTaskToProjectMutationOptions(queryClient: QueryClient): MoveTaskToProjectOptions {
+  return {
+    mutationFn: async ({ id, toProjectId, version }: MoveTaskToProjectVariables): Promise<TaskResponse> => {
+      const { data, error } = await apiClient.PATCH("/api/tasks/{id}/project", {
+        params: { path: { id } },
+        body: { projectId: toProjectId, version },
+      });
+      if (error || !data) {
+        const errorCode = (error as ProblemDetails | undefined)?.errorCode;
+        throw new TaskMutationError(errorCode ?? "internal_error", mapError(errorCode).message);
+      }
+      return data;
+    },
+
+    onMutate: async (variables: MoveTaskToProjectVariables): Promise<MoveTaskToProjectContext> => {
+      const sourceKey = listKeyForProject(variables.fromProjectId);
+      const targetKey = listKeyForProject(variables.toProjectId);
+
+      // Stop in-flight refetches on BOTH lists so neither can clobber the optimistic relocate.
+      await queryClient.cancelQueries({ queryKey: sourceKey });
+      await queryClient.cancelQueries({ queryKey: targetKey });
+
+      const previousSource = queryClient.getQueryData<TaskResponse[]>(sourceKey);
+      const previousTarget = queryClient.getQueryData<TaskResponse[]>(targetKey);
+
+      // The row being moved (read from the source snapshot), re-stamped with the new placement.
+      const row = previousSource?.find((t) => t.id === variables.id);
+
+      // Remove from the source list.
+      queryClient.setQueryData<TaskResponse[]>(sourceKey, (old) =>
+        (old ?? []).filter((t) => t.id !== variables.id),
+      );
+
+      // Insert into the target list (re-stamped projectId), keeping the position ordering invariant.
+      if (row) {
+        const moved: TaskResponse = { ...row, projectId: variables.toProjectId };
+        queryClient.setQueryData<TaskResponse[]>(targetKey, (old) =>
+          sortByPosition([...(old ?? []), moved]),
+        );
+      }
+
+      return { sourceKey, targetKey, previousSource, previousTarget };
+    },
+
+    onError: async (
+      _error: Error,
+      _variables: MoveTaskToProjectVariables,
+      context: MoveTaskToProjectContext | undefined,
+    ): Promise<void> => {
+      // Plain rollback of BOTH caches — the moved row reappears in its source. No reapply.
+      if (!context) return;
+      queryClient.setQueryData<TaskResponse[] | undefined>(context.sourceKey, context.previousSource);
+      queryClient.setQueryData<TaskResponse[] | undefined>(context.targetKey, context.previousTarget);
+    },
+
+    onSettled: async (
+      _data: TaskResponse | undefined,
+      _error: Error | null,
+      _variables: MoveTaskToProjectVariables,
+      context: MoveTaskToProjectContext | undefined,
+    ): Promise<void> => {
+      // Reconcile the two SPECIFIC list caches with server truth — never the bare `['projects']`
+      // prefix (it would also evict the sidebar list + the archived listing).
+      if (!context) return;
+      await queryClient.invalidateQueries({ queryKey: context.sourceKey });
+      await queryClient.invalidateQueries({ queryKey: context.targetKey });
+    },
+  };
+}
+
 /**
  * "use client" hook wrapper. `createTask(title)` validates the title at the trust
  * boundary (Constitution VI), mints the client-side UUIDv7 id, computes the
@@ -554,6 +687,9 @@ export function useTaskMutations() {
   );
   const deleteMutation = useMutation<void, Error, DeleteTaskVariables, DeleteTaskContext>(
     deleteTaskMutationOptions(queryClient),
+  );
+  const moveMutation = useMutation<TaskResponse, Error, MoveTaskToProjectVariables, MoveTaskToProjectContext>(
+    moveTaskToProjectMutationOptions(queryClient),
   );
 
   const currentTasks = (): TaskResponse[] => queryClient.getQueryData<TaskResponse[]>(TASKS_QUERY_KEY) ?? [];
@@ -605,5 +741,23 @@ export function useTaskMutations() {
     deleteMutation.mutate({ id });
   };
 
-  return { createTask, renameTask, setTaskDone, reorderTask, deleteTask };
+  /**
+   * Moves a task to `toProjectId` (or back to the Inbox when `null`). Reads the row's CURRENT
+   * placement (`projectId`) + `version` from the live caches so the recipe can relocate it
+   * between the source and target list caches and carry the optimistic `version` to the server.
+   * Looks the row up in the Inbox first, then in the source project cache when supplied.
+   */
+  const moveTaskToProject = (
+    id: string,
+    toProjectId: string | null,
+    fromProjectId: string | null = null,
+  ): void => {
+    const source =
+      queryClient.getQueryData<TaskResponse[]>(listKeyForProject(fromProjectId)) ?? [];
+    const row = source.find((t) => t.id === id);
+    if (!row) return;
+    moveMutation.mutate({ id, fromProjectId, toProjectId, version: row.version });
+  };
+
+  return { createTask, renameTask, setTaskDone, reorderTask, deleteTask, moveTaskToProject };
 }

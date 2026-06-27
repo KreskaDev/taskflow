@@ -58,6 +58,26 @@ internal sealed class TaskFlowDocumentTransformer : IOpenApiDocumentTransformer
         SetOperation(document, "/api/tasks/{id}/position", OperationType.Patch, "reorderTask", 404, 409, 422);
         SetOperation(document, "/api/tasks/{id}", OperationType.Delete, "deleteTask", 404);
 
+        // Project surface (slice 004, contracts/openapi.yaml). Same pattern as the task ops: success
+        // bodies auto-emit from the endpoint signatures; here we stamp the stable operationIds and the
+        // exception-driven ProblemDetails responses (401 always, plus the documented 404/409/422 per op)
+        // the .NET generator does not infer. NO new errorCode — the ErrorCodes enum is unchanged (R12).
+        // listProjects is a read with only the deny-by-default 401; createProject has no 409 (idempotent
+        // insert, version-free); unarchiveProject has no 422 (version-only body, no preset/nesting field).
+        SetOperation(document, "/api/projects/{id}", OperationType.Put, "createProject", 404, 422);
+        SetOperation(document, "/api/projects", OperationType.Get, "listProjects");
+        SetOperation(document, "/api/projects/{id}", OperationType.Patch, "editProject", 404, 409, 422);
+        SetOperation(document, "/api/projects/{id}/archive", OperationType.Patch, "archiveProject", 404, 409, 422);
+        SetOperation(document, "/api/projects/{id}/unarchive", OperationType.Patch, "unarchiveProject", 404, 409);
+        SetOperation(document, "/api/projects/{id}", OperationType.Delete, "deleteProject", 404, 409, 422);
+
+        // Task ⇆ Project surface (slice 004, US2). moveTaskToProject (the `M` action) checks ownership of
+        // BOTH the task and the target project (foreign either → 404), carries the optimistic version
+        // (stale → 409), and validates the body (→ 422). listProjectTasks is a read scoped to an owned
+        // project (foreign/absent → 404), only the deny-by-default 401 otherwise. No new errorCode (R12).
+        SetOperation(document, "/api/tasks/{id}/project", OperationType.Patch, "moveTaskToProject", 404, 409, 422);
+        SetOperation(document, "/api/projects/{id}/tasks", OperationType.Get, "listProjectTasks", 404);
+
         return Task.CompletedTask;
     }
 

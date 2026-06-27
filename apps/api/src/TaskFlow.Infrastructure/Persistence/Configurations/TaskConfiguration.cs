@@ -90,8 +90,14 @@ public sealed class TaskConfiguration : IEntityTypeConfiguration<TaskEntity>
         builder.Property(t => t.DueHasTime)
             .HasColumnName("due_has_time");
 
+        // Strongly-typed nullable id (slice 004): the explicit nullable converter keeps EF from
+        // tripping on the ProjectId? → uuid? round-trip (null = Inbox). The store column is unchanged
+        // (uuid NULL) — activating the CLR type is not a column change.
         builder.Property(t => t.ProjectId)
-            .HasColumnName("project_id");
+            .HasColumnName("project_id")
+            .HasConversion(
+                id => id == null ? (Guid?)null : id.Value.Value,
+                value => value == null ? (ProjectId?)null : ProjectId.From(value.Value));
 
         builder.Property(t => t.CycleId)
             .HasColumnName("cycle_id");
@@ -107,6 +113,16 @@ public sealed class TaskConfiguration : IEntityTypeConfiguration<TaskEntity>
             .WithMany()
             .HasForeignKey(t => t.CreatedBy)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // project_id → projects(id), ON DELETE SET NULL (slice 004, R14): the column already exists
+        // (reserved by slice-002 AddTasks); this slice adds only the FK constraint. SET NULL is the
+        // defensive backstop under soft-delete — the delete dispositions (R5) reconcile a project's
+        // tasks BEFORE the reaper hard-deletes, so this only ever catches a straggler. A null
+        // project_id is the Inbox (FR-021/R6). No navigation property (data-model.md: no nav props).
+        builder.HasOne<Project>()
+            .WithMany()
+            .HasForeignKey(t => t.ProjectId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         // Partial composite index serving the single hot query exactly:
         // WHERE created_by = @caller AND deleted_at IS NULL ORDER BY position, id.

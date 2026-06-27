@@ -11,3 +11,12 @@ import { v7 } from "uuid";
 export function newTaskId(): string {
   return v7();
 }
+
+/**
+ * Mints a new project id as a UUIDv7 (slice 004, T026). Same rationale as {@link newTaskId}:
+ * a client-minted, time-ordered id lets an optimistic project create carry its own stable identity
+ * into the `['projects']` cache and the idempotent `PUT /api/projects/{id}` request.
+ */
+export function newProjectId(): string {
+  return v7();
+}

@@ -46,6 +46,18 @@ interface TaskRowProps {
   onCancelRename: () => void;
   /** Selects this row on pointer click — the controlled selection path (US8/T055). */
   onSelect?: () => void;
+  /**
+   * The display name of the project this task is in (T041). When present (the task is projected,
+   * R16), the row renders a project chip; absent → the task is in the Inbox and no chip shows.
+   * Resolved by the parent from the loaded project tree so the row holds no query dependency.
+   */
+  projectName?: string | null;
+  /**
+   * Opens the move-to-project selector for THIS row (T041; FR-021/AS-05). Optional so the
+   * virtualized {@link TaskList} can omit it; wired to the chip button when supplied. The bare
+   * `M` shortcut targets the SELECTED row via the global gate — this is the pointer affordance.
+   */
+  onOpenMove?: () => void;
   /** Absolute position styles supplied by the virtualizer for this row. */
   style: CSSProperties;
 }
@@ -75,9 +87,12 @@ export function TaskRow({
   onCommitRename,
   onCancelRename,
   onSelect,
+  projectName,
+  onOpenMove,
   style,
 }: TaskRowProps) {
   const done = task.status === "done";
+  const projected = task.projectId != null;
 
   return (
     <div
@@ -101,6 +116,31 @@ export function TaskRow({
       ) : (
         <span className="tf-task-row__title">{task.title}</span>
       )}
+      {!isRenaming && projected ? (
+        // Project chip (T041, R16): a visible, always-rendered placement label (FR-046: no
+        // hover-only affordance). The project NAME carries the meaning (never color alone,
+        // FR-044) and is a React text node so it is escaped (FR-099). When `onOpenMove` is
+        // supplied the chip is a button that opens the move selector (pointer affordance for
+        // the `M` shortcut); `stopPropagation` keeps the row's select `onClick` from also firing.
+        onOpenMove ? (
+          <button
+            type="button"
+            className="tf-task-row__project"
+            aria-label={`In project ${projectName ?? ""}. Move to another project`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenMove();
+            }}
+          >
+            {projectName ?? "Project"}
+          </button>
+        ) : (
+          <span className="tf-task-row__project">
+            <span className="tf-sr-only">projekt: </span>
+            {projectName ?? "Project"}
+          </span>
+        )
+      ) : null}
       {!isRenaming && task.dueDate ? (
         // Visible, always-rendered text label (FR-046: no hover-only affordance). The
         // calendar day/time is the meaning — never color alone (FR-044) — and it carries no

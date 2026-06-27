@@ -86,8 +86,14 @@ public sealed class Task : AggregateRoot<TaskId>
     /// <summary>The <c>DueDate.has_time</c> flag (slice 003). Written at create time by <see cref="Create(TaskId, UserId, string, string, DateTime, DateTime?, bool?)"/>; null for no due date.</summary>
     public bool? DueHasTime { get; private set; }
 
-    /// <summary>Reserved (slice 004) — owning project. Mapped but unused this slice.</summary>
-    public Guid? ProjectId { get; private set; }
+    /// <summary>
+    /// Owning project (slice 004), or null for the Inbox (FR-021/R6). Strongly-typed to
+    /// <see cref="ProjectId"/> so the <c>project_id → projects(id)</c> FK matches by CLR type
+    /// (mirrors <see cref="CreatedBy"/>); the store column stays <c>uuid</c> NULL — activating the
+    /// CLR type does not alter the column. Written by <c>MoveTaskToProject</c> (slice 004 T032,
+    /// out of this Foundational scope); read by the Inbox/project-task queries.
+    /// </summary>
+    public ProjectId? ProjectId { get; private set; }
 
     /// <summary>Reserved (slice 011) — owning cycle. Mapped but unused this slice.</summary>
     public Guid? CycleId { get; private set; }
@@ -161,6 +167,21 @@ public sealed class Task : AggregateRoot<TaskId>
         ArgumentException.ThrowIfNullOrWhiteSpace(position);
 
         Position = position;
+        Touch(utcNow);
+    }
+
+    /// <summary>
+    /// Moves the task to <paramref name="projectId"/>, or to the Inbox when null (slice 004 US2,
+    /// US-08.AS-05/R7). Assigning a project removes the task from the Inbox (FR-021); a null target
+    /// clears the project and returns it to the Inbox (the natural inverse). Bumps <see cref="Version"/>
+    /// and stamps <see cref="UpdatedAt"/>. The handler (<c>MoveTaskToProject</c>) authorizes ownership of
+    /// BOTH the task and the target project before calling this; the aggregate just records the move.
+    /// </summary>
+    /// <param name="projectId">The target project, or null for the Inbox.</param>
+    /// <param name="utcNow">The current UTC time (injected for testability).</param>
+    public void MoveToProject(ProjectId? projectId, DateTime utcNow)
+    {
+        ProjectId = projectId;
         Touch(utcNow);
     }
 

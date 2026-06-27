@@ -5,6 +5,7 @@ using TaskFlow.Application.TaskManagement;
 using TaskFlow.Domain.IdentityAccess;
 using TaskEntity = TaskFlow.Domain.TaskManagement.Task;
 using TaskId = TaskFlow.Domain.TaskManagement.TaskId;
+using ProjectId = TaskFlow.Domain.TaskManagement.ProjectId;
 
 namespace TaskFlow.Infrastructure.Persistence;
 
@@ -25,12 +26,26 @@ public sealed class TaskRepository(AppDbContext db) : ITaskRepository
         db.Tasks.FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
 
     public async Task<IReadOnlyList<TaskEntity>> ListOwnedAsync(UserId owner, CancellationToken cancellationToken) =>
+        // The Inbox (FR-021/R6): narrowed to project_id IS NULL — unprojected tasks only. Backward-compatible
+        // because every pre-slice-004 task has no project, so existing data stays in the Inbox; only tasks
+        // moved to a project (R7) drop out. Keeps slice-002's ORDER BY position, id (and its index).
         await db.Tasks
-            .Where(t => t.CreatedBy == owner && t.DeletedAt == null)
+            .Where(t => t.CreatedBy == owner && t.DeletedAt == null && t.ProjectId == null)
             .OrderBy(t => t.Position)
             .ThenBy(t => t.Id)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+
+    public async Task<IReadOnlyList<TaskEntity>> ListByProjectAsync(ProjectId projectId, UserId owner, CancellationToken cancellationToken) =>
+        await db.Tasks
+            .Where(t => t.ProjectId == projectId && t.CreatedBy == owner && t.DeletedAt == null)
+            .OrderBy(t => t.Position)
+            .ThenBy(t => t.Id)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+    public Task<int> CountByProjectAsync(ProjectId projectId, UserId owner, CancellationToken cancellationToken) =>
+        db.Tasks.CountAsync(t => t.ProjectId == projectId && t.CreatedBy == owner && t.DeletedAt == null, cancellationToken);
 
     public void Add(TaskEntity task)
     {
