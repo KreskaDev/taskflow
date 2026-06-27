@@ -97,7 +97,7 @@ Handlers load the project **and** (when `shared`) its membership set, then call 
 | Read project / list its tasks / list members | `viewer`+ | allow | allow | allow | **404** |
 | Write a task (create/edit/move/complete in the project) — *slice 008+* | `editor`+ | **403** | allow | allow | **404** |
 | Manage: invite / change-role / remove / unshare / transfer / delete project | `owner` | **403** | **403** | allow | **404** |
-| Leave the project | any non-owner member (self) | allow | allow | **`last_owner` (422)** | **404** |
+| Leave the project | any non-owner member (self) | allow | allow | **`last_owner` (409)** | **404** |
 
 > The "write a task" row is the policy contract this slice *establishes*; the task-write handlers that consume it on shared projects arrive with slice 008. The shared-project **read** rows (project/tasks/members) and **manage** rows are realized and tested **this** slice.
 
@@ -105,7 +105,7 @@ Handlers load the project **and** (when `shared`) its membership set, then call 
 
 - **Non-member** (effective role = `none` — neither owner nor a row-holder; includes a *removed* member and any outsider `X`) → **404 `not_found`**. Existence is **not disclosed** across the membership boundary (Constitution XII; same posture as the slice-004 ownership 404).
 - **Member with insufficient role** (e.g. viewer attempting a write; editor attempting a manage op) → **403 `forbidden`**. The member already knows the project exists, so the honest answer is "you lack the role" (FR-067) with an FR-049 recovery.
-- **Last-owner-targeted** remove/demote/leave → **422 `last_owner`** (R7), recoverable ("transfer ownership to another member first").
+- **Last-owner-targeted** remove/demote/leave → **409 `last_owner`** (R7), recoverable ("transfer ownership to another member first").
 
 ### Revoke-ALL on leave / remove / unshare (FR-066, R10)
 
@@ -118,7 +118,7 @@ The instant a user's membership ends (`LeaveProject`, `RemoveMember`, or `Unshar
 
 ### Test coverage (Constitution VIII + IX governance gate)
 
-**Every** data handler ships an **allow** and a **deny** integration test through the real DB, and the slice ships the **role × operation deny matrix** above as first-class tests (SC-013, SC-016): viewer-denied-write, editor-denied-manage, non-member-denied-read (404), removed-member-loses-access (404), last-owner-guard (422) per applicable surface, plus the allow case per handler.
+**Every** data handler ships an **allow** and a **deny** integration test through the real DB, and the slice ships the **role × operation deny matrix** above as first-class tests (SC-013, SC-016): viewer-denied-write, editor-denied-manage, non-member-denied-read (404), removed-member-loses-access (404), last-owner-guard (409) per applicable surface, plus the allow case per handler.
 
 ---
 
@@ -142,6 +142,7 @@ The instant a user's membership ends (`LeaveProject`, `RemoveMember`, or `Unshar
                                                           │                                          │
                                                           ▼  MembershipRevoked raised (R13) ─────────┘
 ```
+> The `ChangeMemberRole (editor ↔ viewer)` edge also raises **`MembershipRevoked` on a demotion (editor→viewer)** (R5/H1) — a demotion revokes the editor capability; a promotion (viewer→editor) is access-additive and raises no event.
 
 ### Ownership transfer (R6 — the only legal `ownerId` mutation)
 ```
@@ -155,9 +156,9 @@ The instant a user's membership ends (`LeaveProject`, `RemoveMember`, or `Unshar
 
 ### Last-owner guard (R7) — degenerate single-owner case
 ```
-  LeaveProject(caller == ownerId)                 → 422 last_owner  ("transfer ownership first")
-  RemoveMember(target == ownerId)                 → 422 last_owner
-  ChangeMemberRole(target == ownerId)             → 422 last_owner
+  LeaveProject(caller == ownerId)                 → 409 last_owner  ("transfer ownership first")
+  RemoveMember(target == ownerId)                 → 409 last_owner
+  ChangeMemberRole(target == ownerId)             → 409 last_owner
   (checked BEFORE the membership-row lookup — the owner has no row)
 ```
 
@@ -184,13 +185,13 @@ The instant a user's membership ends (`LeaveProject`, `RemoveMember`, or `Unshar
 - `IResourceAuthorizationPolicy` extension — `ResolveEffectiveRole(...)` + `RequireRole(...)` (the §3 dispatch-by-visibility methods).
 - FluentValidation validators for `InviteMember` (email shape), `ChangeMemberRole` / `TransferOwnership` (target + role shape); cross-row checks (email resolution, member existence, last-owner) in the handlers (R4/R6/R7).
 - `ProjectMembershipId` strongly-typed id + EF value conversion, mirroring `ProjectId`.
-- Domain events `ProjectShared` / `ProjectUnshared` / `OwnerTransferred` / `MembershipRevoked` raised via the Wolverine transactional outbox (R13), consumed by slices 008/016/017.
+- Domain events `ProjectShared` / `ProjectUnshared` / `OwnerTransferred` / `MembershipRevoked` raised via the Wolverine transactional outbox (R13), consumed by slices 008/016/017. **`MembershipRevoked` is raised by `RemoveMember`, `LeaveProject`, AND a `ChangeMemberRole` demotion (editor→viewer)** (R5/H1) — that is the complete raiser set; a promotion (viewer→editor) raises no event.
 
 ---
 
 ## What is unchanged
 
 - The `projects` table columns and the `tasks` table (no DDL on either) — only `Project` **behavior** grows (`Share`/`Unshare`/`TransferOwnerTo`) and a new table is added.
-- The `version` / `version_conflict` optimistic-concurrency machinery; the error contract — **no new error code** (R16): `forbidden` (403) and `last_owner` (422) were pre-provisioned in slice 004 and are *first used* here; `not_found` (404), `validation_failed` (422), `version_conflict` (409) are reused.
+- The `version` / `version_conflict` optimistic-concurrency machinery; the error contract — **no new error code** (R16): `forbidden` (403) and `last_owner` (409) were pre-provisioned in slice 004 and are *first used* here; `not_found` (404), `validation_failed` (422), `version_conflict` (409) are reused.
 - The BFF proxy, authentication wiring, `ICurrentUser` resolution, the `AuthorizationMiddleware` deny-by-default authentication gate, and the slice-004 ownership branch (which remains the `personal`-visibility arm of the new dispatch).
 - The soft-delete reaper, the project archive lifecycle, and all slice-002/003/004 task behavior. No NodaTime surface (membership timestamps are plain UTC `timestamptz`; this slice introduces no new date-relative computation — Constitution X).

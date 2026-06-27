@@ -26,14 +26,15 @@ info:
     pre-provisioned (but unused) since slice 004:
       • **403 `forbidden`** — a member with insufficient role (e.g. viewer→write,
         editor→manage).
-      • **422 `last_owner`** — the last-owner guard (cannot remove / demote / leave
-        the owner; transfer ownership first).
+      • **409 `last_owner`** — the last-owner guard (cannot remove / demote / leave
+        the owner; transfer ownership first) — a STATE conflict, sharing HTTP 409
+        with `version_conflict` but distinguished by `errorCode` (research R7/R16).
     and reuses existing codes: **404 `not_found`** for a non-member / foreign /
     absent project (existence NOT disclosed across the membership boundary —
     Constitution XII); **422 `validation_failed`** for an unknown invite email,
-    self/duplicate invite, or transfer-to-non-member; **409 `version_conflict`**
-    for a stale sharing/membership mutation (the Project `version` guards the whole
-    sharing state — research R11). The `ProblemDetails.errorCode` enum is
+    self/duplicate invite, transfer-to-non-member, or a malformed role; **409
+    `version_conflict`** for a stale sharing/membership mutation (the Project
+    `version` guards the whole sharing state — research R11). The `ProblemDetails.errorCode` enum is
     UNCHANGED (transformer `ErrorCodes` array NOT edited).
 
     The C# success-body schemas auto-derive from the request/response DTOs
@@ -197,12 +198,13 @@ paths:
         Owner-only. Sets the target member's `role` to the given assignable value
         (`editor|viewer`; a stale UI re-sending the current value is a no-op +
         version bump, not an error — research R5). The target MUST be a current
-        membership row. If the target is the OWNER → **422 `last_owner`** (the owner
-        is not demotable; transfer ownership instead — research R7), checked BEFORE
-        the row lookup. A target who is neither owner nor a member → **404**. A
-        member caller with insufficient role → **403**; a non-member caller →
-        **404**. `owner` is not a representable role value. Confirmation-gated
-        (FR-064). Carries `version`.
+        membership row. If the target is the OWNER → **409 `last_owner`** (the owner
+        is not demotable; transfer ownership instead — research R7/R16: a state
+        conflict, not field validation), checked BEFORE the row lookup. A target who
+        is neither owner nor a member → **404**. A member caller with insufficient
+        role → **403**; a non-member caller → **404**. `owner` is not a representable
+        role value. A demotion (editor→viewer) raises `MembershipRevoked` (research
+        R5/R13). Confirmation-gated (FR-064). Carries `version`.
       requestBody:
         required: true
         content:
@@ -213,7 +215,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
-        "409": { $ref: "#/components/responses/VersionConflict" }
+        "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
     delete:
       operationId: removeProjectMember
@@ -222,11 +224,12 @@ paths:
       description: >
         Owner-only. Deletes the target member's row; the removed user loses ALL
         access to the project's data immediately (research R10) and (slice 008) is
-        unassigned from its tasks. If the target is the OWNER → **422 `last_owner`**
-        (transfer first — research R7), checked BEFORE the row lookup. A target who
-        is neither owner nor a member → **404**. A member caller with insufficient
-        role → **403**; a non-member caller → **404**. Confirmation-gated with a
-        blast-radius preview, NOT under the 30s undo (FR-064). **Parameter
+        unassigned from its tasks. If the target is the OWNER → **409 `last_owner`**
+        (transfer first — research R7/R16, a state conflict), checked BEFORE the row
+        lookup. A target who is neither owner nor a member → **404**. A member caller
+        with insufficient role → **403**; a non-member caller → **404**. Removing the
+        member raises `MembershipRevoked` (research R10/R13). Confirmation-gated with
+        a blast-radius preview, NOT under the 30s undo (FR-064). **Parameter
         convention** (slice-004 posture): DELETE carries `version` as a query param
         (HTTP DELETE bodies are poorly supported by tooling/proxies).
       parameters:
@@ -236,8 +239,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
-        "409": { $ref: "#/components/responses/VersionConflict" }
-        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "409": { $ref: "#/components/responses/Conflict" }
 
   /api/projects/{id}/membership:
     parameters:
@@ -251,19 +253,18 @@ paths:
         losing ALL access immediately (research R10) and (slice 008) being
         unassigned from the project's tasks. Distinct from remove-member by WHO is
         authorized (self vs owner-targets-another). If the CALLER is the owner →
-        **422 `last_owner`** (the owner cannot leave; transfer ownership first —
-        research R7), checked BEFORE the row lookup (the owner has no row). A
-        non-member caller → **404**. Confirmation-gated with a blast-radius preview,
-        NOT under the 30s undo (FR-064). DELETE carries `version` as a query param
-        (slice-004 posture).
+        **409 `last_owner`** (the owner cannot leave; transfer ownership first —
+        research R7/R16, a state conflict), checked BEFORE the row lookup (the owner
+        has no row). A non-member caller → **404**. Leaving raises `MembershipRevoked`
+        (research R10/R13). Confirmation-gated with a blast-radius preview, NOT under
+        the 30s undo (FR-064). DELETE carries `version` as a query param (slice-004 posture).
       parameters:
         - { name: version, in: query, required: true, schema: { type: integer }, description: Optimistic-concurrency token (the Project version) }
       responses:
         "204": { description: Left the project }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
-        "409": { $ref: "#/components/responses/VersionConflict" }
-        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "409": { $ref: "#/components/responses/Conflict" }
 
 components:
   parameters:
@@ -409,14 +410,22 @@ components:
     VersionConflict:
       description: The Project optimistic-concurrency token was stale; reload and retry (409 `version_conflict`)
       content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+    Conflict:
+      description: >
+        A 409 STATE conflict — the response carries ONE of two error codes (clients
+        branch on `errorCode`, ADR-0009): `version_conflict` — the Project
+        optimistic-concurrency token was stale, reload and retry; OR `last_owner` —
+        the last-owner guard: the owner cannot be removed, demoted, or leave while
+        they are the sole owner (recoverable — transfer ownership to another member
+        first; research R7/R16). OpenAPI permits one `409` per operation, so the
+        change-role/remove/leave ops surface both codes through this single response.
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
     ValidationFailed:
       description: >
-        Validation failed (422). Carries one of:
-        `validation_failed` — unknown invite email, self/duplicate invite, or
-        transfer-to-non-member (the human specifics ride in the field-`errors`
-        envelope; FR-049); OR
-        `last_owner` — the last-owner guard: the owner cannot be removed, demoted,
-        or leave (recoverable — transfer ownership to another member first; R7).
+        Validation failed (422), `validation_failed` — unknown invite email,
+        self/duplicate invite, transfer-to-non-member, or a malformed role value
+        (the human specifics ride in the field-`errors` envelope; FR-049). The
+        last-owner guard is NOT here — it is a 409 state conflict (see Conflict).
       content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
 
 # ProblemDetails schema + errorCode enum are UNCHANGED from slices 001/002/004 (research R16):

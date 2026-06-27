@@ -55,9 +55,9 @@ pnpm e2e                          # Playwright (self-boots its own stack)
 
 | # | Action | Expected |
 |---|---|---|
-| owner-cannot-leave | As the owner, attempt to **leave** the project | **422 `last_owner`** — "transfer ownership to another member first" (FR-049 recoverable); checked **before** any row lookup (the owner has no row, R7) |
-| owner-cannot-be-removed | As owner **A**, attempt to **remove** the owner (target == `ownerId`) | **422 `last_owner`** (not a misleading 404) |
-| owner-cannot-be-demoted | As owner **A**, attempt to **change-role** on the owner | **422 `last_owner`** |
+| owner-cannot-leave | As the owner, attempt to **leave** the project | **409 `last_owner`** — "transfer ownership to another member first" (FR-049 recoverable); checked **before** any row lookup (the owner has no row, R7) |
+| owner-cannot-be-removed | As owner **A**, attempt to **remove** the owner (target == `ownerId`) | **409 `last_owner`** (not a misleading 404) |
+| owner-cannot-be-demoted | As owner **A**, attempt to **change-role** on the owner | **409 `last_owner`** |
 
 ### E. Remove / leave revoke ALL access (US-12.AS-04 / AS-05 — FR-066)
 
@@ -79,7 +79,7 @@ pnpm e2e                          # Playwright (self-boots its own stack)
 | Case | Expected |
 |---|---|
 | Each data handler (share/unshare/invite/change-role/remove/leave/transfer/list-members) | Ships **both** an **allow** AND a **deny** integration test through the real DB (SC-013) |
-| The **role × operation deny matrix** (SC-016) | viewer-denied-write (403), editor-denied-manage (403), non-member-denied-read (404), removed-member-loses-access (404), last-owner-guard (422) — each asserted as a first-class test (data-model §3) |
+| The **role × operation deny matrix** (SC-016) | viewer-denied-write (403), editor-denied-manage (403), non-member-denied-read (404), removed-member-loses-access (404), last-owner-guard (409) — each asserted as a first-class test (data-model §3) |
 | Any request without a valid session | **401 `unauthenticated`** |
 | Governance | Authorization changes reviewed by a **non-author** before merge (governance gate); the deny matrix is the mechanically-verifiable artifact |
 
@@ -91,7 +91,7 @@ pnpm e2e                          # Playwright (self-boots its own stack)
 | Invite the **owner's** own email, or an **already-existing member** | **422 `validation_failed`** ("already the owner" / "already a member — change their role instead", R4) |
 | Invite/change-role with `role` outside `{editor, viewer}` (e.g. `owner`) | Rejected at the boundary — `owner` is **not a representable** `MembershipRole` (R2) |
 | Transfer to a **non-member** or the **current owner** | **422 `validation_failed`** (R6) |
-| Leave / remove / change-role targeting the **owner** | **422 `last_owner`** (R7) |
+| Leave / remove / change-role targeting the **owner** | **409 `last_owner`** (R7) |
 | Non-member targets any shared-project operation | **404 `not_found`** (existence not disclosed, R9) |
 | Member with insufficient role (viewer→write, editor→manage) | **403 `forbidden`** (R9) |
 | Stale `version` on any sharing/membership mutation | **409 `version_conflict`** (the Project version guards the whole sharing state, R11) |
