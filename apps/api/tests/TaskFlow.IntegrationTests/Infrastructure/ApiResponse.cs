@@ -40,7 +40,13 @@ public sealed record TaskBody(
 /// </summary>
 public sealed record ProjectBody(
     Guid Id, string Name, string Color, string Icon, Guid? ParentId, string Visibility,
-    DateTime? ArchivedAt, int Version, DateTime CreatedAt, DateTime UpdatedAt);
+    DateTime? ArchivedAt, int Version, DateTime CreatedAt, DateTime UpdatedAt, string? Role = null);
+
+/// <summary>A single <c>MemberResponse</c> roster entry (slice 007). NEVER carries an email (Constitution XI).</summary>
+public sealed record MemberBody(Guid UserId, string DisplayName, string Role, bool IsOwner);
+
+/// <summary>The <c>MembersResponse</c> roster body (slice 007): the composed roster + the project <c>version</c>.</summary>
+public sealed record MembersBody(Guid ProjectId, int Version, IReadOnlyList<MemberBody> Members);
 
 /// <summary>
 /// Helpers for the allow/deny integration tests: read the typed bodies the API emits using the same
@@ -83,6 +89,20 @@ public static class ApiResponse
         ArgumentNullException.ThrowIfNull(response);
         return (await response.Content.ReadFromJsonAsync<IReadOnlyList<ProjectBody>>(Web))
             ?? throw new InvalidOperationException("Expected a ProjectResponse array but the response was empty.");
+    }
+
+    public static async Task<MembersBody> ReadMembersAsync(this HttpResponseMessage response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        return (await response.Content.ReadFromJsonAsync<MembersBody>(Web))
+            ?? throw new InvalidOperationException("Expected a MembersResponse body but the response was empty.");
+    }
+
+    public static async Task<MemberBody> ReadMemberAsync(this HttpResponseMessage response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        return (await response.Content.ReadFromJsonAsync<MemberBody>(Web))
+            ?? throw new InvalidOperationException("Expected a MemberResponse body but the response was empty.");
     }
 
     public static async Task<ProblemBody> ReadProblemAsync(this HttpResponseMessage response)

@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using TaskFlow.Application.Authorization;
+using TaskFlow.Domain.TaskManagement;
 
 namespace TaskFlow.Application.TaskManagement.Queries;
 
@@ -34,16 +35,32 @@ public static class GetMyProjectsHandler
         GetMyProjects query,
         ICurrentUser currentUser,
         IProjectRepository projects,
+        IProjectMembershipRepository members,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
         ArgumentNullException.ThrowIfNull(currentUser);
         ArgumentNullException.ThrowIfNull(projects);
+        ArgumentNullException.ThrowIfNull(members);
 
-        var owned = await projects
-            .ListOwnedAsync(currentUser.Id, query.Archived, cancellationToken)
-            .ConfigureAwait(false);
+        var caller = currentUser.Id;
 
-        return owned.Select(ProjectResponse.From).ToList();
+        // Owned projects (personal + shared-owned) — the caller is the owner of each (effective role owner).
+        var owned = await projects.ListOwnedAsync(caller, query.Archived, cancellationToken).ConfigureAwait(false);
+        var result = owned.Select(p => ProjectResponse.From(p, EffectiveRole.Owner)).ToList();
+
+        // Shared projects the caller is a MEMBER of (not owner) — include them with the caller's effective
+        // editor/viewer role (R8/R17). The membership set is small at team scale (ASM-01/ASM-10), so the
+        // per-project role lookup is negligible.
+        var sharedIds = await members.ListProjectIdsForUserAsync(caller, cancellationToken).ConfigureAwait(false);
+        var sharedProjects = await projects.ListByIdsAsync(sharedIds, query.Archived, cancellationToken).ConfigureAwait(false);
+        foreach (var project in sharedProjects)
+        {
+            var row = await members.FindAsync(project.Id, caller, cancellationToken).ConfigureAwait(false);
+            var role = row?.Role == MembershipRoles.Editor ? EffectiveRole.Editor : EffectiveRole.Viewer;
+            result.Add(ProjectResponse.From(project, role));
+        }
+
+        return result;
     }
 }

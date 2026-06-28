@@ -99,21 +99,24 @@ public static class EditProjectHandler
         EditProject command,
         ICurrentUser currentUser,
         IProjectRepository projects,
+        IProjectMembershipRepository members,
+        IResourceAuthorizationPolicy authorization,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(currentUser);
         ArgumentNullException.ThrowIfNull(projects);
+        ArgumentNullException.ThrowIfNull(members);
+        ArgumentNullException.ThrowIfNull(authorization);
 
         var owner = currentUser.Id;
 
-        var project = await projects
-            .FindOwnedAsync(command.Id, owner, cancellationToken)
+        // Manage-op visibility dispatch (R8/R9): personal → owner-only (non-owner → 404); shared → owner-only
+        // (editor/viewer member → 403, non-member → 404). The owner-scoped parent/child logic below is
+        // unchanged — on the manage path the caller IS the owner (owner == project.OwnerId).
+        var project = await MembershipGuards
+            .LoadOwnerManagedProjectAsync(command.Id, currentUser, projects, members, authorization, cancellationToken)
             .ConfigureAwait(false);
-        if (project is null)
-        {
-            throw new NotFoundException();
-        }
 
         if (project.Version != command.Version)
         {

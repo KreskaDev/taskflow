@@ -1,3 +1,4 @@
+using TaskFlow.Application.Authorization;
 using TaskFlow.Domain.TaskManagement;
 
 namespace TaskFlow.Application.TaskManagement;
@@ -25,8 +26,16 @@ public sealed record ProjectResponse
     /// <summary>The parent project id, or null for a top-level project (one-level rule, R3).</summary>
     public Guid? ParentId { get; init; }
 
-    /// <summary>Visibility — <c>personal</c> this slice (R11); the <c>shared</c> value is slice 007.</summary>
+    /// <summary>Visibility — <c>personal</c> or <c>shared</c> (research R3).</summary>
     public required string Visibility { get; init; }
+
+    /// <summary>
+    /// The CALLER's effective role for this project (<c>owner | editor | viewer</c>, research R17). For a
+    /// personal project the caller is always the owner (<c>owner</c>). Drives client-side UI gating (a
+    /// viewer sees read-only); NOT the security boundary (server FR-068 is authoritative). Nullable for
+    /// forward-compatibility, but always populated by the slice-007 projections.
+    /// </summary>
+    public string? Role { get; init; }
 
     /// <summary>Archive timestamp (UTC); null = active, non-null = archived (reversible state, R2).</summary>
     public DateTime? ArchivedAt { get; init; }
@@ -40,8 +49,14 @@ public sealed record ProjectResponse
     /// <summary>UTC last-mutation timestamp.</summary>
     public required DateTime UpdatedAt { get; init; }
 
-    /// <summary>Projects a <see cref="Project"/> aggregate to its lean wire model (mirrors <c>TaskResponse.From</c>).</summary>
-    public static ProjectResponse From(Project project)
+    /// <summary>
+    /// Projects a <see cref="Project"/> aggregate to its lean wire model (mirrors <c>TaskResponse.From</c>).
+    /// The caller's effective <paramref name="role"/> defaults to <see cref="EffectiveRole.Owner"/>: every
+    /// slice-004 caller (create/edit/archive/unarchive/owned-list) is the owner of the projected row, so the
+    /// default is correct without threading the policy through those handlers. The shared-projects branch of
+    /// <c>GetMyProjects</c> passes the resolved <c>editor</c>/<c>viewer</c> role explicitly (R17).
+    /// </summary>
+    public static ProjectResponse From(Project project, EffectiveRole role = EffectiveRole.Owner)
     {
         ArgumentNullException.ThrowIfNull(project);
         return new ProjectResponse
@@ -52,6 +67,7 @@ public sealed record ProjectResponse
             Icon = project.Icon,
             ParentId = project.ParentId?.Value,
             Visibility = project.Visibility,
+            Role = role.ToWireValue(),
             ArchivedAt = project.ArchivedAt,
             Version = project.Version,
             CreatedAt = project.CreatedAt,

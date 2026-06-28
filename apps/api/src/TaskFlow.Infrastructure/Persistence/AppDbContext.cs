@@ -17,6 +17,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<TaskFlow.Domain.TaskManagement.Project> Projects => Set<TaskFlow.Domain.TaskManagement.Project>();
 
+    public DbSet<TaskFlow.Domain.TaskManagement.ProjectMembership> ProjectMemberships => Set<TaskFlow.Domain.TaskManagement.ProjectMembership>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);

@@ -5,7 +5,9 @@ import { useState } from "react";
 
 import { ArchiveProjectDialog } from "@/components/projects/ArchiveProjectDialog";
 import { DeleteProjectDialog } from "@/components/projects/DeleteProjectDialog";
+import { MembersDialog } from "@/components/projects/MembersDialog";
 import { ProjectForm } from "@/components/projects/ProjectForm";
+import { ShareProjectDialog } from "@/components/projects/ShareProjectDialog";
 import { useProjectTasks } from "@/hooks/useProjectTasks";
 import { useArchivedProjects, useProjects, type ProjectResponse } from "@/hooks/useProjects";
 import { useProjectMutations } from "@/hooks/useProjectMutations";
@@ -74,6 +76,18 @@ export function Sidebar() {
   const [editing, setEditing] = useState<ProjectResponse | null>(null);
   const [deleting, setDeleting] = useState<ProjectResponse | null>(null);
   const [archiving, setArchiving] = useState<ProjectResponse | null>(null);
+  const [sharing, setSharing] = useState<ProjectResponse | null>(null);
+  const [managing, setManaging] = useState<ProjectResponse | null>(null);
+
+  // A personal project is shared via the confirm dialog; a shared project opens its members roster (the
+  // hub for invite / role / transfer / remove / leave / unshare). Keyboard-reachable per FR-001/I.
+  const onShareOrManage = (project: ProjectResponse) => {
+    if (project.visibility === "shared") {
+      setManaging(project);
+    } else {
+      setSharing(project);
+    }
+  };
 
   const activeChildCount = (project: ProjectResponse) =>
     active.filter((p) => p.parentId === project.id).length;
@@ -121,6 +135,7 @@ export function Sidebar() {
                 onEdit={() => setEditing(node.project)}
                 onArchive={() => onArchive(node.project)}
                 onDelete={() => setDeleting(node.project)}
+                onShareOrManage={() => onShareOrManage(node.project)}
               />
               {node.children.length > 0 ? (
                 <ul className="tf-sidebar__children">
@@ -131,6 +146,7 @@ export function Sidebar() {
                         onEdit={() => setEditing(child.project)}
                         onArchive={() => onArchive(child.project)}
                         onDelete={() => setDeleting(child.project)}
+                        onShareOrManage={() => onShareOrManage(child.project)}
                       />
                     </li>
                   ))}
@@ -171,6 +187,12 @@ export function Sidebar() {
           childCount={activeChildCount(archiving)}
         />
       ) : null}
+      {sharing ? (
+        <ShareProjectDialog open onClose={() => setSharing(null)} project={sharing} />
+      ) : null}
+      {managing ? (
+        <MembersDialog open onClose={() => setManaging(null)} project={managing} />
+      ) : null}
     </nav>
   );
 }
@@ -186,12 +208,19 @@ function ProjectRow({
   onEdit,
   onArchive,
   onDelete,
+  onShareOrManage,
 }: {
   project: ProjectResponse;
   onEdit: () => void;
   onArchive: () => void;
   onDelete: () => void;
+  onShareOrManage: () => void;
 }) {
+  const isShared = project.visibility === "shared";
+  // The caller's effective role (R17). On a personal project (always owner) sharing is offered; on a shared
+  // project the owner sees "Members" (manage) while a non-owner member sees "Members" (read-only + leave).
+  const shareLabel = isShared ? "Members" : "Share";
+
   return (
     <div className="tf-sidebar__project-row">
       <Link className="tf-sidebar__project" href={`/projects/${project.id}`} data-color={project.color}>
@@ -200,8 +229,23 @@ function ProjectRow({
         </span>
         <span className="tf-sidebar__swatch" aria-hidden="true" data-color={project.color} />
         <span className="tf-sidebar__name">{project.name}</span>
+        {isShared ? (
+          // Shared-visibility indicator: TEXT label (never color/icon alone, FR-044).
+          <span className="tf-sidebar__shared-indicator" data-testid="shared-indicator">
+            <span aria-hidden="true">👥</span>
+            <span className="tf-visually-hidden">Shared project</span>
+          </span>
+        ) : null}
       </Link>
       <span className="tf-sidebar__project-actions">
+        <button
+          type="button"
+          className="tf-icon-button"
+          aria-label={`${shareLabel === "Members" ? "Manage members of" : "Share"} ${project.name}`}
+          onClick={onShareOrManage}
+        >
+          {shareLabel}
+        </button>
         <button type="button" className="tf-icon-button" aria-label={`Edit ${project.name}`} onClick={onEdit}>
           Edit
         </button>

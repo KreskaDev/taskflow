@@ -78,6 +78,23 @@ internal sealed class TaskFlowDocumentTransformer : IOpenApiDocumentTransformer
         SetOperation(document, "/api/tasks/{id}/project", OperationType.Patch, "moveTaskToProject", 404, 409, 422);
         SetOperation(document, "/api/projects/{id}/tasks", OperationType.Get, "listProjectTasks", 404);
 
+        // Sharing / membership surface (slice 007, contracts/openapi.yaml). Same pattern: the success bodies
+        // auto-emit from the endpoint signatures; here we stamp the stable operationIds and the
+        // exception-driven ProblemDetails responses (401 always, plus 403/404/409/422 per op). This slice is
+        // the FIRST USE of the pre-provisioned `forbidden` (403) and `last_owner` (409, an errorCode branch
+        // of the shared Conflict response) — the ErrorCodes enum is UNCHANGED (R16). share is owner-only on a
+        // still-personal project (non-owner → 404, never 403); leave is self-service (no 403 — a non-member
+        // is 404). The 409 covers version_conflict everywhere and additionally last_owner on
+        // change-role/remove/leave (clients branch on errorCode, ADR-0009).
+        SetOperation(document, "/api/projects/{id}/share", OperationType.Patch, "shareProject", 404, 409, 422);
+        SetOperation(document, "/api/projects/{id}/unshare", OperationType.Patch, "unshareProject", 403, 404, 409);
+        SetOperation(document, "/api/projects/{id}/owner", OperationType.Patch, "transferProjectOwnership", 403, 404, 409, 422);
+        SetOperation(document, "/api/projects/{id}/members", OperationType.Get, "listProjectMembers", 404);
+        SetOperation(document, "/api/projects/{id}/members", OperationType.Post, "inviteProjectMember", 403, 404, 409, 422);
+        SetOperation(document, "/api/projects/{id}/members/{userId}", OperationType.Patch, "changeProjectMemberRole", 403, 404, 409, 422);
+        SetOperation(document, "/api/projects/{id}/members/{userId}", OperationType.Delete, "removeProjectMember", 403, 404, 409);
+        SetOperation(document, "/api/projects/{id}/membership", OperationType.Delete, "leaveProject", 404, 409);
+
         return Task.CompletedTask;
     }
 
@@ -112,8 +129,9 @@ internal sealed class TaskFlowDocumentTransformer : IOpenApiDocumentTransformer
     /// <summary>The documented purpose of each exception-driven status code stamped by the transformer.</summary>
     private static readonly Dictionary<int, string> ProblemDescriptions = new()
     {
-        [404] = "The task does not exist, is soft-deleted, or belongs to another user (errorCode = not_found).",
-        [409] = "The write carried a stale version (optimistic-concurrency conflict; errorCode = version_conflict).",
+        [403] = "The caller is a member but lacks the required role for this operation (errorCode = forbidden).",
+        [404] = "The resource does not exist, is soft-deleted, or the caller is not permitted to observe it (errorCode = not_found).",
+        [409] = "A state conflict: a stale version (errorCode = version_conflict) or the last-owner guard (errorCode = last_owner).",
         [422] = "Request validation failed (errorCode = validation_failed).",
     };
 

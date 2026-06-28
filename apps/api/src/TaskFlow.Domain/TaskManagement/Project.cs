@@ -1,5 +1,6 @@
 using TaskFlow.Domain.Common;
 using TaskFlow.Domain.IdentityAccess;
+using TaskFlow.Domain.TaskManagement.Events;
 
 namespace TaskFlow.Domain.TaskManagement;
 
@@ -29,8 +30,11 @@ public sealed class Project : AggregateRoot<ProjectId>
 {
     private const int MaxNameLength = 200;
 
-    /// <summary>The default (and, this slice, only writable) visibility value (R11).</summary>
+    /// <summary>The default visibility value (R11). A project starts personal.</summary>
     public const string PersonalVisibility = "personal";
+
+    /// <summary>The shared visibility value (research R3) — made writable this slice by <see cref="Share"/>.</summary>
+    public const string SharedVisibility = "shared";
 
     private Project()
     {
@@ -222,6 +226,106 @@ public sealed class Project : AggregateRoot<ProjectId>
 
         DeletedAt = utcNow;
         Touch(utcNow);
+    }
+
+    /// <summary>
+    /// Converts a personal project to <c>shared</c> (research R3, FR-058) — the <b>first legal write</b> of
+    /// <see cref="SharedVisibility"/> (slice 004 froze the value at <c>personal</c>). Valid only from
+    /// <c>personal</c>; a freshly shared project has zero membership rows (the owner is implicit via
+    /// <see cref="OwnerId"/> — members are added by separate invites). Bumps <see cref="Version"/>, stamps
+    /// <see cref="UpdatedAt"/>, and raises <see cref="ProjectShared"/> (R13).
+    /// </summary>
+    /// <param name="utcNow">The current UTC time (injected for testability).</param>
+    /// <exception cref="InvalidOperationException">The project is not currently personal.</exception>
+    public void Share(DateTime utcNow)
+    {
+        if (Visibility != PersonalVisibility)
+        {
+            throw new InvalidOperationException("Only a personal project can be shared.");
+        }
+
+        Visibility = SharedVisibility;
+        Touch(utcNow);
+        AddDomainEvent(new ProjectShared(Id, OwnerId));
+    }
+
+    /// <summary>
+    /// Re-personalizes a shared project (research R3, FR-058): flips <see cref="Visibility"/> back to
+    /// <c>personal</c>. The handler removes ALL membership rows in the same transaction (R3) — this method
+    /// only flips the project's own state; <see cref="OwnerId"/> and the project's tasks are retained. Bumps
+    /// <see cref="Version"/>, stamps <see cref="UpdatedAt"/>, and raises <see cref="ProjectUnshared"/> (R13).
+    /// </summary>
+    /// <param name="utcNow">The current UTC time (injected for testability).</param>
+    /// <exception cref="InvalidOperationException">The project is not currently shared.</exception>
+    public void Unshare(DateTime utcNow)
+    {
+        if (Visibility != SharedVisibility)
+        {
+            throw new InvalidOperationException("Only a shared project can be unshared.");
+        }
+
+        Visibility = PersonalVisibility;
+        Touch(utcNow);
+        AddDomainEvent(new ProjectUnshared(Id, OwnerId));
+    }
+
+    /// <summary>
+    /// Reassigns <see cref="OwnerId"/> to <paramref name="newOwner"/> (research R6, FR-094) — the <b>only</b>
+    /// legal mutation of the otherwise-immutable owner. Valid only on a shared project. The handler performs
+    /// the surrounding membership reconciliation (remove the new owner's row, insert an <c>editor</c> row for
+    /// the prior owner) in the same transaction; this method only moves the anchor. Bumps
+    /// <see cref="Version"/>, stamps <see cref="UpdatedAt"/>, and raises <see cref="OwnerTransferred"/> (R13).
+    /// </summary>
+    /// <param name="newOwner">The current member who becomes the new owner.</param>
+    /// <param name="utcNow">The current UTC time (injected for testability).</param>
+    /// <exception cref="InvalidOperationException">The project is not shared, or the target is already the owner.</exception>
+    public void TransferOwnerTo(UserId newOwner, DateTime utcNow)
+    {
+        if (Visibility != SharedVisibility)
+        {
+            throw new InvalidOperationException("Ownership can only be transferred on a shared project.");
+        }
+
+        if (newOwner == OwnerId)
+        {
+            throw new InvalidOperationException("The target is already the owner.");
+        }
+
+        var priorOwner = OwnerId;
+        OwnerId = newOwner;
+        Touch(utcNow);
+        AddDomainEvent(new OwnerTransferred(Id, priorOwner, newOwner));
+    }
+
+    /// <summary>
+    /// Advances the optimistic-concurrency token for a membership-set mutation (invite / change-role /
+    /// remove / leave) that changes the project's sharing state without altering a <see cref="Project"/>
+    /// field. The single <see cref="Version"/> token guards the whole sharing state (R1/R11), so every
+    /// membership command bumps it; the membership-row mutation and any <c>MembershipRevoked</c> event are
+    /// the handler's responsibility. Stamps <see cref="UpdatedAt"/> and bumps <see cref="Version"/>.
+    /// </summary>
+    /// <param name="utcNow">The current UTC time (injected for testability).</param>
+    public void RecordMembershipChange(DateTime utcNow) => Touch(utcNow);
+
+    /// <summary>
+    /// The PURE last-owner guard (research R7, mirroring <see cref="EnsureNestingAllowed"/>). Under the
+    /// single-immutable-owner model the "last owner" degenerates to "the owner", so any leave / remove /
+    /// demote whose <paramref name="target"/> equals the project's <see cref="OwnerId"/> is rejected with a
+    /// recoverable <see cref="LastOwnerException"/> (→ 409 <c>last_owner</c>). Called by the handler
+    /// <b>before</b> the membership-row lookup (the owner has no row), so the owner-as-target case yields the
+    /// actionable "transfer first" message instead of a misleading 404. A no-op for any other target.
+    /// </summary>
+    /// <param name="project">The project whose ownership anchor is checked.</param>
+    /// <param name="target">The user the operation targets.</param>
+    /// <exception cref="LastOwnerException"><paramref name="target"/> is the project's owner.</exception>
+    public static void EnsureNotLastOwner(Project project, UserId target)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+
+        if (target == project.OwnerId)
+        {
+            throw new LastOwnerException();
+        }
     }
 
     private static string NormalizeName(string name)

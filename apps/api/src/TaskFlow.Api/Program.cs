@@ -53,6 +53,7 @@ builder.Services.AddScoped<IResourceAuthorizationPolicy, ResourceAuthorizationPo
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 builder.Services.AddScoped<IProjectRepository, ProjectRepository>();
+builder.Services.AddScoped<IProjectMembershipRepository, ProjectMembershipRepository>();
 
 // --- EF Core write-side + Wolverine durable messaging (Postgres outbox/inbox) ---
 builder.Services.AddDbContextWithWolverineIntegration<AppDbContext>(o => o.UseNpgsql(connectionString));
@@ -81,6 +82,16 @@ builder.Host.UseWolverine(opts =>
     // transactional destination instead of being silently dropped as an unrouted publish.
     opts.PublishMessage<ReapDeletedTask>().ToLocalQueue("task-reaper");
 
+    // Slice-007 membership/sharing domain events (research R13). Each is raised by a sharing/membership
+    // command and routed to an outbox-backed durable local queue (mirrors account-deletion) so the
+    // publish enrolls in the command's transaction (atomic with the project/membership write) and is
+    // observable via the tracking harness. This slice RAISES but does not CONSUME them (no-op handlers);
+    // the real consumers ship with slices 008/016/017.
+    opts.PublishMessage<ProjectShared>().ToLocalQueue("membership-events");
+    opts.PublishMessage<ProjectUnshared>().ToLocalQueue("membership-events");
+    opts.PublishMessage<OwnerTransferred>().ToLocalQueue("membership-events");
+    opts.PublishMessage<MembershipRevoked>().ToLocalQueue("membership-events");
+
     // Single-node deployment (one VPS, ~10 users): Solo durability skips the distributed
     // leader-election/agent machinery, giving faster, cleaner startup/shutdown (also avoids a
     // background-agent logger race during WebApplicationFactory teardown in integration tests).
@@ -97,7 +108,14 @@ builder.Host.UseWolverine(opts =>
     opts.Policies.AddMiddleware(
         typeof(AuthorizationMiddleware),
         chain => chain.MessageType != typeof(AccountDeletionRequested)
-            && chain.MessageType != typeof(ReapDeletedTask));
+            && chain.MessageType != typeof(ReapDeletedTask)
+            // The slice-007 membership events are processed off the durable local queue (no HttpContext),
+            // so exclude their no-op handlers from the deny-by-default auth policy — same exemption as
+            // AccountDeletionRequested. Every real command/query keeps deny-by-default.
+            && chain.MessageType != typeof(ProjectShared)
+            && chain.MessageType != typeof(ProjectUnshared)
+            && chain.MessageType != typeof(OwnerTransferred)
+            && chain.MessageType != typeof(MembershipRevoked));
 });
 
 // --- Built-in .NET 9 OpenAPI document at /openapi/v1.json (R5) ---

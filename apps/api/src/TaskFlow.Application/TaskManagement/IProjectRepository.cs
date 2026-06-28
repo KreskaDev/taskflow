@@ -29,6 +29,25 @@ public interface IProjectRepository
     Task<Project?> FindOwnedIncludingDeletedAsync(ProjectId id, UserId owner, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Finds a NON-deleted project the caller may READ (slice 007, R8): the caller is either the
+    /// <c>owner_id</c> OR (the project is <c>shared</c> AND the caller holds a <c>project_memberships</c>
+    /// row). Returns <c>null</c> for a foreign personal project, a shared project the caller is not a member
+    /// of, or an absent/tombstoned id — the handler maps that to 404 (existence not disclosed, R9). Archived
+    /// rows ARE returned (archive is a reversible state). This is the load that lets the visibility-dispatch
+    /// handlers see a shared project's <see cref="Project.Visibility"/> before the role check; the membership
+    /// set is loaded separately for the role decision (the manage/leave 403-vs-404 split).
+    /// </summary>
+    Task<Project?> FindReadableAsync(ProjectId id, UserId caller, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Loads the NON-deleted projects whose ids are in <paramref name="ids"/>, filtered to the ACTIVE set
+    /// (<paramref name="includeArchived"/> = false) or the ARCHIVED set (true) — the two disjoint sidebar
+    /// views (R8). Used by <c>GetMyProjects</c> to materialize the shared projects the caller is a member of
+    /// (the ids come from <c>IProjectMembershipRepository.ListProjectIdsForUserAsync</c>, R17).
+    /// </summary>
+    Task<IReadOnlyList<Project>> ListByIdsAsync(IReadOnlyCollection<ProjectId> ids, bool includeArchived, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Lists the caller's NON-deleted projects (owner-scoped + <c>deleted_at IS NULL</c>) for the
     /// sidebar/archived listing (R8). The two view sets are DISJOINT:
     /// <list type="bullet">

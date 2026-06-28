@@ -4,6 +4,7 @@ using FluentValidation;
 using Microsoft.Extensions.Logging;
 using TaskFlow.Application.Authorization;
 using TaskFlow.Application.Errors;
+using LastOwnerException = TaskFlow.Domain.TaskManagement.LastOwnerException;
 
 namespace TaskFlow.Api.Middleware;
 
@@ -85,6 +86,10 @@ internal sealed class ProblemDetailsMiddleware(RequestDelegate next, ILogger<Pro
         UnauthenticatedException => (StatusCodes.Status401Unauthorized, "unauthenticated", "Authentication required", null),
         ForbiddenException => (StatusCodes.Status403Forbidden, "forbidden", "Access denied", null),
         NotFoundException => (StatusCodes.Status404NotFound, "not_found", "Resource not found", null),
+        // last_owner shares HTTP 409 with version_conflict but is distinguished by errorCode (ADR-0009 /
+        // self-review M1): a recoverable STATE conflict ("transfer ownership first"), NOT field validation.
+        // The code was pre-provisioned in the ErrorCodes array since slice 004; only this mapping is new.
+        LastOwnerException => (StatusCodes.Status409Conflict, "last_owner", "Last owner", null),
         VersionConflictException => (StatusCodes.Status409Conflict, "version_conflict", "Version conflict", null),
         ValidationException ve => (StatusCodes.Status422UnprocessableEntity, "validation_failed", "Validation failed", ToErrors(ve)),
         _ => (StatusCodes.Status500InternalServerError, "internal_error", "An unexpected error occurred", null),

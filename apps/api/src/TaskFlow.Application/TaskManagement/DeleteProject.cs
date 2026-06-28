@@ -65,22 +65,25 @@ public static class DeleteProjectHandler
         ICurrentUser currentUser,
         IProjectRepository projects,
         ITaskRepository tasks,
+        IProjectMembershipRepository members,
+        IResourceAuthorizationPolicy authorization,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(currentUser);
         ArgumentNullException.ThrowIfNull(projects);
         ArgumentNullException.ThrowIfNull(tasks);
+        ArgumentNullException.ThrowIfNull(members);
+        ArgumentNullException.ThrowIfNull(authorization);
 
         var owner = currentUser.Id;
 
-        var project = await projects
-            .FindOwnedAsync(command.Id, owner, cancellationToken)
+        // Manage-op visibility dispatch (R8/R9): personal arm unchanged (non-owner → 404); shared arm
+        // owner-only (editor/viewer member → 403, non-member → 404). The owner-scoped disposition logic
+        // below is unchanged — on the manage path the caller IS the owner.
+        var project = await MembershipGuards
+            .LoadOwnerManagedProjectAsync(command.Id, currentUser, projects, members, authorization, cancellationToken)
             .ConfigureAwait(false);
-        if (project is null)
-        {
-            throw new NotFoundException();
-        }
 
         if (project.Version != command.Version)
         {

@@ -110,6 +110,59 @@ public static class ProjectEndpoints
     }
 
     /// <summary>
+    /// Share the caller's own personal project (personal → shared, FR-058). Owner-only: a non-owner → 404
+    /// (the project is still personal, so existence is not disclosed). A stale <c>version</c> → 409.
+    /// Confirmation-gated, NOT under the 30s undo (FR-064).
+    /// </summary>
+    [WolverinePatch("/api/projects/{id}/share")]
+    public static Task<ProjectResponse> Share(Guid id, VersionOnlyRequest request, IMessageBus bus)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(bus);
+        return bus.InvokeAsync<ProjectResponse>(new ShareProject
+        {
+            Id = ProjectId.From(id),
+            Version = request.Version,
+        });
+    }
+
+    /// <summary>
+    /// Unshare a shared project (shared → personal, FR-058/FR-059), removing ALL membership rows in the
+    /// same transaction. Owner-only manage op: an insufficient-role member → 403, a non-member → 404. A
+    /// stale <c>version</c> → 409. Confirmation-gated with a blast-radius preview (FR-064).
+    /// </summary>
+    [WolverinePatch("/api/projects/{id}/unshare")]
+    public static Task<ProjectResponse> Unshare(Guid id, VersionOnlyRequest request, IMessageBus bus)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(bus);
+        return bus.InvokeAsync<ProjectResponse>(new UnshareProject
+        {
+            Id = ProjectId.From(id),
+            Version = request.Version,
+        });
+    }
+
+    /// <summary>
+    /// Transfer ownership of a shared project to a current member (FR-094) — the only move of the immutable
+    /// <c>ownerId</c>. Owner-only: editor/viewer member → 403, non-member → 404. Target who is a non-member or
+    /// the current owner → 422; a stale <c>version</c> → 409. Returns the project with the caller's new
+    /// (editor) role.
+    /// </summary>
+    [WolverinePatch("/api/projects/{id}/owner")]
+    public static Task<ProjectResponse> TransferOwner(Guid id, TransferOwnershipRequest request, IMessageBus bus)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(bus);
+        return bus.InvokeAsync<ProjectResponse>(new TransferOwnership
+        {
+            Id = ProjectId.From(id),
+            NewOwnerId = TaskFlow.Domain.IdentityAccess.UserId.From(request.UserId),
+            Version = request.Version,
+        });
+    }
+
+    /// <summary>
     /// List the caller's own tasks under a project (owner + project scoped, R6). A foreign/absent project →
     /// 404 (the ownership posture, R13) — never a leaky 200 empty list. Reuses <c>TaskResponse</c>.
     /// </summary>

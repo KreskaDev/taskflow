@@ -23,6 +23,37 @@ public sealed class ProjectRepository(AppDbContext db) : IProjectRepository
     public Task<Project?> FindOwnedIncludingDeletedAsync(ProjectId id, UserId owner, CancellationToken cancellationToken) =>
         db.Projects.FirstOrDefaultAsync(p => p.Id == id && p.OwnerId == owner, cancellationToken);
 
+    public Task<Project?> FindReadableAsync(ProjectId id, UserId caller, CancellationToken cancellationToken) =>
+        // Readable iff the caller owns it OR it is shared and the caller holds a membership row (R8). The
+        // EXISTS subquery over project_memberships keeps the personal-project path identical to
+        // FindOwnedAsync (the OR short-circuits to owner_id), so the slice-004 ownership-404 is unchanged; a
+        // shared project is additionally loadable for its members. Archived rows ARE returned.
+        db.Projects.FirstOrDefaultAsync(
+            p => p.Id == id
+                && p.DeletedAt == null
+                && (p.OwnerId == caller
+                    || (p.Visibility == Project.SharedVisibility
+                        && db.ProjectMemberships.Any(m => m.ProjectId == id && m.UserId == caller))),
+            cancellationToken);
+
+    public async Task<IReadOnlyList<Project>> ListByIdsAsync(IReadOnlyCollection<ProjectId> ids, bool includeArchived, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(ids);
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        return await db.Projects
+            .Where(p => ids.Contains(p.Id)
+                && p.DeletedAt == null
+                && (includeArchived ? p.ArchivedAt != null : p.ArchivedAt == null))
+            .OrderBy(p => p.Name)
+            .ThenBy(p => p.Id)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public async Task<IReadOnlyList<Project>> ListOwnedAsync(UserId owner, bool includeArchived, CancellationToken cancellationToken) =>
         await db.Projects
             .Where(p => p.OwnerId == owner

@@ -156,6 +156,8 @@ export function apiAs(taskFlowUserId: string): {
   createTask: (input: { title: string; position: string }) => Promise<{ id: string; version: number }>;
   moveTask: (taskId: string, projectId: string | null, version: number) => Promise<void>;
   archiveProject: (projectId: string, version: number, childDisposition?: "cascade" | "orphan_to_top") => Promise<void>;
+  shareProject: (projectId: string, version: number) => Promise<{ version: number }>;
+  inviteMember: (projectId: string, email: string, role: "editor" | "viewer", version: number) => Promise<{ userId: string }>;
 } {
   const base = process.env.API_INTERNAL_URL as string;
 
@@ -204,6 +206,19 @@ export function apiAs(taskFlowUserId: string): {
         body: childDisposition ? { version, childDisposition } : { version },
       });
       if (!res.ok) throw new Error(`archiveProject failed (${String(res.status)}): ${await res.text()}`);
+    },
+    async shareProject(projectId, version) {
+      const res = await authedFetch(`/api/projects/${projectId}/share`, { method: "PATCH", body: { version } });
+      if (!res.ok) throw new Error(`shareProject failed (${String(res.status)}): ${await res.text()}`);
+      return (await res.json()) as { version: number };
+    },
+    async inviteMember(projectId, email, role, version) {
+      const res = await authedFetch(`/api/projects/${projectId}/members`, {
+        method: "POST",
+        body: { email, role, version },
+      });
+      if (!res.ok) throw new Error(`inviteMember failed (${String(res.status)}): ${await res.text()}`);
+      return (await res.json()) as { userId: string };
     },
   };
 }

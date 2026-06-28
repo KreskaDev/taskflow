@@ -15,6 +15,19 @@ public interface IUserRepository
     /// <summary>Finds a user by TaskFlow id, or <c>null</c> if the row no longer exists (e.g. hard-deleted).</summary>
     Task<User?> FindByIdAsync(UserId id, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Finds an admitted user by email — case-insensitive exact match (slice 007 invite-by-email
+    /// resolution, R4). Returns <c>null</c> when no admitted user has that email (the handler maps that to a
+    /// 422 on the <c>email</c> field; no pending record is created, OOS-18).
+    /// </summary>
+    Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Loads the users whose ids are in <paramref name="ids"/> (slice 007 members-roster display-name
+    /// resolution, R17). Order is unspecified; the caller maps by id.
+    /// </summary>
+    Task<IReadOnlyList<User>> ListByIdsAsync(IReadOnlyCollection<UserId> ids, CancellationToken cancellationToken);
+
     /// <summary>Stages a newly created user for insertion.</summary>
     void Add(User user);
 
