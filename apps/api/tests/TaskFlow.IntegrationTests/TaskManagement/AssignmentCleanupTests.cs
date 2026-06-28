@@ -104,4 +104,23 @@ public sealed class AssignmentCleanupTests : SharingTestBase
 
         (await AssigneeIdsAsync(id)).Should().BeEmpty("the task moved to the Inbox (personal) — assignees cleared (R5)");
     }
+
+    [Fact]
+    public async Task Edit_moving_the_task_to_the_inbox_clears_assignees()
+    {
+        // The /edit whole-object replace can also move a task; moving a shared task to the Inbox makes it
+        // personal → assignees cleared (FR-069), persisted via the owned-collection delete.
+        var owner = await CreateUserAsync("g-cl-edo", "cledo@example.com", "Owner");
+        var token = TokenFor(owner);
+        var project = await ShareProjectAsync(token, await CreateProjectAsync(token));
+        var id = await SeedTaskAsync(owner, "Shared task", projectId: project.Id);
+        await AssignAsync(token, id, owner.Value);
+        var version = (await LoadTaskAsync(id))!.Version;
+
+        using var response = await SendAsync(HttpMethod.Patch, $"/api/tasks/{id}/edit", token,
+            new { title = "Shared task", description = (string?)null, priority = (string?)null, dueDate = (DateTime?)null, dueHasTime = (bool?)null, projectId = (string?)null, version });
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        (await AssigneeIdsAsync(id)).Should().BeEmpty("a /edit move to the Inbox clears assignees (FR-069)");
+    }
 }

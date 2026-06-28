@@ -152,6 +152,7 @@ public sealed class TaskConfiguration : IEntityTypeConfiguration<TaskEntity>
                 .WithMany()
                 .HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+            a.HasIndex(x => x.UserId).HasDatabaseName("ix_task_assignees_user_id"); // snake_case index convention
         });
 
         // Domain events are an in-memory, transient concern — never persisted.

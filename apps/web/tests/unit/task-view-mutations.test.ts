@@ -5,6 +5,7 @@ import type { components } from "@/lib/api/generated/schema";
 import { TASKS_QUERY_KEY } from "@/hooks/useTasks";
 import { TODAY_QUERY_KEY } from "@/hooks/useTodayTasks";
 import { UPCOMING_QUERY_KEY } from "@/hooks/useUpcomingTasks";
+import { ASSIGNED_QUERY_KEY, type AssignedResponse } from "@/hooks/useAssignedTasks";
 import {
   rescheduleDueDateMutationOptions,
   setPriorityMutationOptions,
@@ -145,6 +146,20 @@ describe("set-assignees optimistic surface (slice 008)", () => {
     await opts.onMutate({ id: "a", assigneeIds: ["u1", "u2"], version: 0 });
 
     const stored = qc.getQueryData<TodayResponse>(TODAY_QUERY_KEY)!.groups[0]!.tasks.find((t) => t.id === "a")!;
+    expect(stored.assignees).toEqual(["u1", "u2"]);
+  });
+
+  it("resolves + repaints a task that lives ONLY in the Assigned cache (the headline FR-071 surface)", async () => {
+    // Regression guard: a dateless/far-future shared task assigned to the caller is NOT in Inbox/Today/
+    // Upcoming — only in the assigned cache. The optimistic recipe must still find + repaint it.
+    freezeNow();
+    const qc = new QueryClient();
+    const a = row({ id: "a", projectId: "p1", assignees: ["u1"] });
+    qc.setQueryData<AssignedResponse>(ASSIGNED_QUERY_KEY, { groups: [{ projectId: "p1", tasks: [a] }] });
+
+    await setTaskAssigneesMutationOptions(qc).onMutate({ id: "a", assigneeIds: ["u1", "u2"], version: 0 });
+
+    const stored = qc.getQueryData<AssignedResponse>(ASSIGNED_QUERY_KEY)!.groups[0]!.tasks.find((t) => t.id === "a")!;
     expect(stored.assignees).toEqual(["u1", "u2"]);
   });
 

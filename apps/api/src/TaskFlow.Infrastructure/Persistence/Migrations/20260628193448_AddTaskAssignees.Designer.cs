@@ -12,7 +12,7 @@ using TaskFlow.Infrastructure.Persistence;
 namespace TaskFlow.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260628184235_AddTaskAssignees")]
+    [Migration("20260628193448_AddTaskAssignees")]
     partial class AddTaskAssignees
     {
         /// <inheritdoc />
@@ -338,7 +338,8 @@ namespace TaskFlow.Infrastructure.Persistence.Migrations
 
                             b1.HasKey("TaskId", "UserId");
 
-                            b1.HasIndex("UserId");
+                            b1.HasIndex("UserId")
+                                .HasDatabaseName("ix_task_assignees_user_id");
 
                             b1.ToTable("task_assignees", (string)null);
 

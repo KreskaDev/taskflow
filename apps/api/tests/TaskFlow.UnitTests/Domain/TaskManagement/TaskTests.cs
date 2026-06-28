@@ -491,4 +491,28 @@ public sealed class TaskTests
 
         task.Assignees.Should().BeEmpty("a personal/Inbox task carries no assignees (FR-069)");
     }
+
+    [Fact]
+    public void EditTask_clears_assignees_on_a_real_project_change()
+    {
+        // The whole-object edit can ALSO move a task; it does NOT route through MoveToProject, so it must
+        // clear assignees on a real project change too (FR-069) — else a /edit move strands the old set.
+        var task = SharedProjectTask();
+        task.SetAssignees([UserId.New(), UserId.New()], UserId.New(), MutateInstant);
+
+        task.EditTask("Title", null, null, null, null, ProjectId.From(Guid.NewGuid()), LaterInstant);
+
+        task.Assignees.Should().BeEmpty("EditTask moving to a different project clears the assignee set");
+    }
+
+    [Fact]
+    public void EditTask_to_inbox_clears_assignees()
+    {
+        var task = SharedProjectTask();
+        task.SetAssignees([UserId.New()], UserId.New(), MutateInstant);
+
+        task.EditTask("Title", null, null, null, null, null, LaterInstant); // to the Inbox
+
+        task.Assignees.Should().BeEmpty("EditTask to the Inbox clears the assignee set (FR-069)");
+    }
 }

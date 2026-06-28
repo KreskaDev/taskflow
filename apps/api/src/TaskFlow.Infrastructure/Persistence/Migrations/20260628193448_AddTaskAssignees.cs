@@ -36,7 +36,7 @@ namespace TaskFlow.Infrastructure.Persistence.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_task_assignees_user_id",
+                name: "ix_task_assignees_user_id",
                 table: "task_assignees",
                 column: "user_id");
         }

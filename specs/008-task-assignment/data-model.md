@@ -90,17 +90,17 @@ A pure relation row, owned by the `Task` aggregate. No behavior, no version of i
 
 ## 7. Assignment cleanup on membership loss (R5)
 
-The slice-007 membership-removal handlers gain an assignment-clear step, transactional with the membership mutation:
+Cleanup is **event-driven** for the membership-loss flows (consuming the slice-007 domain events built for it) and **inline** for the two aggregate-bypassing paths:
 
-| Flow (slice-007 handler) | Added cleanup |
+| Flow | Cleanup mechanism |
 |---|---|
-| `UnshareProject` (already `RemoveAllForProjectAsync`) | `ITaskRepository.ClearAssigneesForProjectAsync(projectId)` — delete ALL `task_assignees` for the project's tasks (the project reverts to personal; assignment no longer applies). |
-| `RemoveMember` / `LeaveProject` | `ITaskRepository.ClearAssigneesForUserInProjectAsync(projectId, userId)` — delete that user's `task_assignees` rows across the project's tasks. |
-| Account deletion (FR-085) | **Automatic** via the `user_id` FK `ON DELETE CASCADE` — no handler change. |
-| **Task moves project / to Inbox** (`MoveTaskToProject`, `EditTask` projectId change) | **`Task.MoveToProject` clears the assignee set** on a real project change (§1) — assignment is project-scoped (FR-069); a personal/Inbox task carries no assignees. Structural, no event. Tested on both move paths. |
-| **Delete shared project with `move_to_inbox`** (`DeleteProject`) | The bulk `MoveProjectTasksToInboxAsync` (`ExecuteUpdate`) bypasses the aggregate, so `DeleteProject`'s `move_to_inbox` branch ALSO calls `ClearAssigneesForProjectAsync(projectId)` in the same transaction. (`cascade` disposition needs no clear — tasks are soft-deleted; the `task_id` FK cascade clears rows at reap.) |
+| `UnshareProject` (raises `ProjectUnshared`) | **`ProjectUnsharedHandler`** consumes it → `ITaskRepository.ClearAssigneesForProjectAsync(projectId)` (delete ALL — the project reverts to personal). |
+| `RemoveMember` / `LeaveProject` (raise `MembershipRevoked`) | **`MembershipRevokedHandler`** consumes it → `ClearAssigneesForUserInProjectAsync(projectId, userId)`, **guarded by a current-membership re-check** so a role DEMOTION (which also raises `MembershipRevoked`) does NOT clear (a viewer is still a member). |
+| Account deletion (FR-085) | **Automatic** via the `user_id` FK `ON DELETE CASCADE` — no handler. |
+| **Task moves project / to Inbox** (`MoveTaskToProject`; `EditTask` projectId change) | **`Task.MoveToProject` AND `Task.EditTask` clear the assignee set** on a real project change (§1) — assignment is project-scoped (FR-069). Structural, no event. (`EditTask` does NOT route through `MoveToProject`, so it carries its own clear.) Tested on both paths. |
+| **Delete shared project with `move_to_inbox`** (`DeleteProject`) | INLINE: the bulk `MoveProjectTasksToInboxAsync` (`ExecuteUpdate`) bypasses the aggregate and nulls `project_id` first, so `DeleteProject`'s `move_to_inbox` branch calls `ClearAssigneesForProjectAsync(projectId)` BEFORE the move. (`cascade` disposition needs no clear — tasks soft-deleted; `task_id` FK cascade clears at reap.) |
 
-These are set-based `ExecuteDelete` bulk maintenance ops (like the slice-004 `MoveProjectTasksToInboxAsync`/`OrphanChildrenAsync`), run in the same per-message transaction as the membership change — no window where access is revoked but the assignment lingers.
+The `ClearAssignees*` ops are parameterized bulk SQL. Async cleanup is safe because the assignee row is **provenance only** (FR-066) — membership-gated reads already exclude a former member the instant membership ends, so a row lingering until the durable-queue handler runs is invisible (no access window).
 
 ---
 

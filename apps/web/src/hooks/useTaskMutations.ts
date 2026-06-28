@@ -11,7 +11,7 @@ import { assigneeSetSchema, createTaskSchema, editTaskSchema, type Priority, tas
 import { TASKS_QUERY_KEY } from "@/hooks/useTasks";
 import { TODAY_QUERY_KEY } from "@/hooks/useTodayTasks";
 import { UPCOMING_QUERY_KEY } from "@/hooks/useUpcomingTasks";
-import { ASSIGNED_QUERY_KEY } from "@/hooks/useAssignedTasks";
+import { ASSIGNED_QUERY_KEY, type AssignedResponse } from "@/hooks/useAssignedTasks";
 
 type TaskResponse = components["schemas"]["TaskResponse"];
 type TodayResponse = components["schemas"]["TodayResponse"];
@@ -25,6 +25,8 @@ interface ViewCachesSnapshot {
   previousTasks: TaskResponse[] | undefined;
   previousToday: TodayResponse | undefined;
   previousUpcoming: UpcomingResponse | undefined;
+  /** The "Assigned to me" cache (slice 008) — captured only by the set-assignees recipe that paints it. */
+  previousAssigned?: AssignedResponse | undefined;
 }
 
 /** Snapshots the Inbox + Today + Upcoming caches (for rollback). */
@@ -75,6 +77,9 @@ function rollbackViewCaches(queryClient: QueryClient, snapshot: ViewCachesSnapsh
   queryClient.setQueryData<TaskResponse[] | undefined>(TASKS_QUERY_KEY, snapshot.previousTasks);
   queryClient.setQueryData<TodayResponse | undefined>(TODAY_QUERY_KEY, snapshot.previousToday);
   queryClient.setQueryData<UpcomingResponse | undefined>(UPCOMING_QUERY_KEY, snapshot.previousUpcoming);
+  if (snapshot.previousAssigned !== undefined) {
+    queryClient.setQueryData<AssignedResponse | undefined>(ASSIGNED_QUERY_KEY, snapshot.previousAssigned);
+  }
 }
 
 /** Reconciles the triage caches with server truth (on settle). */
@@ -84,13 +89,19 @@ async function settleViewCaches(queryClient: QueryClient): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: UPCOMING_QUERY_KEY });
 }
 
-/** Finds a task row across the Inbox + Today + Upcoming caches (the source for an optimistic edit). */
+/** Finds a task row across the Inbox + Today + Upcoming + Assigned caches (the source for an optimistic edit). */
 function findTaskInViewCaches(queryClient: QueryClient, id: string): TaskResponse | undefined {
   const inbox = queryClient.getQueryData<TaskResponse[]>(TASKS_QUERY_KEY)?.find((t) => t.id === id);
   if (inbox) return inbox;
   const today = flattenToday(queryClient.getQueryData<TodayResponse>(TODAY_QUERY_KEY)).find((t) => t.id === id);
   if (today) return today;
-  return flattenUpcoming(queryClient.getQueryData<UpcomingResponse>(UPCOMING_QUERY_KEY)).find((t) => t.id === id);
+  const upcoming = flattenUpcoming(queryClient.getQueryData<UpcomingResponse>(UPCOMING_QUERY_KEY)).find((t) => t.id === id);
+  if (upcoming) return upcoming;
+  // The "Assigned to me" view (slice 008): a dateless/far-future SHARED task assigned to the caller lives
+  // ONLY here (not Inbox/Today/Upcoming), so every DailyView operate verb on that surface must resolve its
+  // row + version from this cache too — else they silently no-op there (FR-071).
+  const assigned = queryClient.getQueryData<AssignedResponse>(ASSIGNED_QUERY_KEY);
+  return assigned?.groups.flatMap((g) => g.tasks).find((t) => t.id === id);
 }
 
 /**
@@ -976,8 +987,21 @@ export function setTaskAssigneesMutationOptions(queryClient: QueryClient): ViewM
       await queryClient.cancelQueries({ queryKey: UPCOMING_QUERY_KEY });
       await queryClient.cancelQueries({ queryKey: ASSIGNED_QUERY_KEY });
       const snapshot = snapshotViewCaches(queryClient);
+      snapshot.previousAssigned = queryClient.getQueryData<AssignedResponse>(ASSIGNED_QUERY_KEY);
       const row = findTaskInViewCaches(queryClient, variables.id);
       if (row) applyTaskToViewCaches(queryClient, { ...row, assignees: variables.assigneeIds }, new Date());
+      // Repaint the chip on the Assigned surface itself within 16ms (SC-003); membership changes
+      // (self-(un)assign) are reconciled by the onSettled invalidate.
+      queryClient.setQueryData<AssignedResponse>(ASSIGNED_QUERY_KEY, (old) =>
+        old == null
+          ? old
+          : {
+              groups: old.groups.map((g) => ({
+                ...g,
+                tasks: g.tasks.map((t) => (t.id === variables.id ? { ...t, assignees: variables.assigneeIds } : t)),
+              })),
+            },
+      );
       return snapshot;
     },
     onError: (_error, _variables, context): void => {

@@ -335,7 +335,8 @@ namespace TaskFlow.Infrastructure.Persistence.Migrations
 
                             b1.HasKey("TaskId", "UserId");
 
-                            b1.HasIndex("UserId");
+                            b1.HasIndex("UserId")
+                                .HasDatabaseName("ix_task_assignees_user_id");
 
                             b1.ToTable("task_assignees", (string)null);
 

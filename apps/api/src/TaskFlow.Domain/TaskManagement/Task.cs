@@ -299,6 +299,13 @@ public sealed class Task : AggregateRoot<TaskId>
         Priority = NormalizePriority(priority);
         DueDate = dueDate;
         DueHasTime = dueHasTime;
+        // slice 008 (FR-069): a real project change here (whole-object edit can also move a task) CLEARS the
+        // assignee set — same invariant as MoveToProject. EditTask does NOT route through MoveToProject, so
+        // the clear must be applied on this path too, else a /edit move would strand the old assignees.
+        if (ProjectId != projectId && _assignees.Count > 0)
+        {
+            _assignees.Clear();
+        }
         ProjectId = projectId;
         Touch(utcNow);
     }
