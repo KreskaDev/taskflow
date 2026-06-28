@@ -47,6 +47,7 @@ function row(overrides: Partial<TaskResponse> & Pick<TaskResponse, "id">): TaskR
     projectId: overrides.projectId ?? null,
     priority: overrides.priority ?? null,
     description: overrides.description ?? null,
+    assignees: overrides.assignees ?? [],
   };
 }
 

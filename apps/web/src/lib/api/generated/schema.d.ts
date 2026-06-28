@@ -344,6 +344,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tasks/assigned": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GET_api_tasks_assigned
+         * @description GET_api_tasks_assigned
+         */
+        get: operations["getAssignedToMe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tasks/{id}/title": {
         parameters: {
             query?: never;
@@ -484,6 +504,26 @@ export interface paths {
         patch: operations["editTask"];
         trace?: never;
     };
+    "/api/tasks/{id}/assignees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * PATCH_api_tasks_id_assignees
+         * @description PATCH_api_tasks_id_assignees
+         */
+        patch: operations["setTaskAssignees"];
+        trace?: never;
+    };
     "/api/users/ensure": {
         parameters: {
             query?: never;
@@ -564,6 +604,14 @@ export interface components {
             /** Format: int32 */
             version: number;
             childDisposition?: string | null;
+        };
+        AssignedGroup: {
+            /** Format: uuid */
+            projectId: string;
+            tasks: components["schemas"]["TaskResponse"][];
+        };
+        AssignedResponse: {
+            groups: components["schemas"]["AssignedGroup"][];
         };
         ChangeMemberRoleRequest: {
             role: string;
@@ -679,6 +727,11 @@ export interface components {
             /** Format: int32 */
             version: number;
         };
+        SetTaskAssigneesRequest: {
+            assigneeIds: string[];
+            /** Format: int32 */
+            version: number;
+        };
         SetTaskStatusRequest: {
             status: string;
             /** Format: int32 */
@@ -705,6 +758,7 @@ export interface components {
             projectId?: string | null;
             priority?: string | null;
             description?: string | null;
+            assignees: string[];
         };
         TodayGroup: {
             /** Format: uuid */
@@ -735,6 +789,7 @@ export interface components {
             projectId?: string | null;
             priority?: string | null;
             description?: string | null;
+            assignees: string[];
             isOverdue: boolean;
         };
         TransferOwnershipRequest: {
@@ -1870,6 +1925,44 @@ export interface operations {
             };
         };
     };
+    getAssignedToMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignedResponse"];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     renameTask: {
         parameters: {
             query?: never;
@@ -2281,6 +2374,77 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["EditTaskRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The caller is a member but lacks the required role for this operation (errorCode = forbidden). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The resource does not exist, is soft-deleted, or the caller is not permitted to observe it (errorCode = not_found). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description A state conflict: a stale version (errorCode = version_conflict) or the last-owner guard (errorCode = last_owner). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Request validation failed (errorCode = validation_failed). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    setTaskAssignees: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetTaskAssigneesRequest"];
             };
         };
         responses: {

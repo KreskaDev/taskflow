@@ -200,6 +200,7 @@ export function createTaskMutationOptions(queryClient: QueryClient): OptimisticC
         completedAt: null,
         dueDate: variables.dueDate ?? null,
         dueHasTime: variables.dueHasTime ?? null,
+        assignees: [], // a freshly captured (Inbox) task has no assignees (slice 008)
       };
 
       // Newest-first: the rank already sorts before the current head, so prepend verbatim.

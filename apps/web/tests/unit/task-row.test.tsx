@@ -31,6 +31,7 @@ function makeTask(overrides: Partial<TaskResponse> = {}): TaskResponse {
     completedAt: null,
     dueDate: null,
     dueHasTime: null,
+    assignees: [],
     ...overrides,
   };
 }
