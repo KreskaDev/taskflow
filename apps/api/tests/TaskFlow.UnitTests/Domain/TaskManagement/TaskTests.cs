@@ -401,4 +401,94 @@ public sealed class TaskTests
 
         task.Description.Should().BeNull("a whitespace-only description is normalized to no description");
     }
+
+    // ── slice 008: assignees (R2/R3) ───────────────────────────────────────────────────────
+
+    private static Task SharedProjectTask()
+    {
+        var task = NewTask();
+        task.MoveToProject(ProjectId.From(Guid.NewGuid()), MutateInstant); // assignment is shared-project only
+        return task;
+    }
+
+    private static TaskFlow.Domain.TaskManagement.Events.TaskAssigned? LastAssignedEvent(Task task) =>
+        task.DomainEvents.OfType<TaskFlow.Domain.TaskManagement.Events.TaskAssigned>().LastOrDefault();
+
+    [Fact]
+    public void SetAssignees_adds_the_set_bumps_version_and_raises_the_added_delta()
+    {
+        var task = SharedProjectTask();
+        var versionBefore = task.Version;
+        var actor = UserId.New();
+        var u1 = UserId.New();
+        var u2 = UserId.New();
+
+        task.SetAssignees([u1, u2], actor, LaterInstant);
+
+        task.Assignees.Select(a => a.UserId).Should().BeEquivalentTo([u1, u2]);
+        task.Version.Should().Be(versionBefore + 1);
+        var evt = LastAssignedEvent(task)!;
+        evt.AddedAssigneeIds.Should().BeEquivalentTo([u1, u2]);
+        evt.RemovedAssigneeIds.Should().BeEmpty();
+        evt.ActorUserId.Should().Be(actor);
+    }
+
+    [Fact]
+    public void SetAssignees_computes_the_remove_delta()
+    {
+        var task = SharedProjectTask();
+        var actor = UserId.New();
+        var u1 = UserId.New();
+        var u2 = UserId.New();
+        task.SetAssignees([u1, u2], actor, MutateInstant);
+        task.ClearDomainEvents();
+        var versionAfterFirst = task.Version;
+
+        task.SetAssignees([u1], actor, LaterInstant);
+
+        task.Assignees.Select(a => a.UserId).Should().BeEquivalentTo([u1]);
+        task.Version.Should().Be(versionAfterFirst + 1);
+        var evt = LastAssignedEvent(task)!;
+        evt.AddedAssigneeIds.Should().BeEmpty();
+        evt.RemovedAssigneeIds.Should().BeEquivalentTo([u2]);
+    }
+
+    [Fact]
+    public void SetAssignees_with_no_delta_is_an_idempotent_no_op()
+    {
+        var task = SharedProjectTask();
+        var actor = UserId.New();
+        var u1 = UserId.New();
+        task.SetAssignees([u1], actor, MutateInstant);
+        task.ClearDomainEvents();
+        var versionAfterFirst = task.Version;
+
+        task.SetAssignees([u1], actor, LaterInstant); // same set
+
+        task.Version.Should().Be(versionAfterFirst, "a no-op set does NOT bump version (idempotency, R3)");
+        LastAssignedEvent(task).Should().BeNull("a no-op set raises NO TaskAssigned event");
+    }
+
+    [Fact]
+    public void MoveToProject_clears_assignees_on_a_real_project_change()
+    {
+        var task = SharedProjectTask();
+        task.SetAssignees([UserId.New(), UserId.New()], UserId.New(), MutateInstant);
+        task.Assignees.Should().NotBeEmpty();
+
+        task.MoveToProject(ProjectId.From(Guid.NewGuid()), LaterInstant); // move to a different project
+
+        task.Assignees.Should().BeEmpty("assignment is project-scoped (FR-069) — a move clears it");
+    }
+
+    [Fact]
+    public void MoveToProject_to_inbox_clears_assignees()
+    {
+        var task = SharedProjectTask();
+        task.SetAssignees([UserId.New()], UserId.New(), MutateInstant);
+
+        task.MoveToProject(null, LaterInstant); // to the Inbox (personal)
+
+        task.Assignees.Should().BeEmpty("a personal/Inbox task carries no assignees (FR-069)");
+    }
 }

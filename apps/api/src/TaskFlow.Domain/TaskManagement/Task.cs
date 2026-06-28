@@ -26,6 +26,10 @@ public sealed class Task : AggregateRoot<TaskId>
     private const int MaxTitleLength = 500;
     private const int MaxDescriptionLength = 8000;
 
+    /// <summary>The assignee set (slice 008) — owned children persisted in <c>task_assignees</c>. EF populates
+    /// this backing field on materialization; <see cref="SetAssignees"/> is the only mutator.</summary>
+    private readonly List<TaskAssignee> _assignees = [];
+
     private Task()
     {
         // EF Core materialization constructor. Non-nullable values are populated
@@ -50,6 +54,13 @@ public sealed class Task : AggregateRoot<TaskId>
 
     /// <summary>The creating <see cref="User"/> (FR-002). Immutable; doubles as the ownership key.</summary>
     public UserId CreatedBy { get; private set; }
+
+    /// <summary>
+    /// The assignee set (slice 008, ENT-01 `assignees`) — owned children (<see cref="TaskAssignee"/>) on
+    /// shared-project tasks only (FR-069), exposed read-only over the backing field so EF maps the
+    /// collection while <see cref="SetAssignees"/> stays the sole mutator. Empty on personal/Inbox tasks.
+    /// </summary>
+    public IReadOnlyList<TaskAssignee> Assignees => _assignees;
 
     /// <summary>The task title; trimmed-non-empty and ≤ 500 chars (FR-001).</summary>
     public string Title { get; private set; }
@@ -182,8 +193,58 @@ public sealed class Task : AggregateRoot<TaskId>
     /// <param name="utcNow">The current UTC time (injected for testability).</param>
     public void MoveToProject(ProjectId? projectId, DateTime utcNow)
     {
+        // slice 008: assignment is scoped to the task's project's membership (FR-069), so a real project
+        // change (incl. a move to the Inbox) CLEARS the assignee set — a personal/Inbox task and a different
+        // project must not carry the old project's assignees. Structural cleanup, no TaskAssigned event.
+        if (ProjectId != projectId && _assignees.Count > 0)
+        {
+            _assignees.Clear();
+        }
+
         ProjectId = projectId;
         Touch(utcNow);
+    }
+
+    /// <summary>
+    /// Replaces the task's assignee set with <paramref name="desired"/> (slice 008, AS-01/AS-02, R2/R3) — a
+    /// whole-set replace. Computes the delta against the current set; a no-op (no added/removed) does NOT
+    /// <see cref="Touch"/> and raises NO event (idempotency, R3). On a real change it applies the set,
+    /// <see cref="Touch"/>es (bumps <see cref="Version"/>), and raises ONE <see cref="Events.TaskAssigned"/>
+    /// carrying the delta + <paramref name="actor"/>. Membership-validity and the shared-only rule are
+    /// enforced UPSTREAM by the handler (FR-069/R4); the aggregate records the validated set.
+    /// </summary>
+    /// <param name="desired">The desired full assignee set (de-duplicated by the caller).</param>
+    /// <param name="actor">The user making the change (carried in the event for slice-017 self-suppression).</param>
+    /// <param name="utcNow">The current UTC time (injected for testability).</param>
+    public void SetAssignees(IReadOnlyCollection<UserId> desired, UserId actor, DateTime utcNow)
+    {
+        ArgumentNullException.ThrowIfNull(desired);
+
+        var current = _assignees.Select(a => a.UserId).ToHashSet();
+        var target = desired.ToHashSet();
+
+        var added = target.Where(u => !current.Contains(u)).ToList();
+        var removed = current.Where(u => !target.Contains(u)).ToList();
+        if (added.Count == 0 && removed.Count == 0)
+        {
+            return; // idempotent no-op: no change, no version bump, no event (R3).
+        }
+
+        _assignees.RemoveAll(a => removed.Contains(a.UserId));
+        foreach (var userId in added)
+        {
+            _assignees.Add(new TaskAssignee(userId));
+        }
+
+        Touch(utcNow);
+
+        ProjectId? projectId = ProjectId;
+        AddDomainEvent(new Events.TaskAssigned(
+            Id,
+            projectId ?? throw new InvalidOperationException("Assignment requires a shared project."),
+            added,
+            removed,
+            actor));
     }
 
     /// <summary>

@@ -52,6 +52,9 @@ public sealed record TaskResponse
     /// <summary>The description (markdown source, slice 005, R3), or null. Output-escaped on render (FR-099). Nullable; NOT in <c>required[]</c>.</summary>
     public string? Description { get; init; }
 
+    /// <summary>The assignee user ids (slice 008, R7). ALWAYS present; EMPTY for personal/unassigned tasks. Ids only (names via the roster).</summary>
+    public required IReadOnlyList<Guid> Assignees { get; init; }
+
     /// <summary>Projects a <see cref="TaskEntity"/> aggregate to its lean wire model (mirrors <c>UserProfile.From</c>).</summary>
     public static TaskResponse From(TaskEntity task)
     {
@@ -71,6 +74,7 @@ public sealed record TaskResponse
             ProjectId = task.ProjectId?.Value,
             Priority = task.Priority,
             Description = task.Description,
+            Assignees = task.Assignees.Select(a => a.UserId.Value).ToList(),
         };
     }
 

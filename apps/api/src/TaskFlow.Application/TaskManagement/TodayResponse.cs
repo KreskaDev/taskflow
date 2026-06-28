@@ -49,6 +49,9 @@ public sealed record TodayTaskResponse
     /// <summary>The description (markdown source), or null. Output-escaped on render (FR-099).</summary>
     public string? Description { get; init; }
 
+    /// <summary>The assignee user ids (slice 008); empty for personal/unassigned. Ids only.</summary>
+    public required IReadOnlyList<Guid> Assignees { get; init; }
+
     /// <summary>True when <c>due_date</c> is before the start of today-Warsaw (overdue incomplete). Today-only.</summary>
     public required bool IsOverdue { get; init; }
 
@@ -72,6 +75,7 @@ public sealed record TodayTaskResponse
             ProjectId = t.ProjectId,
             Priority = t.Priority,
             Description = t.Description,
+            Assignees = t.Assignees,
             IsOverdue = isOverdue,
         };
     }

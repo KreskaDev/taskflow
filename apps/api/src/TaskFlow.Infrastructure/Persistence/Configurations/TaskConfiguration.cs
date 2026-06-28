@@ -132,6 +132,28 @@ public sealed class TaskConfiguration : IEntityTypeConfiguration<TaskEntity>
             .HasDatabaseName("ix_tasks_created_by_position")
             .HasFilter("deleted_at IS NULL");
 
+        // Assignees (slice 008) — the owned collection mapped to the task_assignees join table. Composite
+        // PK (task_id, user_id) enforces set-uniqueness. The owner FK (task_id → tasks) cascades with the
+        // task (hard-delete/reaper cleanup). The user_id → users(id) FK cascades on account deletion (the
+        // erasure cascade, Constitution XI/FR-085 — mirrors created_by). Assignment is shared-only (FR-069),
+        // enforced at the handler; the schema does not constrain visibility.
+        builder.OwnsMany(t => t.Assignees, a =>
+        {
+            a.ToTable("task_assignees");
+            a.WithOwner().HasForeignKey("TaskId");
+            a.Property<TaskId>("TaskId")
+                .HasColumnName("task_id")
+                .HasConversion(id => id.Value, value => TaskId.From(value));
+            a.Property(x => x.UserId)
+                .HasColumnName("user_id")
+                .HasConversion(id => id.Value, value => UserId.From(value));
+            a.HasKey("TaskId", "UserId");
+            a.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         // Domain events are an in-memory, transient concern — never persisted.
         builder.Ignore(t => t.DomainEvents);
     }
