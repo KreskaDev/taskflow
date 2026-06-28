@@ -54,15 +54,22 @@ public sealed class SetTaskDoneValidator : AbstractValidator<SetTaskDone>
 /// <summary>
 /// Handles <see cref="SetTaskDone"/> as a DESIRED-state write under the optimistic-concurrency
 /// <c>version</c> guard (research R3/R4). Authentication is enforced upstream by the deny-by-default
-/// middleware; this handler owns only the ownership-disclosure + version-compare + apply logic.
+/// middleware; this handler owns the dispatch-by-visibility load + version-compare + apply logic.
 /// </summary>
 /// <remarks>
-/// Decision path (owner-scoped + NON-deleted load, so a foreign/absent/soft-deleted id is
-/// indistinguishable — never an enumeration oracle, R9/R17):
+/// <para>⚠ <b>slice 005 (the BLOCKER-resolved deviation, spec L127):</b> the <c>Space</c> toggle-done is now
+/// <b>membership-aware</b> — authorization is dispatched on the containing project's visibility via
+/// <see cref="TaskAccessGuards.LoadWritableTaskAsync"/> with <see cref="EffectiveRole.Editor"/>, exactly like
+/// the three new slice-005 write commands, so an editor member MAY complete a shared task and a viewer is
+/// denied 403 (FR-067: "write requires editor or owner"). The personal/Inbox path is unchanged from slice
+/// 002 (foreign/absent/soft-deleted → 404, owner → allow — the slice-002 <c>SetTaskDoneTests</c> are the
+/// additive-regression proof).</para>
+/// Decision path:
 /// <list type="bullet">
-/// <item>no live row owned by the caller → <see cref="NotFoundException"/> (404), checked BEFORE the
-/// version compare so a foreign id is 404 for any version value (never 403).</item>
-/// <item>the caller's row exists but <c>row.Version != command.Version</c> → <see cref="VersionConflictException"/>
+/// <item>no writable row (personal foreign/absent/soft-deleted → 404; shared non-member → 404) →
+/// <see cref="NotFoundException"/>; a shared viewer → <see cref="ForbiddenException"/> (403). Checked BEFORE
+/// the version compare so a foreign id is 404 for any version value.</item>
+/// <item>the row exists but <c>row.Version != command.Version</c> → <see cref="VersionConflictException"/>
 /// (409), rejected before any mutation.</item>
 /// <item>otherwise apply the desired state: <c>done</c> → <c>MarkDone</c> (status=done, stamp
 /// <c>completedAt</c>); <c>backlog</c> → <c>MarkBacklog</c> (status=backlog, clear <c>completedAt</c>).
@@ -82,21 +89,18 @@ public static class SetTaskDoneHandler
         SetTaskDone command,
         ICurrentUser currentUser,
         ITaskRepository tasks,
+        IProjectRepository projects,
+        IProjectMembershipRepository members,
+        IResourceAuthorizationPolicy authorization,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(currentUser);
         ArgumentNullException.ThrowIfNull(tasks);
 
-        var owner = currentUser.Id;
-
-        var task = await tasks
-            .FindOwnedAsync(command.Id, owner, cancellationToken)
+        var task = await TaskAccessGuards
+            .LoadWritableTaskAsync(command.Id, EffectiveRole.Editor, currentUser, tasks, projects, members, authorization, cancellationToken)
             .ConfigureAwait(false);
-        if (task is null)
-        {
-            throw new NotFoundException();
-        }
 
         if (task.Version != command.Version)
         {

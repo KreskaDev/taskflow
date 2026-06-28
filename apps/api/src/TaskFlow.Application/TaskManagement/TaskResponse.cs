@@ -46,6 +46,12 @@ public sealed record TaskResponse
     /// <summary>The owning project's id (slice 004, R16), or null when the task is in the Inbox (FR-021).</summary>
     public Guid? ProjectId { get; init; }
 
+    /// <summary>The priority token <c>P0</c>–<c>P3</c> (slice 005, R2), or null = unprioritized. Nullable; NOT in <c>required[]</c>.</summary>
+    public string? Priority { get; init; }
+
+    /// <summary>The description (markdown source, slice 005, R3), or null. Output-escaped on render (FR-099). Nullable; NOT in <c>required[]</c>.</summary>
+    public string? Description { get; init; }
+
     /// <summary>Projects a <see cref="TaskEntity"/> aggregate to its lean wire model (mirrors <c>UserProfile.From</c>).</summary>
     public static TaskResponse From(TaskEntity task)
     {
@@ -63,6 +69,8 @@ public sealed record TaskResponse
             DueDate = task.DueDate,
             DueHasTime = task.DueHasTime,
             ProjectId = task.ProjectId?.Value,
+            Priority = task.Priority,
+            Description = task.Description,
         };
     }
 

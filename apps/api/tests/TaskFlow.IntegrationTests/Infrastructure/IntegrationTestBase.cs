@@ -3,6 +3,8 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Testcontainers.PostgreSql;
 
@@ -50,10 +52,24 @@ public abstract class IntegrationTestBase : IAsyncLifetime
                 // during host disposal (a teardown race surfacing as a flaky DisposeAsync failure).
                 // Tests never read logs, so clear all providers — this makes the suite deterministic.
                 b.ConfigureLogging(logging => logging.ClearProviders());
+
+                // Per-class service overrides (runs AFTER the app's registrations, so a re-registration wins).
+                // Used by the slice-005 Today/Upcoming suites to freeze TimeProvider for a deterministic
+                // Warsaw day boundary (the default no-op leaves TimeProvider.System in place).
+                b.ConfigureTestServices(ConfigureTestServices);
             });
 
         // Forces host construction → EF Migrate + Wolverine resource setup run now.
         Client = _factory.CreateClient();
+    }
+
+    /// <summary>
+    /// Hook for per-class service overrides, applied via <c>ConfigureTestServices</c> (runs last, so a
+    /// re-registration wins). Default no-op. Override to e.g. replace <see cref="TimeProvider"/> with a frozen
+    /// clock for deterministic Warsaw day-boundary tests (slice 005).
+    /// </summary>
+    protected virtual void ConfigureTestServices(IServiceCollection services)
+    {
     }
 
     public async Task DisposeAsync()

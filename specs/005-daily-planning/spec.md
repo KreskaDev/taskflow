@@ -49,6 +49,7 @@ Entity touchpoint(s):
 Depends on:
 - Slice 003 (natural-language-dates) — provides the Polish date parser consumed by the `T` reschedule scenario (US-02.AS-05); FR-005 is owned there
 - Slice 004 (project-management) — provides projects and the Inbox definition consumed by the Today view's project grouping (FR-022) and the `G I` navigation scenario (US-08.AS-01); FR-021 is owned there
+- Slice 007 (project-sharing-membership) — provides the `ProjectMembership` aggregate, the `shared` visibility realization, and the `ResolveEffectiveRole`/`RequireRole` dispatch-by-visibility policy. **This resolves research open-question #1 (the BLOCKER) via option (a): slice 007 is sequenced before slice 005**, so the shared-project membership + role arm of the Today/Upcoming dispatch (FR-066/FR-067) and its two SC-016 deny tests (viewer-mutation-deny, non-member-read-deny) are now realizable and are realized in this slice. The membership arm fills the seam research R6/R10 reserved with no query/command reshape.
 
 Exercised-but-not-owned (mechanics/keys exercised here; canonical ownership lives in other slices):
 - The `1`-`4` priority keys and the `T` date key are members of FR-029 (the list-shortcuts requirement). They are exercised by US-02.AS-04 and US-02.AS-05 in this slice, but FR-029 is owned by slice 011 (cycles) — see Constitution Compliance.

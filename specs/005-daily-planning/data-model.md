@@ -6,7 +6,16 @@ This slice **introduces no new entity and no EF migration**. It **activates two 
 
 ---
 
-## ⚠ Authorization scope is governed by an open blocker (research open-question #1)
+## ⚠ Authorization scope — the blocker (research open-question #1) is RESOLVED (option (a))
+
+> **✅ RESOLVED.** Slice 007 is sequenced before slice 005 (rebased), so the `ProjectMembership` substrate exists. This
+> data model realizes **both** authorization arms: the **ownership** branch (personal/Inbox) **and** the **shared-project
+> membership + role** branch. The read queries surface tasks in shared projects the caller is a current member of; the
+> write commands (`SetPriority`/`RescheduleDueDate`/`EditTask` and the now-membership-aware `SetTaskDone`, §9) dispatch on
+> the containing project's visibility via the slice-007 `ResolveEffectiveRole`/`RequireRole` policy and a new
+> `TaskAccessGuards` helper. The SC-016 viewer-deny (403) / non-member-deny (404/absent) tests are realized. The original
+> seam framing below is retained; "named, not-yet-realized branch" now reads "realized via the dispatch-by-visibility
+> seam."
 
 The spec mandates the **shared-project membership + role** authorization branch (FR-066/FR-067) as in-scope, with SC-016 deny tests (viewer-mutation-deny, non-member-read-deny). **The `ProjectMembership` substrate does not exist** (deferred to slice 007 by slice 004 R11) and slice 005's "Depends on" lists only 003+004. **This data model realizes the OWNERSHIP branch in full** and structures the read/write handlers as a **dispatch-by-visibility seam** with the membership arm a **named, not-yet-realized branch** (research R10). The SC-016 viewer-deny / non-member-deny tests are **blocked** pending that substrate. See research.md → BLOCKER for the sequencing/spec resolution. No `ProjectMembership` is designed or pulled forward here (that is slice 007's owned scope; building it here is the scope creep YAGNI forbids).
 

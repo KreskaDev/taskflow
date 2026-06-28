@@ -30,7 +30,27 @@ public sealed record TaskListItem(Guid Id, string Title, string Status, string P
 public sealed record TaskBody(
     Guid Id, string Title, string Status, string Position, int Version,
     DateTime CreatedAt, DateTime UpdatedAt, DateTime? CompletedAt,
-    DateTime? DueDate = null, bool? DueHasTime = null);
+    DateTime? DueDate = null, bool? DueHasTime = null,
+    Guid? ProjectId = null, string? Priority = null, string? Description = null);
+
+/// <summary>A Today row (slice 005): the lean TaskResponse fields PLUS the Today-only <c>isOverdue</c> flag.</summary>
+public sealed record TodayTaskBody(
+    Guid Id, string Title, string Status, string Position, int Version,
+    DateTime CreatedAt, DateTime UpdatedAt, DateTime? CompletedAt,
+    DateTime? DueDate, bool? DueHasTime, Guid? ProjectId, string? Priority, string? Description,
+    bool IsOverdue);
+
+/// <summary>A Today group (slice 005): the owning project (null = Inbox) and its ordered rows.</summary>
+public sealed record TodayGroupBody(Guid? ProjectId, IReadOnlyList<TodayTaskBody> Tasks);
+
+/// <summary>The <c>TodayResponse</c> envelope (slice 005): tasks grouped by project.</summary>
+public sealed record TodayBody(IReadOnlyList<TodayGroupBody> Groups);
+
+/// <summary>An Upcoming group (slice 005): a Warsaw calendar day and its ordered rows.</summary>
+public sealed record UpcomingGroupBody(string Date, IReadOnlyList<TaskBody> Tasks);
+
+/// <summary>The <c>UpcomingResponse</c> envelope (slice 005): tasks grouped by Warsaw day.</summary>
+public sealed record UpcomingBody(IReadOnlyList<UpcomingGroupBody> Groups);
 
 /// <summary>
 /// The lean <c>ProjectResponse</c> read model (contracts/openapi.yaml, slice 004). Declared in the
@@ -103,6 +123,20 @@ public static class ApiResponse
         ArgumentNullException.ThrowIfNull(response);
         return (await response.Content.ReadFromJsonAsync<MemberBody>(Web))
             ?? throw new InvalidOperationException("Expected a MemberResponse body but the response was empty.");
+    }
+
+    public static async Task<TodayBody> ReadTodayAsync(this HttpResponseMessage response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        return (await response.Content.ReadFromJsonAsync<TodayBody>(Web))
+            ?? throw new InvalidOperationException("Expected a TodayResponse body but the response was empty.");
+    }
+
+    public static async Task<UpcomingBody> ReadUpcomingAsync(this HttpResponseMessage response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        return (await response.Content.ReadFromJsonAsync<UpcomingBody>(Web))
+            ?? throw new InvalidOperationException("Expected an UpcomingResponse body but the response was empty.");
     }
 
     public static async Task<ProblemBody> ReadProblemAsync(this HttpResponseMessage response)

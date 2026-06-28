@@ -54,9 +54,21 @@ internal sealed class TaskFlowDocumentTransformer : IOpenApiDocumentTransformer
         SetOperation(document, "/api/tasks/{id}", OperationType.Put, "createTask", 404, 422);
         SetOperation(document, "/api/tasks", OperationType.Get, "listTasks");
         SetOperation(document, "/api/tasks/{id}/title", OperationType.Patch, "renameTask", 404, 409, 422);
-        SetOperation(document, "/api/tasks/{id}/status", OperationType.Patch, "setTaskDone", 404, 409, 422);
+        // setTaskDone is membership-aware as of slice 005 (the BLOCKER-resolved deviation): a viewer member
+        // mutating a shared task → 403, so it now carries the 403 like the new editor commands.
+        SetOperation(document, "/api/tasks/{id}/status", OperationType.Patch, "setTaskDone", 403, 404, 409, 422);
         SetOperation(document, "/api/tasks/{id}/position", OperationType.Patch, "reorderTask", 404, 409, 422);
         SetOperation(document, "/api/tasks/{id}", OperationType.Delete, "deleteTask", 404);
+
+        // Daily-planning surface (slice 005, contracts/openapi.yaml). The Today/Upcoming reads carry only the
+        // deny-by-default 401 (a non-member's task is simply absent — no 403/404 on a collection read). The
+        // three editor mutations dispatch by visibility: shared viewer → 403, foreign/non-member → 404, stale
+        // version → 409, bad input → 422. NO new errorCode — the 403 reuses the pre-provisioned `forbidden` (R11).
+        SetOperation(document, "/api/tasks/today", OperationType.Get, "getTodayTasks");
+        SetOperation(document, "/api/tasks/upcoming", OperationType.Get, "getUpcomingTasks");
+        SetOperation(document, "/api/tasks/{id}/priority", OperationType.Patch, "setTaskPriority", 403, 404, 409, 422);
+        SetOperation(document, "/api/tasks/{id}/due-date", OperationType.Patch, "rescheduleTaskDueDate", 403, 404, 409, 422);
+        SetOperation(document, "/api/tasks/{id}/edit", OperationType.Patch, "editTask", 403, 404, 409, 422);
 
         // Project surface (slice 004, contracts/openapi.yaml). Same pattern as the task ops: success
         // bodies auto-emit from the endpoint signatures; here we stamp the stable operationIds and the

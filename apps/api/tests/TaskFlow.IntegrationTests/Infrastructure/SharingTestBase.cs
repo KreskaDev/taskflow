@@ -74,6 +74,55 @@ public abstract class SharingTestBase : IntegrationTestBase
         return id;
     }
 
+    /// <summary>
+    /// Seeds a task directly (slice 005) with optional project / due-date pair / priority / done — created by
+    /// <paramref name="createdBy"/>, version 0 (a fresh non-done seed; <paramref name="done"/> bumps to 1). The
+    /// reserved columns are set via the change-tracker entry so the seed needs no command. Returns the id.
+    /// </summary>
+    protected async Task<Guid> SeedTaskAsync(
+        UserId createdBy,
+        string title,
+        string position = "a0",
+        Guid? projectId = null,
+        DateTime? dueDate = null,
+        bool? dueHasTime = null,
+        string? priority = null,
+        bool done = false)
+    {
+        var id = Guid.CreateVersion7();
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var task = TaskFlow.Domain.TaskManagement.Task.Create(
+            TaskFlow.Domain.TaskManagement.TaskId.From(id), createdBy, title, position, DateTime.UtcNow, dueDate, dueHasTime);
+        if (done)
+        {
+            task.MarkDone(DateTime.UtcNow);
+        }
+
+        var entry = db.Entry(task);
+        if (projectId is { } pid)
+        {
+            entry.Property(nameof(TaskFlow.Domain.TaskManagement.Task.ProjectId)).CurrentValue = ProjectId.From(pid);
+        }
+
+        if (priority is not null)
+        {
+            entry.Property(nameof(TaskFlow.Domain.TaskManagement.Task.Priority)).CurrentValue = priority;
+        }
+
+        db.Tasks.Add(task);
+        await db.SaveChangesAsync();
+        return id;
+    }
+
+    /// <summary>Loads the persisted task aggregate (query-filters ignored), or null — for post-mutation assertions.</summary>
+    protected async Task<TaskFlow.Domain.TaskManagement.Task?> LoadTaskAsync(Guid id)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await db.Tasks.FirstOrDefaultAsync(t => t.Id == TaskFlow.Domain.TaskManagement.TaskId.From(id));
+    }
+
     /// <summary>Loads all membership rows of a project (assertions on the persisted set).</summary>
     protected async Task<IReadOnlyList<ProjectMembership>> LoadMembershipsAsync(Guid projectId)
     {

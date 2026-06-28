@@ -4,7 +4,7 @@ Validates the **US-02 Daily Planning Session** journey (AS-01..AS-08) and the **
 
 > This is a run/validation guide — not implementation. Bodies, validators, and full test suites belong in `tasks.md` and the implementation phase.
 
-> ⚠ **Authorization scope (research open-question #1 — the BLOCKER)**: this slice realizes the **ownership** authorization branch in full; the shared-project **membership + role** branch (FR-066/FR-067) and the SC-016 **viewer-deny / non-member-deny** tests are a **named, not-yet-realized seam** — the `ProjectMembership` substrate is deferred to slice 007. The authorization section below validates the ownership allow+deny per handler; the two shared-project deny cases are listed as **BLOCKED** (not skipped silently). See `plan.md` → Complexity Tracking.
+> ✅ **Authorization scope (research open-question #1 — RESOLVED via option (a))**: slice 007 is sequenced before slice 005, so this slice realizes **both** the **ownership** branch AND the shared-project **membership + role** branch (FR-066/FR-067). The authorization section below validates the ownership allow+deny per handler **and** the shared-project allow (editor)/deny (viewer → 403, non-member → 404/absent) — the two SC-016 cases are now **realized**, no longer BLOCKED.
 
 ## Prerequisites
 
@@ -87,11 +87,13 @@ Seed several tasks across projects/priorities with today's, yesterday's (overdue
 
 | Case | Expected |
 |---|---|
-| Caller reads Today/Upcoming, or set-priority / reschedule / edit / toggle-done **their own** task | Allowed — the row is owner-scoped (`created_by = caller`) |
-| Caller targets **another user's** personal task id (priority / reschedule / edit) | **404 not_found** (existence not disclosed) — both an allow and a deny test exist **per handler** |
+| Caller reads Today/Upcoming, or set-priority / reschedule / edit / toggle-done **their own** task | Allowed — owner-scoped (`created_by = caller`) |
+| Caller targets **another user's** personal task id (priority / reschedule / edit / toggle-done) | **404 not_found** (existence not disclosed) — allow + deny test per handler |
 | Any request without a valid session | **401 unauthenticated** |
-| ⚠ **SC-016 — a viewer attempting a mutation on a shared task** | **BLOCKED** — unwritable until the `ProjectMembership` substrate exists (slice 007); see the BLOCKER. Not skipped silently — tracked as blocked |
-| ⚠ **SC-016 — a non-member reading another project's task** | **BLOCKED** — same reason (the membership arm is a named seam) |
+| ✅ **SC-016 — an EDITOR member mutating a shared task** (priority / reschedule / edit / toggle-done) | **Allowed** — `RequireRole(Editor)` passes (write requires editor/owner, FR-067) |
+| ✅ **SC-016 — a VIEWER member attempting a mutation on a shared task** | **403 forbidden** — member, but insufficient role (the slice-007 `forbidden` code; viewer-mutation-deny) |
+| ✅ **SC-016 — a non-member reading another project's task via Today/Upcoming** | **Absent** from the result (collection read; a current member sees it, a non-member does not — non-member-read-deny, FR-066) |
+| ✅ **SC-016 — a non-member targeting a shared task's mutation by id** | **404 not_found** (existence not disclosed across the membership boundary) |
 
 ## Cross-cutting checks
 

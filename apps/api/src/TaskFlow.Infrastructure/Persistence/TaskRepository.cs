@@ -6,6 +6,7 @@ using TaskFlow.Domain.IdentityAccess;
 using TaskEntity = TaskFlow.Domain.TaskManagement.Task;
 using TaskId = TaskFlow.Domain.TaskManagement.TaskId;
 using ProjectId = TaskFlow.Domain.TaskManagement.ProjectId;
+using TaskStatus = TaskFlow.Domain.TaskManagement.TaskStatus;
 
 namespace TaskFlow.Infrastructure.Persistence;
 
@@ -24,6 +25,66 @@ public sealed class TaskRepository(AppDbContext db) : ITaskRepository
 
     public Task<TaskEntity?> FindByIdIncludingDeletedAsync(TaskId id, CancellationToken cancellationToken) =>
         db.Tasks.FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
+
+    public Task<TaskEntity?> FindByIdAsync(TaskId id, CancellationToken cancellationToken) =>
+        // NOT owner-scoped (a shared-project task may be authored by the project owner, not the caller), but
+        // tombstone-exclusive. The slice-005 dispatch-by-visibility guard applies authorization afterwards.
+        db.Tasks.FirstOrDefaultAsync(t => t.Id == id && t.DeletedAt == null, cancellationToken);
+
+    public async Task<IReadOnlyList<TaskEntity>> ListDueInRangeReadableAsync(
+        UserId caller,
+        IReadOnlyCollection<ProjectId> sharedProjectIds,
+        DateTime? lowerInclusiveUtc,
+        DateTime upperExclusiveUtc,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(sharedProjectIds);
+
+        // The zone-free date/status/tombstone filter (the boundary math is already collapsed to UTC instants).
+        var query = db.Tasks.Where(t =>
+            t.DeletedAt == null
+            && t.DueDate != null
+            && t.DueDate < upperExclusiveUtc
+            && (lowerInclusiveUtc == null || t.DueDate >= lowerInclusiveUtc)
+            && t.Status != TaskStatus.Done
+            && t.Status != TaskStatus.Cancelled);
+
+        // The dispatch-by-visibility read scope (R6/R10): the caller's own tasks PLUS tasks in shared projects
+        // the caller is a current member of. Built as an OR of per-id equalities rather than Contains/IN:
+        // Npgsql cannot array-map a collection of the value-converted nullable ProjectId FK, but a per-id
+        // `project_id = @p` equality translates cleanly (the proven pattern from MoveProjectTasksToInboxAsync).
+        // An empty shared set degrades to owner-only.
+        return await query
+            .Where(BuildReadableVisibilityPredicate(caller, sharedProjectIds))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private static System.Linq.Expressions.Expression<Func<TaskEntity, bool>> BuildReadableVisibilityPredicate(
+        UserId caller, IReadOnlyCollection<ProjectId> sharedProjectIds)
+    {
+        var t = System.Linq.Expressions.Expression.Parameter(typeof(TaskEntity), "t");
+
+        // t.CreatedBy == caller (the value converter applies to the captured-as-constant UserId).
+        System.Linq.Expressions.Expression body = System.Linq.Expressions.Expression.Equal(
+            System.Linq.Expressions.Expression.Property(t, nameof(TaskEntity.CreatedBy)),
+            System.Linq.Expressions.Expression.Constant(caller, typeof(UserId)));
+
+        if (sharedProjectIds.Count > 0)
+        {
+            var projectId = System.Linq.Expressions.Expression.Property(t, nameof(TaskEntity.ProjectId)); // ProjectId?
+            foreach (var id in sharedProjectIds)
+            {
+                // || t.ProjectId == (ProjectId?)id
+                var eq = System.Linq.Expressions.Expression.Equal(
+                    projectId,
+                    System.Linq.Expressions.Expression.Constant((ProjectId?)id, typeof(ProjectId?)));
+                body = System.Linq.Expressions.Expression.OrElse(body, eq);
+            }
+        }
+
+        return System.Linq.Expressions.Expression.Lambda<Func<TaskEntity, bool>>(body, t);
+    }
 
     public async Task<IReadOnlyList<TaskEntity>> ListOwnedAsync(UserId owner, CancellationToken cancellationToken) =>
         // The Inbox (FR-021/R6): narrowed to project_id IS NULL — unprojected tasks only. Backward-compatible

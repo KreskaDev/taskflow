@@ -15,7 +15,15 @@ The two repo facts that anchor everything (verified in code, not inferred):
 
 ---
 
-## ⚠ BLOCKER (open question #1) — the membership/role authorization branch (FR-066/FR-067) the spec mandates is not realizable in this slice's declared dependency set
+## ⚠ BLOCKER (open question #1) — RESOLVED via option (a): slice 007 sequenced before slice 005
+
+> **✅ RESOLVED (implementation time).** The recommendation below was acted on as **option (a)**: slice 007
+> (project-sharing-membership) was implemented and sequenced **before** slice 005, and 005 was rebased onto it. The
+> `ProjectMembership` aggregate, the `shared` visibility, and the `ResolveEffectiveRole`/`RequireRole` policy are now in
+> the tree, so the membership/role branch (FR-066/FR-067) and its two SC-016 deny tests are **realized in this slice**
+> (see `spec.md` → Depends on, and `tasks.md` → Phase 6 UNBLOCKED + T007a/T042/T043/T044). The membership arm filled
+> the R6/R10 seam with no query/command reshape — exactly as designed below. The original blocker analysis is retained
+> verbatim for provenance.
 
 **This must be resolved by a sequencing or spec decision before slice 005 can ship as specified. It is surfaced here, not silently engineered away.**
 

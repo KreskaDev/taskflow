@@ -48,6 +48,30 @@ public static class TaskEndpoints
     }
 
     /// <summary>
+    /// The Today view (slice 005, AS-01/AS-02): the caller's readable tasks due today-in-Warsaw or
+    /// overdue-incomplete, grouped by project, R5-ordered (research R5/R6). The literal <c>/today</c> segment
+    /// is registered ahead of any <c>/{id}</c> template so it wins (data-model §6 routing note).
+    /// </summary>
+    [WolverineGet("/api/tasks/today")]
+    public static Task<TodayResponse> Today(IMessageBus bus)
+    {
+        ArgumentNullException.ThrowIfNull(bus);
+        return bus.InvokeAsync<TodayResponse>(new GetTodayTasks());
+    }
+
+    /// <summary>
+    /// The Upcoming view (slice 005, US-08.AS-02): the caller's readable tasks in the next 7 Warsaw days,
+    /// grouped by Warsaw day, R5-ordered (research R5/R6). The literal <c>/upcoming</c> segment wins over
+    /// <c>/{id}</c>.
+    /// </summary>
+    [WolverineGet("/api/tasks/upcoming")]
+    public static Task<UpcomingResponse> Upcoming(IMessageBus bus)
+    {
+        ArgumentNullException.ThrowIfNull(bus);
+        return bus.InvokeAsync<UpcomingResponse>(new GetUpcomingTasks());
+    }
+
+    /// <summary>
     /// Rename the caller's own task under the optimistic-concurrency <c>version</c> guard (FR-001, R4).
     /// The owner is resolved from <c>ICurrentUser</c> in the handler — never the body. A foreign/absent/
     /// soft-deleted id → 404; a stale <c>version</c> → 409; an empty/>500 title → 422.
@@ -117,6 +141,68 @@ public static class TaskEndpoints
         return bus.InvokeAsync<TaskResponse>(new MoveTaskToProject
         {
             Id = TaskId.From(id),
+            ProjectId = request.ProjectId is { } projectId ? ProjectId.From(projectId) : null,
+            Version = request.Version,
+        });
+    }
+
+    /// <summary>
+    /// Set the task's priority (the <c>1</c>-<c>4</c> keys, AS-04), or clear it, under the optimistic
+    /// <c>version</c> guard (slice 005, R2/R4). Authorization is dispatched by the containing project's
+    /// visibility in the handler: personal → ownership (foreign → 404); shared → editor/owner (viewer → 403,
+    /// non-member → 404). Out-of-set priority → 422; stale <c>version</c> → 409.
+    /// </summary>
+    [WolverinePatch("/api/tasks/{id}/priority")]
+    public static Task<TaskResponse> SetPriority(Guid id, SetPriorityRequest request, IMessageBus bus)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(bus);
+        return bus.InvokeAsync<TaskResponse>(new SetPriority
+        {
+            Id = TaskId.From(id),
+            Priority = request.Priority,
+            Version = request.Version,
+        });
+    }
+
+    /// <summary>
+    /// Reschedule the task's due date to a client-resolved UTC instant (the <c>T</c> key, AS-05), or clear it,
+    /// under the optimistic <c>version</c> guard (slice 005, R4). Same dispatch-by-visibility authorization as
+    /// set-priority. A bad due pair / non-UTC kind / implausible range → 422; stale <c>version</c> → 409.
+    /// </summary>
+    [WolverinePatch("/api/tasks/{id}/due-date")]
+    public static Task<TaskResponse> RescheduleDueDate(Guid id, RescheduleDueDateRequest request, IMessageBus bus)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(bus);
+        return bus.InvokeAsync<TaskResponse>(new RescheduleDueDate
+        {
+            Id = TaskId.From(id),
+            DueDate = request.DueDate,
+            DueHasTime = request.DueHasTime,
+            Version = request.Version,
+        });
+    }
+
+    /// <summary>
+    /// The combined task editor (the <c>E</c> editor, AS-06/07/08): saves title, description, priority, due
+    /// date, and project together — a whole-object replace, atomic on <c>Ctrl+Enter</c> — under the
+    /// optimistic <c>version</c> guard (slice 005, R4). Same dispatch-by-visibility authorization; an omitted
+    /// field → 422; an actual project move to a foreign/absent project → 404; stale <c>version</c> → 409.
+    /// </summary>
+    [WolverinePatch("/api/tasks/{id}/edit")]
+    public static Task<TaskResponse> Edit(Guid id, EditTaskRequest request, IMessageBus bus)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(bus);
+        return bus.InvokeAsync<TaskResponse>(new EditTask
+        {
+            Id = TaskId.From(id),
+            Title = request.Title,
+            Description = request.Description,
+            Priority = request.Priority,
+            DueDate = request.DueDate,
+            DueHasTime = request.DueHasTime,
             ProjectId = request.ProjectId is { } projectId ? ProjectId.From(projectId) : null,
             Version = request.Version,
         });

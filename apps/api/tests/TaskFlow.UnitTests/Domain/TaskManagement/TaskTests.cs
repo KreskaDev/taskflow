@@ -256,4 +256,149 @@ public sealed class TaskTests
         task.Version.Should().Be(2, "every move is a mutation");
         task.UpdatedAt.Should().Be(LaterInstant);
     }
+
+    // ── slice 005: priority (R2) ───────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("P0")]
+    [InlineData("P1")]
+    [InlineData("P2")]
+    [InlineData("P3")]
+    public void SetPriority_sets_a_closed_set_token_and_bumps_version(string priority)
+    {
+        var task = NewTask();
+
+        task.SetPriority(priority, MutateInstant);
+
+        task.Priority.Should().Be(priority);
+        task.Version.Should().Be(1);
+        task.UpdatedAt.Should().Be(MutateInstant);
+    }
+
+    [Fact]
+    public void SetPriority_with_null_clears_the_priority_and_still_bumps_version()
+    {
+        var task = NewTask();
+        task.SetPriority("P0", MutateInstant);
+
+        task.SetPriority(null, LaterInstant);
+
+        task.Priority.Should().BeNull("null = unprioritized");
+        task.Version.Should().Be(2, "a no-op-equal set still bumps version, consistent with the other setters");
+        task.UpdatedAt.Should().Be(LaterInstant);
+    }
+
+    [Theory]
+    [InlineData("p0")]
+    [InlineData("P4")]
+    [InlineData("high")]
+    [InlineData("")]
+    public void SetPriority_rejects_an_out_of_set_token(string priority)
+    {
+        var task = NewTask();
+
+        var act = () => task.SetPriority(priority, MutateInstant);
+
+        act.Should().Throw<ArgumentException>("the closed-set guard is belt-and-braces behind the command validator");
+        task.Version.Should().Be(0, "a rejected set leaves the row untouched");
+    }
+
+    // ── slice 005: reschedule (R4) ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Reschedule_sets_the_due_pair_and_bumps_version()
+    {
+        var task = NewTask();
+        var due = new DateTime(2026, 7, 1, 9, 0, 0, DateTimeKind.Utc);
+
+        task.Reschedule(due, dueHasTime: true, MutateInstant);
+
+        task.DueDate.Should().Be(due);
+        task.DueHasTime.Should().BeTrue();
+        task.Version.Should().Be(1);
+        task.UpdatedAt.Should().Be(MutateInstant);
+    }
+
+    [Fact]
+    public void Reschedule_with_both_null_clears_the_due_date()
+    {
+        var task = NewTask();
+        task.Reschedule(new DateTime(2026, 7, 1, 9, 0, 0, DateTimeKind.Utc), true, MutateInstant);
+
+        task.Reschedule(null, null, LaterInstant);
+
+        task.DueDate.Should().BeNull();
+        task.DueHasTime.Should().BeNull();
+        task.Version.Should().Be(2);
+    }
+
+    // ── slice 005: the whole-object editor replace (R4) ────────────────────────────────────
+
+    [Fact]
+    public void EditTask_replaces_all_editable_fields_in_one_touch()
+    {
+        var task = NewTask();
+        var projectId = ProjectId.From(Guid.NewGuid());
+        var due = new DateTime(2026, 8, 2, 13, 0, 0, DateTimeKind.Utc);
+
+        task.EditTask("Edited title", "A description", "P1", due, dueHasTime: true, projectId, MutateInstant);
+
+        task.Title.Should().Be("Edited title");
+        task.Description.Should().Be("A description");
+        task.Priority.Should().Be("P1");
+        task.DueDate.Should().Be(due);
+        task.DueHasTime.Should().BeTrue();
+        task.ProjectId.Should().Be(projectId);
+        task.Version.Should().Be(1, "the whole-object replace is a single mutation (one Touch)");
+        task.UpdatedAt.Should().Be(MutateInstant);
+    }
+
+    [Fact]
+    public void EditTask_clears_nullable_fields_when_passed_null()
+    {
+        var task = NewTask();
+        task.EditTask("First", "desc", "P0", new DateTime(2026, 8, 2, 13, 0, 0, DateTimeKind.Utc), true, ProjectId.From(Guid.NewGuid()), MutateInstant);
+
+        task.EditTask("Second", null, null, null, null, null, LaterInstant);
+
+        task.Title.Should().Be("Second");
+        task.Description.Should().BeNull();
+        task.Priority.Should().BeNull();
+        task.DueDate.Should().BeNull();
+        task.DueHasTime.Should().BeNull();
+        task.ProjectId.Should().BeNull("a null projectId returns the task to the Inbox");
+        task.Version.Should().Be(2);
+    }
+
+    [Fact]
+    public void EditTask_trims_the_title_and_an_over_long_title_throws()
+    {
+        var task = NewTask();
+
+        task.EditTask("  spaced  ", null, null, null, null, null, MutateInstant);
+        task.Title.Should().Be("spaced");
+
+        var act = () => task.EditTask(new string('x', 501), null, null, null, null, null, LaterInstant);
+        act.Should().Throw<ArgumentException>("the domain NormalizeTitle guard backs the command validator");
+    }
+
+    [Fact]
+    public void EditTask_rejects_an_out_of_set_priority()
+    {
+        var task = NewTask();
+
+        var act = () => task.EditTask("Title", null, "P9", null, null, null, MutateInstant);
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void EditTask_treats_a_whitespace_only_description_as_null()
+    {
+        var task = NewTask();
+
+        task.EditTask("Title", "   ", null, null, null, null, MutateInstant);
+
+        task.Description.Should().BeNull("a whitespace-only description is normalized to no description");
+    }
 }

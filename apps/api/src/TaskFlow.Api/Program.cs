@@ -55,6 +55,10 @@ builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 builder.Services.AddScoped<IProjectRepository, ProjectRepository>();
 builder.Services.AddScoped<IProjectMembershipRepository, ProjectMembershipRepository>();
 
+// The wall clock (slice 005): the Today/Upcoming queries resolve "now" through TimeProvider so the Warsaw
+// day boundary is testable (integration tests freeze it via the ConfigureTestServices hook). Default = system.
+builder.Services.AddSingleton(TimeProvider.System);
+
 // --- EF Core write-side + Wolverine durable messaging (Postgres outbox/inbox) ---
 builder.Services.AddDbContextWithWolverineIntegration<AppDbContext>(o => o.UseNpgsql(connectionString));
 builder.Services.AddResourceSetupOnStartup();

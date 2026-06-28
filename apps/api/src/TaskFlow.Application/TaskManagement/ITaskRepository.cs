@@ -43,6 +43,34 @@ public interface ITaskRepository
     Task<TaskEntity?> FindByIdIncludingDeletedAsync(TaskId id, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Finds a NON-deleted task by id ALONE — NOT owner-scoped (no <c>created_by</c> filter), but
+    /// tombstone-EXCLUSIVE (<c>deleted_at IS NULL</c>). The load behind the slice-005 dispatch-by-visibility
+    /// write path (<c>TaskAccessGuards.LoadWritableTaskAsync</c>): a task may live in a shared project the
+    /// caller does not own, so the caller-scoped <see cref="FindOwnedAsync"/> cannot load it; authorization
+    /// is then applied by the guard on the containing project's visibility (personal → ownership; shared →
+    /// <c>RequireRole</c>). Returns <c>null</c> for an absent or soft-deleted id (the guard maps that to 404).
+    /// </summary>
+    Task<TaskEntity?> FindByIdAsync(TaskId id, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Lists the caller's READABLE, non-deleted, non-done/cancelled tasks whose <c>due_date</c> falls in the
+    /// half-open UTC range <c>[lowerInclusiveUtc, upperExclusiveUtc)</c> — the Today/Upcoming fetch (slice 005,
+    /// R6). Dispatch-by-visibility read scope: <c>created_by = caller OR project_id ∈ sharedProjectIds</c>
+    /// (the caller's personal/owned tasks PLUS tasks in shared projects the caller is a current member of,
+    /// the ids supplied by <c>IProjectMembershipRepository.ListProjectIdsForUserAsync</c>). The Warsaw day
+    /// boundary is already collapsed to the UTC instants by <c>WarsawDayBounds</c>, so the filter is
+    /// zone-free. <paramref name="lowerInclusiveUtc"/> null = no lower bound (Today includes overdue). NOT
+    /// ordered/grouped here — the handler applies the R5 deterministic order. An empty
+    /// <paramref name="sharedProjectIds"/> degrades cleanly to owner-only.
+    /// </summary>
+    Task<IReadOnlyList<TaskEntity>> ListDueInRangeReadableAsync(
+        UserId caller,
+        IReadOnlyCollection<ProjectId> sharedProjectIds,
+        DateTime? lowerInclusiveUtc,
+        DateTime upperExclusiveUtc,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Lists the NON-deleted tasks of <paramref name="projectId"/> owned by <paramref name="owner"/>
     /// (owner-scoped + <c>deleted_at IS NULL AND project_id = {id}</c>), ordered by <c>position</c> then
     /// <c>id</c> — the project's task list (slice 004, R6) and the source for the delete <c>cascade</c> task
