@@ -1,3 +1,4 @@
+import { addDays, startOfDay } from "date-fns";
 import { formatInTimeZone, fromZonedTime, toZonedTime } from "date-fns-tz";
 
 /**
@@ -21,4 +22,32 @@ export function fromReferenceZone(wallClock: Date): Date {
 /** Formats a UTC instant for display in the reference zone (DST handled by the library). */
 export function formatInReferenceZone(utc: Date, format: string): string {
   return formatInTimeZone(utc, REFERENCE_TIME_ZONE, format);
+}
+
+/**
+ * The UTC instant at the start of the reference-zone calendar day `days` after the day containing
+ * `now` (slice 005, R7) — the client mirror of the server's `WarsawDayBounds.StartOfDayPlusUtc`, so the
+ * optimistic Today/Upcoming membership decision equals the authoritative one (FR-092). DST is handled by
+ * date-fns-tz, never fixed-offset arithmetic.
+ */
+export function startOfReferenceDayPlusUtc(now: Date, days: number): Date {
+  // toZonedTime yields a Date whose fields read as Warsaw wall-clock; startOfDay/addDays operate on those
+  // fields; fromZonedTime re-interprets them as Warsaw and returns the corresponding UTC instant.
+  const wall = startOfDay(addDays(toZonedTime(now, REFERENCE_TIME_ZONE), days));
+  return fromReferenceZone(wall);
+}
+
+/** The UTC instant at the start of today in the reference zone, relative to `now`. */
+export function startOfReferenceTodayUtc(now: Date): Date {
+  return startOfReferenceDayPlusUtc(now, 0);
+}
+
+/** The UTC instant at the start of tomorrow in the reference zone — the Today/Upcoming split point. */
+export function startOfReferenceTomorrowUtc(now: Date): Date {
+  return startOfReferenceDayPlusUtc(now, 1);
+}
+
+/** The reference-zone calendar date (`YYYY-MM-DD`) a UTC instant falls on — the Upcoming group key (R3). */
+export function referenceDateKey(utc: Date): string {
+  return formatInReferenceZone(utc, "yyyy-MM-dd");
 }

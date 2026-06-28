@@ -304,6 +304,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tasks/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GET_api_tasks_today
+         * @description GET_api_tasks_today
+         */
+        get: operations["getTodayTasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/upcoming": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GET_api_tasks_upcoming
+         * @description GET_api_tasks_upcoming
+         */
+        get: operations["getUpcomingTasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tasks/{id}/title": {
         parameters: {
             query?: never;
@@ -382,6 +422,66 @@ export interface paths {
          * @description PATCH_api_tasks_id_project
          */
         patch: operations["moveTaskToProject"];
+        trace?: never;
+    };
+    "/api/tasks/{id}/priority": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * PATCH_api_tasks_id_priority
+         * @description PATCH_api_tasks_id_priority
+         */
+        patch: operations["setTaskPriority"];
+        trace?: never;
+    };
+    "/api/tasks/{id}/due-date": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * PATCH_api_tasks_id_due_date
+         * @description PATCH_api_tasks_id_due_date
+         */
+        patch: operations["rescheduleTaskDueDate"];
+        trace?: never;
+    };
+    "/api/tasks/{id}/edit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * PATCH_api_tasks_id_edit
+         * @description PATCH_api_tasks_id_edit
+         */
+        patch: operations["editTask"];
         trace?: never;
     };
     "/api/users/ensure": {
@@ -493,6 +593,18 @@ export interface components {
             /** Format: int32 */
             version: number;
         };
+        EditTaskRequest: {
+            title: string;
+            description: string | null;
+            priority: string | null;
+            /** Format: date-time */
+            dueDate: string | null;
+            dueHasTime: boolean | null;
+            /** Format: uuid */
+            projectId: string | null;
+            /** Format: int32 */
+            version: number;
+        };
         EnsureUser: {
             googleSubjectId: string;
             email: string;
@@ -555,6 +667,18 @@ export interface components {
             /** Format: int32 */
             version: number;
         };
+        RescheduleDueDateRequest: {
+            /** Format: date-time */
+            dueDate: string | null;
+            dueHasTime: boolean | null;
+            /** Format: int32 */
+            version: number;
+        };
+        SetPriorityRequest: {
+            priority: string | null;
+            /** Format: int32 */
+            version: number;
+        };
         SetTaskStatusRequest: {
             status: string;
             /** Format: int32 */
@@ -579,12 +703,52 @@ export interface components {
             dueHasTime?: boolean | null;
             /** Format: uuid */
             projectId?: string | null;
+            priority?: string | null;
+            description?: string | null;
+        };
+        TodayGroup: {
+            /** Format: uuid */
+            projectId: string | null;
+            tasks: components["schemas"]["TodayTaskResponse"][];
+        };
+        TodayResponse: {
+            groups: components["schemas"]["TodayGroup"][];
+        };
+        TodayTaskResponse: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            status: string;
+            position: string;
+            /** Format: int32 */
+            version: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            completedAt?: string | null;
+            /** Format: date-time */
+            dueDate?: string | null;
+            dueHasTime?: boolean | null;
+            /** Format: uuid */
+            projectId?: string | null;
+            priority?: string | null;
+            description?: string | null;
+            isOverdue: boolean;
         };
         TransferOwnershipRequest: {
             /** Format: uuid */
             userId: string;
             /** Format: int32 */
             version: number;
+        };
+        UpcomingGroup: {
+            date: string;
+            tasks: components["schemas"]["TaskResponse"][];
+        };
+        UpcomingResponse: {
+            groups: components["schemas"]["UpcomingGroup"][];
         };
         UserProfile: {
             /** Format: uuid */
@@ -1630,6 +1794,82 @@ export interface operations {
             };
         };
     };
+    getTodayTasks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TodayResponse"];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    getUpcomingTasks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpcomingResponse"];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     renameTask: {
         parameters: {
             query?: never;
@@ -1718,6 +1958,15 @@ export interface operations {
             };
             /** @description Missing or invalid identity carrier (deny-by-default). */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The caller is a member but lacks the required role for this operation (errorCode = forbidden). */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1842,6 +2091,219 @@ export interface operations {
             };
             /** @description Missing or invalid identity carrier (deny-by-default). */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The resource does not exist, is soft-deleted, or the caller is not permitted to observe it (errorCode = not_found). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description A state conflict: a stale version (errorCode = version_conflict) or the last-owner guard (errorCode = last_owner). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Request validation failed (errorCode = validation_failed). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    setTaskPriority: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPriorityRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The caller is a member but lacks the required role for this operation (errorCode = forbidden). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The resource does not exist, is soft-deleted, or the caller is not permitted to observe it (errorCode = not_found). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description A state conflict: a stale version (errorCode = version_conflict) or the last-owner guard (errorCode = last_owner). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Request validation failed (errorCode = validation_failed). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    rescheduleTaskDueDate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RescheduleDueDateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The caller is a member but lacks the required role for this operation (errorCode = forbidden). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The resource does not exist, is soft-deleted, or the caller is not permitted to observe it (errorCode = not_found). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description A state conflict: a stale version (errorCode = version_conflict) or the last-owner guard (errorCode = last_owner). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Request validation failed (errorCode = validation_failed). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    editTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditTaskRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The caller is a member but lacks the required role for this operation (errorCode = forbidden). */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

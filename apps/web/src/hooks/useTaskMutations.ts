@@ -4,12 +4,93 @@ import { type QueryClient, useMutation, useQueryClient } from "@tanstack/react-q
 
 import { apiClient, mapError, type ProblemDetails } from "@/lib/api/client";
 import type { components } from "@/lib/api/generated/schema";
+import { buildTodayGroups, buildUpcomingGroups, flattenToday, flattenUpcoming } from "@/lib/dailyViews";
 import { newTaskId } from "@/lib/id";
 import { between } from "@/lib/position";
-import { createTaskSchema, taskTitleSchema } from "@/lib/validation/task";
+import { createTaskSchema, editTaskSchema, type Priority, taskTitleSchema } from "@/lib/validation/task";
 import { TASKS_QUERY_KEY } from "@/hooks/useTasks";
+import { TODAY_QUERY_KEY } from "@/hooks/useTodayTasks";
+import { UPCOMING_QUERY_KEY } from "@/hooks/useUpcomingTasks";
 
 type TaskResponse = components["schemas"]["TaskResponse"];
+type TodayResponse = components["schemas"]["TodayResponse"];
+type UpcomingResponse = components["schemas"]["UpcomingResponse"];
+
+/**
+ * The triage-view cache snapshot (slice 005, R7): the Inbox flat list + the grouped Today/Upcoming caches.
+ * Captured before an optimistic mutation so any of them can be rolled back on error.
+ */
+interface ViewCachesSnapshot {
+  previousTasks: TaskResponse[] | undefined;
+  previousToday: TodayResponse | undefined;
+  previousUpcoming: UpcomingResponse | undefined;
+}
+
+/** Snapshots the Inbox + Today + Upcoming caches (for rollback). */
+function snapshotViewCaches(queryClient: QueryClient): ViewCachesSnapshot {
+  return {
+    previousTasks: queryClient.getQueryData<TaskResponse[]>(TASKS_QUERY_KEY),
+    previousToday: queryClient.getQueryData<TodayResponse>(TODAY_QUERY_KEY),
+    previousUpcoming: queryClient.getQueryData<UpcomingResponse>(UPCOMING_QUERY_KEY),
+  };
+}
+
+/**
+ * Optimistically applies an updated task across the triage caches using the client membership recompute
+ * (R7, FR-092): the Today and Upcoming grouped caches are flattened, the task is upserted, and the groups
+ * are rebuilt with the SAME Warsaw boundary + R5 order the server uses — so a reschedule-to-tomorrow drops
+ * the row out of Today (into Upcoming), a toggle-done drops it from both, and a priority change re-sorts it.
+ * The Inbox flat list is updated in place (a dated Inbox task lives in both `['tasks']` and the views).
+ */
+function applyTaskToViewCaches(queryClient: QueryClient, updated: TaskResponse, now: Date): void {
+  queryClient.setQueryData<TaskResponse[]>(TASKS_QUERY_KEY, (old) =>
+    old?.map((t) => (t.id === updated.id ? updated : t)),
+  );
+
+  // A projected task may also live in its project board cache (slice 010 surface) — update it in place.
+  if (updated.projectId != null) {
+    queryClient.setQueryData<TaskResponse[]>(projectTasksQueryKey(updated.projectId), (old) =>
+      old?.map((t) => (t.id === updated.id ? updated : t)),
+    );
+  }
+
+  queryClient.setQueryData<TodayResponse>(TODAY_QUERY_KEY, (old) => {
+    if (old === undefined) return old;
+    const flat = flattenToday(old).filter((t) => t.id !== updated.id);
+    flat.push(updated);
+    return buildTodayGroups(flat, now);
+  });
+
+  queryClient.setQueryData<UpcomingResponse>(UPCOMING_QUERY_KEY, (old) => {
+    if (old === undefined) return old;
+    const flat = flattenUpcoming(old).filter((t) => t.id !== updated.id);
+    flat.push(updated);
+    return buildUpcomingGroups(flat, now);
+  });
+}
+
+/** Rolls the triage caches back to a pre-mutation snapshot (on error). */
+function rollbackViewCaches(queryClient: QueryClient, snapshot: ViewCachesSnapshot): void {
+  queryClient.setQueryData<TaskResponse[] | undefined>(TASKS_QUERY_KEY, snapshot.previousTasks);
+  queryClient.setQueryData<TodayResponse | undefined>(TODAY_QUERY_KEY, snapshot.previousToday);
+  queryClient.setQueryData<UpcomingResponse | undefined>(UPCOMING_QUERY_KEY, snapshot.previousUpcoming);
+}
+
+/** Reconciles the triage caches with server truth (on settle). */
+async function settleViewCaches(queryClient: QueryClient): Promise<void> {
+  await queryClient.invalidateQueries({ queryKey: TASKS_QUERY_KEY });
+  await queryClient.invalidateQueries({ queryKey: TODAY_QUERY_KEY });
+  await queryClient.invalidateQueries({ queryKey: UPCOMING_QUERY_KEY });
+}
+
+/** Finds a task row across the Inbox + Today + Upcoming caches (the source for an optimistic edit). */
+function findTaskInViewCaches(queryClient: QueryClient, id: string): TaskResponse | undefined {
+  const inbox = queryClient.getQueryData<TaskResponse[]>(TASKS_QUERY_KEY)?.find((t) => t.id === id);
+  if (inbox) return inbox;
+  const today = flattenToday(queryClient.getQueryData<TodayResponse>(TODAY_QUERY_KEY)).find((t) => t.id === id);
+  if (today) return today;
+  return flattenUpcoming(queryClient.getQueryData<UpcomingResponse>(UPCOMING_QUERY_KEY)).find((t) => t.id === id);
+}
 
 /**
  * Structured mutation error carrying the machine-readable `errorCode` alongside the
@@ -162,7 +243,8 @@ interface EditTaskContext {
 }
 
 export type RenameTaskContext = EditTaskContext;
-export type ToggleDoneContext = EditTaskContext;
+/** Toggle-done also recomputes the Today/Upcoming caches (a completed task leaves both), so it carries the full view snapshot (slice 005, R7). */
+export type ToggleDoneContext = ViewCachesSnapshot;
 export type ReorderTaskContext = EditTaskContext;
 export type DeleteTaskContext = EditTaskContext;
 
@@ -319,14 +401,24 @@ export function toggleDoneMutationOptions(queryClient: QueryClient): ToggleDoneO
     },
 
     onMutate: async (variables: ToggleDoneVariables): Promise<ToggleDoneContext> => {
+      // slice 005 (R7): toggle-done recomputes the Today/Upcoming caches too — a completed task leaves
+      // BOTH triage views — alongside the slice-002 Inbox patch. Snapshot all three for rollback.
       await queryClient.cancelQueries({ queryKey: TASKS_QUERY_KEY });
-      const previousTasks = queryClient.getQueryData<TaskResponse[]>(TASKS_QUERY_KEY);
+      await queryClient.cancelQueries({ queryKey: TODAY_QUERY_KEY });
+      await queryClient.cancelQueries({ queryKey: UPCOMING_QUERY_KEY });
+      const snapshot = snapshotViewCaches(queryClient);
 
-      queryClient.setQueryData<TaskResponse[]>(TASKS_QUERY_KEY, (old) =>
-        (old ?? []).map((t) => (t.id === variables.id ? { ...t, status: variables.status } : t)),
-      );
+      const row = findTaskInViewCaches(queryClient, variables.id);
+      if (row) {
+        const done = variables.status === "done";
+        applyTaskToViewCaches(
+          queryClient,
+          { ...row, status: variables.status, completedAt: done ? new Date().toISOString() : null },
+          new Date(),
+        );
+      }
 
-      return { previousTasks };
+      return snapshot;
     },
 
     onError: async (
@@ -335,7 +427,7 @@ export function toggleDoneMutationOptions(queryClient: QueryClient): ToggleDoneO
       context: ToggleDoneContext | undefined,
     ): Promise<void> => {
       if (!isVersionConflict(error)) {
-        queryClient.setQueryData<TaskResponse[] | undefined>(TASKS_QUERY_KEY, context?.previousTasks);
+        if (context) rollbackViewCaches(queryClient, context);
         return;
       }
       const fresh = await refetchFreshRow(queryClient, variables.id);
@@ -345,16 +437,17 @@ export function toggleDoneMutationOptions(queryClient: QueryClient): ToggleDoneO
     },
 
     onSettled: async (data): Promise<void> => {
-      // On success, write the server's returned row (with its FRESH bumped `version`) back into
-      // the cache synchronously, so a rapid SECOND toggle on the same row reads the current
-      // version instead of the stale optimistic one — otherwise the next PATCH would 409 and
-      // race the once-only reapply path (research R10; fixes sequential same-row toggles).
+      // On success, write the server's returned row (with its FRESH bumped `version`) back into the
+      // caches synchronously, so a rapid SECOND toggle on the same row reads the current version instead
+      // of the stale optimistic one (research R10; fixes sequential same-row toggles). Then reconcile
+      // all three triage caches with server truth.
       if (data) {
         queryClient.setQueryData<TaskResponse[]>(TASKS_QUERY_KEY, (old) =>
           (old ?? []).map((t) => (t.id === data.id ? data : t)),
         );
+        applyTaskToViewCaches(queryClient, data, new Date());
       }
-      await queryClient.invalidateQueries({ queryKey: TASKS_QUERY_KEY });
+      await settleViewCaches(queryClient);
     },
   };
 }
@@ -663,6 +756,177 @@ export function moveTaskToProjectMutationOptions(queryClient: QueryClient): Move
   };
 }
 
+/* ─────────────────────────── SET PRIORITY (PATCH /priority) ─────────────────────────── */
+
+export interface SetPriorityVariables {
+  id: string;
+  priority: Priority;
+  version: number;
+}
+
+type ViewMutationOptions<TVariables> = {
+  mutationFn: (variables: TVariables) => Promise<TaskResponse>;
+  onMutate: (variables: TVariables) => Promise<ViewCachesSnapshot>;
+  onError: (error: Error, variables: TVariables, context: ViewCachesSnapshot | undefined) => void;
+  onSettled: (
+    data: TaskResponse | undefined,
+    error: Error | null,
+    variables: TVariables,
+    context: ViewCachesSnapshot | undefined,
+  ) => Promise<void>;
+};
+
+/**
+ * Optimistic SET-PRIORITY recipe (slice 005, AS-04, R2/R7). Re-stamps the priority on the target row and
+ * re-sorts the Today/Upcoming groups via the client membership recompute (priority does not change
+ * membership, only order). Like move-to-project there is NO once-only 409 reapply — a 409/422/network error
+ * is a PLAIN rollback (the FR-049 message surfaces through the global MutationCache announcer).
+ */
+export function setPriorityMutationOptions(queryClient: QueryClient): ViewMutationOptions<SetPriorityVariables> {
+  return {
+    mutationFn: async ({ id, priority, version }: SetPriorityVariables): Promise<TaskResponse> => {
+      const { data, error } = await apiClient.PATCH("/api/tasks/{id}/priority", {
+        params: { path: { id } },
+        body: { priority, version },
+      });
+      if (error || !data) {
+        const errorCode = (error as ProblemDetails | undefined)?.errorCode;
+        throw new TaskMutationError(errorCode ?? "internal_error", mapError(errorCode).message);
+      }
+      return data;
+    },
+    onMutate: async (variables: SetPriorityVariables): Promise<ViewCachesSnapshot> => {
+      await queryClient.cancelQueries({ queryKey: TODAY_QUERY_KEY });
+      await queryClient.cancelQueries({ queryKey: UPCOMING_QUERY_KEY });
+      const snapshot = snapshotViewCaches(queryClient);
+      const row = findTaskInViewCaches(queryClient, variables.id);
+      if (row) applyTaskToViewCaches(queryClient, { ...row, priority: variables.priority }, new Date());
+      return snapshot;
+    },
+    onError: (_error, _variables, context): void => {
+      if (context) rollbackViewCaches(queryClient, context);
+    },
+    onSettled: async (): Promise<void> => settleViewCaches(queryClient),
+  };
+}
+
+/* ─────────────────────────── RESCHEDULE (PATCH /due-date) ─────────────────────────── */
+
+export interface RescheduleDueDateVariables {
+  id: string;
+  dueDate: string | null;
+  dueHasTime: boolean | null;
+  version: number;
+}
+
+/**
+ * Optimistic RESCHEDULE recipe (slice 005, AS-05, R4/R7). Re-stamps the due pair and recomputes view
+ * membership: a reschedule to tomorrow DROPS the row from Today and adds it to Upcoming (AS-05's "it
+ * disappears from Today"); clearing the due date drops it from both. Plain rollback on error.
+ */
+export function rescheduleDueDateMutationOptions(
+  queryClient: QueryClient,
+): ViewMutationOptions<RescheduleDueDateVariables> {
+  return {
+    mutationFn: async ({ id, dueDate, dueHasTime, version }: RescheduleDueDateVariables): Promise<TaskResponse> => {
+      const { data, error } = await apiClient.PATCH("/api/tasks/{id}/due-date", {
+        params: { path: { id } },
+        body: { dueDate, dueHasTime, version },
+      });
+      if (error || !data) {
+        const errorCode = (error as ProblemDetails | undefined)?.errorCode;
+        throw new TaskMutationError(errorCode ?? "internal_error", mapError(errorCode).message);
+      }
+      return data;
+    },
+    onMutate: async (variables: RescheduleDueDateVariables): Promise<ViewCachesSnapshot> => {
+      await queryClient.cancelQueries({ queryKey: TODAY_QUERY_KEY });
+      await queryClient.cancelQueries({ queryKey: UPCOMING_QUERY_KEY });
+      const snapshot = snapshotViewCaches(queryClient);
+      const row = findTaskInViewCaches(queryClient, variables.id);
+      if (row) {
+        applyTaskToViewCaches(
+          queryClient,
+          { ...row, dueDate: variables.dueDate, dueHasTime: variables.dueHasTime },
+          new Date(),
+        );
+      }
+      return snapshot;
+    },
+    onError: (_error, _variables, context): void => {
+      if (context) rollbackViewCaches(queryClient, context);
+    },
+    onSettled: async (): Promise<void> => settleViewCaches(queryClient),
+  };
+}
+
+/* ──────────────────────────────── EDIT (PATCH /edit) ──────────────────────────────── */
+
+export interface EditTaskVariables {
+  id: string;
+  title: string;
+  description: string | null;
+  priority: Priority;
+  dueDate: string | null;
+  dueHasTime: boolean | null;
+  projectId: string | null;
+  version: number;
+}
+
+/**
+ * Optimistic EDIT recipe (slice 005, AS-06/07/08, R4/R7) — the combined whole-object replace. Re-stamps all
+ * editable fields and recomputes view membership/order. Plain rollback on error. `onSettled` additionally
+ * invalidates the source + target project caches when the edit moved the task across projects.
+ */
+export function editTaskMutationOptions(queryClient: QueryClient): ViewMutationOptions<EditTaskVariables> {
+  return {
+    mutationFn: async (variables: EditTaskVariables): Promise<TaskResponse> => {
+      const { id, title, description, priority, dueDate, dueHasTime, projectId, version } = variables;
+      const { data, error } = await apiClient.PATCH("/api/tasks/{id}/edit", {
+        params: { path: { id } },
+        body: { title, description, priority, dueDate, dueHasTime, projectId, version },
+      });
+      if (error || !data) {
+        const errorCode = (error as ProblemDetails | undefined)?.errorCode;
+        throw new TaskMutationError(errorCode ?? "internal_error", mapError(errorCode).message);
+      }
+      return data;
+    },
+    onMutate: async (variables: EditTaskVariables): Promise<ViewCachesSnapshot> => {
+      await queryClient.cancelQueries({ queryKey: TODAY_QUERY_KEY });
+      await queryClient.cancelQueries({ queryKey: UPCOMING_QUERY_KEY });
+      const snapshot = snapshotViewCaches(queryClient);
+      const row = findTaskInViewCaches(queryClient, variables.id);
+      if (row) {
+        applyTaskToViewCaches(
+          queryClient,
+          {
+            ...row,
+            title: variables.title,
+            description: variables.description,
+            priority: variables.priority,
+            dueDate: variables.dueDate,
+            dueHasTime: variables.dueHasTime,
+            projectId: variables.projectId,
+          },
+          new Date(),
+        );
+      }
+      return snapshot;
+    },
+    onError: (_error, _variables, context): void => {
+      if (context) rollbackViewCaches(queryClient, context);
+    },
+    onSettled: async (_data, _error, variables): Promise<void> => {
+      await settleViewCaches(queryClient);
+      // An edit can move the task across projects — reconcile the (possibly two) project board caches.
+      if (variables.projectId != null) {
+        await queryClient.invalidateQueries({ queryKey: projectTasksQueryKey(variables.projectId) });
+      }
+    },
+  };
+}
+
 /**
  * "use client" hook wrapper. `createTask(title)` validates the title at the trust
  * boundary (Constitution VI), mints the client-side UUIDv7 id, computes the
@@ -690,6 +954,15 @@ export function useTaskMutations() {
   );
   const moveMutation = useMutation<TaskResponse, Error, MoveTaskToProjectVariables, MoveTaskToProjectContext>(
     moveTaskToProjectMutationOptions(queryClient),
+  );
+  const setPriorityMutation = useMutation<TaskResponse, Error, SetPriorityVariables, ViewCachesSnapshot>(
+    setPriorityMutationOptions(queryClient),
+  );
+  const rescheduleMutation = useMutation<TaskResponse, Error, RescheduleDueDateVariables, ViewCachesSnapshot>(
+    rescheduleDueDateMutationOptions(queryClient),
+  );
+  const editMutation = useMutation<TaskResponse, Error, EditTaskVariables, ViewCachesSnapshot>(
+    editTaskMutationOptions(queryClient),
   );
 
   const currentTasks = (): TaskResponse[] => queryClient.getQueryData<TaskResponse[]>(TASKS_QUERY_KEY) ?? [];
@@ -721,9 +994,57 @@ export function useTaskMutations() {
   };
 
   const setTaskDone = (id: string, done: boolean): void => {
-    const row = currentTasks().find((t) => t.id === id);
+    // Find the row across the Inbox + Today + Upcoming caches — toggle-done is exercised from all three.
+    const row = findTaskInViewCaches(queryClient, id);
     if (!row) return;
     toggleMutation.mutate({ id, status: done ? "done" : "backlog", version: row.version });
+  };
+
+  /** Sets (or clears) the selected task's priority — the `1`-`4` keys (slice 005, AS-04). */
+  const setTaskPriority = (id: string, priority: Priority): void => {
+    const row = findTaskInViewCaches(queryClient, id);
+    if (!row) return;
+    setPriorityMutation.mutate({ id, priority, version: row.version });
+  };
+
+  /** Reschedules (or clears) the selected task's due date — the `T` key (slice 005, AS-05). */
+  const rescheduleTask = (id: string, dueDate: Date | null, dueHasTime: boolean | null): void => {
+    const row = findTaskInViewCaches(queryClient, id);
+    if (!row) return;
+    rescheduleMutation.mutate({
+      id,
+      dueDate: dueDate ? dueDate.toISOString() : null,
+      dueHasTime,
+      version: row.version,
+    });
+  };
+
+  /** Saves the task editor's whole-object replace — `Ctrl+Enter` (slice 005, AS-06/07/08). */
+  const editTask = (
+    id: string,
+    fields: {
+      title: string;
+      description: string | null;
+      priority: Priority;
+      dueDate: Date | null;
+      dueHasTime: boolean | null;
+      projectId: string | null;
+    },
+  ): void => {
+    const row = findTaskInViewCaches(queryClient, id);
+    if (!row) return;
+    // Defensive boundary parse (Constitution VI) — the whole-object replace, validated as one schema.
+    const parsed = editTaskSchema.parse(fields);
+    editMutation.mutate({
+      id,
+      title: parsed.title,
+      description: parsed.description,
+      priority: parsed.priority,
+      dueDate: parsed.dueDate ? parsed.dueDate.toISOString() : null,
+      dueHasTime: parsed.dueHasTime,
+      projectId: parsed.projectId,
+      version: row.version,
+    });
   };
 
   /** Moves `id` to sit between the rows currently above/below the drop target (by id). */
@@ -759,5 +1080,15 @@ export function useTaskMutations() {
     moveMutation.mutate({ id, fromProjectId, toProjectId, version: row.version });
   };
 
-  return { createTask, renameTask, setTaskDone, reorderTask, deleteTask, moveTaskToProject };
+  return {
+    createTask,
+    renameTask,
+    setTaskDone,
+    reorderTask,
+    deleteTask,
+    moveTaskToProject,
+    setTaskPriority,
+    rescheduleTask,
+    editTask,
+  };
 }
