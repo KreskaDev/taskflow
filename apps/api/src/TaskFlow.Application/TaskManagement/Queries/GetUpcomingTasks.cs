@@ -62,7 +62,8 @@ public static class GetUpcomingTasksHandler
                     .OrderBy(t => TaskTriageOrder.PriorityRank(t.Priority))
                     .ThenBy(t => t.DueDate)
                     .ThenBy(t => t.CreatedAt)
-                    .ThenBy(t => t.Id.Value)
+                    // Ordinal-string id tiebreak — identical to the client recompute (dailyViews.ts), FR-092.
+                    .ThenBy(t => t.Id.Value.ToString(), StringComparer.Ordinal)
                     .Select(TaskResponse.From)
                     .ToList(),
             })

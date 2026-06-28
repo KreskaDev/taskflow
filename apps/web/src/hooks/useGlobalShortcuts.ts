@@ -57,7 +57,13 @@ export interface GlobalShortcutHandlers {
  */
 function isTextFieldFocused(): boolean {
   const active = document.activeElement;
-  if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) {
+  if (
+    active instanceof HTMLInputElement ||
+    active instanceof HTMLTextAreaElement ||
+    // A focused <select> (the editor's priority/project fields) must also swallow single-key shortcuts
+    // (FR-031), else Space/1-4/T/E leak to the global gate while the dropdown has focus.
+    active instanceof HTMLSelectElement
+  ) {
     return true;
   }
   if (active instanceof HTMLElement) {

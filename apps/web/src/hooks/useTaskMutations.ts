@@ -796,6 +796,7 @@ export function setPriorityMutationOptions(queryClient: QueryClient): ViewMutati
       return data;
     },
     onMutate: async (variables: SetPriorityVariables): Promise<ViewCachesSnapshot> => {
+      await queryClient.cancelQueries({ queryKey: TASKS_QUERY_KEY });
       await queryClient.cancelQueries({ queryKey: TODAY_QUERY_KEY });
       await queryClient.cancelQueries({ queryKey: UPCOMING_QUERY_KEY });
       const snapshot = snapshotViewCaches(queryClient);
@@ -806,7 +807,12 @@ export function setPriorityMutationOptions(queryClient: QueryClient): ViewMutati
     onError: (_error, _variables, context): void => {
       if (context) rollbackViewCaches(queryClient, context);
     },
-    onSettled: async (): Promise<void> => settleViewCaches(queryClient),
+    onSettled: async (data): Promise<void> => {
+      // Write the server row (with its FRESH bumped version) back so a rapid SECOND op on the same row
+      // reads the current version instead of the stale optimistic one (mirrors toggle/rename/reorder).
+      if (data) applyTaskToViewCaches(queryClient, data, new Date());
+      await settleViewCaches(queryClient);
+    },
   };
 }
 
@@ -840,6 +846,7 @@ export function rescheduleDueDateMutationOptions(
       return data;
     },
     onMutate: async (variables: RescheduleDueDateVariables): Promise<ViewCachesSnapshot> => {
+      await queryClient.cancelQueries({ queryKey: TASKS_QUERY_KEY });
       await queryClient.cancelQueries({ queryKey: TODAY_QUERY_KEY });
       await queryClient.cancelQueries({ queryKey: UPCOMING_QUERY_KEY });
       const snapshot = snapshotViewCaches(queryClient);
@@ -856,7 +863,10 @@ export function rescheduleDueDateMutationOptions(
     onError: (_error, _variables, context): void => {
       if (context) rollbackViewCaches(queryClient, context);
     },
-    onSettled: async (): Promise<void> => settleViewCaches(queryClient),
+    onSettled: async (data): Promise<void> => {
+      if (data) applyTaskToViewCaches(queryClient, data, new Date());
+      await settleViewCaches(queryClient);
+    },
   };
 }
 
@@ -893,6 +903,7 @@ export function editTaskMutationOptions(queryClient: QueryClient): ViewMutationO
       return data;
     },
     onMutate: async (variables: EditTaskVariables): Promise<ViewCachesSnapshot> => {
+      await queryClient.cancelQueries({ queryKey: TASKS_QUERY_KEY });
       await queryClient.cancelQueries({ queryKey: TODAY_QUERY_KEY });
       await queryClient.cancelQueries({ queryKey: UPCOMING_QUERY_KEY });
       const snapshot = snapshotViewCaches(queryClient);
@@ -917,7 +928,10 @@ export function editTaskMutationOptions(queryClient: QueryClient): ViewMutationO
     onError: (_error, _variables, context): void => {
       if (context) rollbackViewCaches(queryClient, context);
     },
-    onSettled: async (_data, _error, variables): Promise<void> => {
+    onSettled: async (data, _error, variables): Promise<void> => {
+      // Write the server row (FRESH version) back so a rapid second edit on the same row isn't a 409 lost
+      // update (mirrors toggle/rename/reorder).
+      if (data) applyTaskToViewCaches(queryClient, data, new Date());
       await settleViewCaches(queryClient);
       // An edit can move the task across projects — reconcile the (possibly two) project board caches.
       if (variables.projectId != null) {

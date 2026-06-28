@@ -78,7 +78,7 @@ Seed several tasks across projects/priorities with today's, yesterday's (overdue
 | Reschedule/edit `dueDate` in a non-`Z` form (offset or unspecified kind) | 422 `validation_failed`, **NOT 500** (the slice-003 UTC-kind trust-boundary guard) |
 | Reschedule/edit `dueDate` implausibly out of range (year 1500 / now + 50y) | 422 `validation_failed` (the slice-003 range rule) |
 | `description` longer than 8000 chars on edit | 422 `validation_failed` (length validated both tiers, research R3) |
-| `editTask` request **omitting** any editable key (`title`/`description`/`priority`/`dueDate`/`dueHasTime`/`projectId`/`version`) | 422 `validation_failed` — whole-object replace, an omitted field is never a silent null (research R4, mirrors slice-004 `EditProjectRequest`) |
+| `editTask` request **omitting** any editable key (`title`/`description`/`priority`/`dueDate`/`dueHasTime`/`projectId`/`version`) | **400 Bad Request** — whole-object replace; a missing System.Text.Json `required` member is rejected at the binding layer (the app-wide behavior, same as slice-004 `EditProjectRequest.parentId`), never a silent null (research R4). The load-bearing invariant is "rejected + row untouched" |
 | `editTask` `projectId` referencing a foreign/absent project | 404 `not_found` (reuses the move-to-project ownership check) |
 | Stale `version` on set-priority / reschedule / edit | 409 `version_conflict` |
 | Foreign/absent/tombstoned task `id` on any mutation | 404 `not_found` (existence not disclosed — the ownership posture) |
@@ -107,6 +107,6 @@ Seed several tasks across projects/priorities with today's, yesterday's (overdue
 
 - Every scenario above passes (manual + automated).
 - Today/Upcoming membership tests are deterministic against an injected Warsaw clock and cover due-today, overdue-in-Today, tomorrow-in-Upcoming-not-Today, no-due-in-neither, done/cancelled-excluded, the R5 deterministic order (NULL-priority-last, date-only-as-start-of-day), and a **DST-boundary** case on **both** tiers.
-- Every new data handler ships an **allow** and a **deny** integration test through the real DB (deny = another user's personal task → 404). The two SC-016 shared-project deny tests are tracked as **BLOCKED** pending slice 007 (not faked).
+- Every new data handler ships an **allow** and a **deny** integration test through the real DB (deny = another user's personal task → 404). ✅ The two SC-016 shared-project deny tests are **realized and green**: viewer-mutation-deny → **403** (`SetPriorityTests`/`RescheduleDueDateTests`/`EditTaskTests`/`SetTaskDoneSharedAuthzTests`) and non-member-read-deny → **absent** from Today/Upcoming (`GetTodayTasksTests`/`GetUpcomingTasksTests`); plus the editor-member-allow on each.
 - `pnpm gen:api` clean; `pnpm typecheck` green; `dotnet test` green; **no new migration file** in the diff (FR-051 no-op).
 - `1`-`4`/`T`/`E`/`Space`/`Ctrl+Enter`/`Esc` and `G T`/`G I`/`G U` all operate mouse-free (SC-001); Today + Upcoming pass the WCAG 2.1 AA audit (SC-008).

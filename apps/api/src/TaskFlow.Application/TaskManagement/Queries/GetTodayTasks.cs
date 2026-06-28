@@ -56,7 +56,9 @@ public static class GetTodayTasksHandler
         var groups = rows
             .GroupBy(t => t.ProjectId?.Value)
             .OrderBy(g => g.Key.HasValue) // null (Inbox) group first, then projects
-            .ThenBy(g => g.Key)
+            // Order project groups by the id's ORDINAL STRING form (not Guid.CompareTo) so the order is
+            // identical to the client's optimistic recompute (dailyViews.ts) — FR-092, no reconcile flicker.
+            .ThenBy(g => g.Key?.ToString(), StringComparer.Ordinal)
             .Select(g => new TodayGroup
             {
                 ProjectId = g.Key,
@@ -64,7 +66,7 @@ public static class GetTodayTasksHandler
                     .OrderBy(t => TaskTriageOrder.PriorityRank(t.Priority))
                     .ThenBy(t => t.DueDate)
                     .ThenBy(t => t.CreatedAt)
-                    .ThenBy(t => t.Id.Value)
+                    .ThenBy(t => t.Id.Value.ToString(), StringComparer.Ordinal)
                     .Select(t => TodayTaskResponse.From(t, isOverdue: t.DueDate < startOfTodayUtc))
                     .ToList(),
             })

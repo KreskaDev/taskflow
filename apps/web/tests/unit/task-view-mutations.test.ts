@@ -70,6 +70,21 @@ describe("set-priority optimistic surface", () => {
     expect(today.groups[0]!.tasks[0]!.priority).toBe("P0");
   });
 
+  it("onSettled writes the server row (fresh version) back so a rapid second op isn't a stale 409", async () => {
+    freezeNow();
+    const qc = new QueryClient();
+    const a = row({ id: "a", dueDate: "2026-06-27T10:00:00Z", dueHasTime: true, priority: "P3", version: 0 });
+    qc.setQueryData(TODAY_QUERY_KEY, todayCache([a]));
+
+    const opts = setPriorityMutationOptions(qc);
+    const server = row({ id: "a", dueDate: "2026-06-27T10:00:00Z", dueHasTime: true, priority: "P0", version: 1 });
+    await opts.onSettled(server, null, { id: "a", priority: "P0", version: 0 }, undefined as never);
+
+    const stored = qc.getQueryData<TodayResponse>(TODAY_QUERY_KEY)!.groups[0]!.tasks.find((t) => t.id === "a")!;
+    expect(stored.version).toBe(1); // fresh version, not the stale optimistic 0
+    expect(stored.priority).toBe("P0");
+  });
+
   it("rolls back the Today cache on error", async () => {
     freezeNow();
     const qc = new QueryClient();

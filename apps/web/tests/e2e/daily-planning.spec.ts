@@ -50,6 +50,7 @@ test.describe("US-02 Daily Planning Session (AS-01..AS-08)", () => {
     await apiAs(userId).createTask({ title: "Review the day", position: "a0", dueDate: dueToday() });
 
     await page.goto("/");
+    await expect(page.getByRole("heading", { name: "Your workspace" })).toBeVisible();
     await page.keyboard.press("g");
     await page.keyboard.press("t");
 
@@ -158,6 +159,9 @@ test.describe("US-08 Keyboard Navigation (AS-01/AS-02)", () => {
     await apiAs(userId).createTask({ title: "Upcoming task", position: "a0", dueDate: dueInDays(2) });
 
     await page.goto("/");
+    // Wait for the Inbox to be interactive (hydrated + the global key listener attached) before the chord,
+    // so `G U` is not raced against hydration.
+    await expect(page.getByRole("heading", { name: "Your workspace" })).toBeVisible();
     await page.keyboard.press("g");
     await page.keyboard.press("u");
 

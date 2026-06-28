@@ -105,3 +105,19 @@ describe("Upcoming membership + assembly", () => {
     expect(isInToday(tomorrow, NOW)).toBe(false);
   });
 });
+
+describe("client-tier DST boundary (FR-092 identical-rule, R13 — both tiers)", () => {
+  // Warsaw springs forward 2026-03-29 02:00 CET → 03:00 CEST (a 23h day). "now" = 05:00Z that day.
+  // start-of-tomorrow-Warsaw = 2026-03-29T22:00Z — proven by the tzdb library, never a fixed offset.
+  const DST_NOW = new Date("2026-03-29T05:00:00Z");
+
+  it("uses the 23h spring-forward day for Today membership", () => {
+    expect(isInToday(task({ id: "a", dueDate: "2026-03-29T21:30:00Z", dueHasTime: true }), DST_NOW)).toBe(true); // 23:30 Warsaw 29th
+    expect(isInToday(task({ id: "b", dueDate: "2026-03-29T22:30:00Z", dueHasTime: true }), DST_NOW)).toBe(false); // 00:30 Warsaw 30th
+  });
+
+  it("groups the next Warsaw day correctly across the DST seam", () => {
+    const upcoming = buildUpcomingGroups([task({ id: "b", dueDate: "2026-03-29T22:30:00Z", dueHasTime: true })], DST_NOW);
+    expect(upcoming.groups[0]!.date).toBe("2026-03-30");
+  });
+});

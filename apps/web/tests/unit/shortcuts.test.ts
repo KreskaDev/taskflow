@@ -284,6 +284,21 @@ describe("createGlobalShortcutsListener — slice 005 keys (priority / reschedul
     expect(handlers.onGoUpcoming).toHaveBeenCalledTimes(1);
   });
 
+  it("suppresses 1-4 / T / Space while a <select> is focused (FR-031, editor priority/project fields)", () => {
+    const handlers = makeHandlers();
+    const listener = createGlobalShortcutsListener(handlers);
+    const select = document.createElement("select");
+    focusEl(select);
+
+    listener(keydown({ key: "1" }));
+    listener(keydown({ key: "t" }));
+    listener(keydown({ key: " " }));
+
+    expect(handlers.onSetPriority).not.toHaveBeenCalled();
+    expect(handlers.onReschedule).not.toHaveBeenCalled();
+    expect(handlers.onToggle).not.toHaveBeenCalled();
+  });
+
   it("an aborted G-chord swallows the stray second key", () => {
     const handlers = makeHandlers();
     const listener = createGlobalShortcutsListener(handlers);
