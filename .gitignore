@@ -50,3 +50,11 @@ appsettings.*.local.json
 **/appsettings.Production.json
 Caddyfile.local
 docker-compose.override.yml
+
+# Local interactive dev launcher + its runtime artifacts (dev-run.mjs is a local tool, not part of the build)
+apps/web/dev-run.mjs
+.specify/workflows/.dev-run-state.json
+.specify/workflows/.launcher.*
+.specify/workflows/.api.log
+.specify/workflows/.web.log
+taskflow-running.png
