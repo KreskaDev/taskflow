@@ -329,3 +329,124 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ─────────────────────────── Daily Planning (slice 005) ─────────────────────────── */
+
+.tf-daily-view {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.tf-daily-view__heading {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--tf-fg);
+}
+
+.tf-daily-view__group {
+  display: flex;
+  flex-direction: column;
+}
+
+.tf-daily-view__group-heading {
+  padding: 0.5rem 0.75rem 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--tf-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.tf-daily-view__empty {
+  padding: 1rem 0.75rem;
+  color: var(--tf-muted);
+}
+
+/* Priority badge — the P0–P3 TEXT carries the meaning (FR-044); the tint only accompanies it.
+   Colors are chosen for ≥ 4.5:1 contrast against the chip background. */
+.tf-task-row__priority {
+  flex: none;
+  margin-left: 0.5rem;
+  padding: 0 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.5;
+  border-radius: 0.25rem;
+  border: 1px solid var(--tf-border);
+  color: var(--tf-fg);
+  background: color-mix(in srgb, var(--tf-border) 30%, #ffffff);
+}
+
+.tf-task-row__priority[data-priority="P0"] {
+  color: #8a1c1c;
+  border-color: #8a1c1c;
+  background: color-mix(in srgb, #8a1c1c 8%, #ffffff);
+}
+
+.tf-task-row__priority[data-priority="P1"] {
+  color: #8a4b00;
+  border-color: #8a4b00;
+}
+
+.tf-task-row__overdue {
+  flex: none;
+  margin-left: 0.5rem;
+  padding: 0 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 0.25rem;
+  color: #8a1c1c; /* dark red on light bg — ≥ 4.5:1; the TEXT "zaległe" is the signal, not color alone */
+  background: color-mix(in srgb, #8a1c1c 8%, #ffffff);
+}
+
+.tf-dialog__title {
+  margin: 0 0 0.75rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--tf-fg);
+}
+
+.tf-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.tf-field--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tf-field__label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--tf-fg);
+}
+
+.tf-field__input {
+  padding: 0.375rem 0.5rem;
+  font: inherit;
+  color: var(--tf-fg);
+  background: #ffffff;
+  border: 1px solid var(--tf-border);
+  border-radius: 0.375rem;
+}
+
+.tf-reschedule-input__field {
+  width: 100%;
+  padding: 0.5rem;
+  font: inherit;
+  color: var(--tf-fg);
+  background: #ffffff;
+  border: 1px solid var(--tf-accent);
+  border-radius: 0.375rem;
+}
+
+.tf-reschedule-input__error {
+  margin: 0.5rem 0 0;
+  color: #8a1c1c;
+  font-size: 0.8125rem;
+}

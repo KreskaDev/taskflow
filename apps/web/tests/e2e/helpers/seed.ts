@@ -153,7 +153,7 @@ export async function setNextIdentity(identity: {
  */
 export function apiAs(taskFlowUserId: string): {
   createProject: (input: { name: string; color: string; icon: string; parentId?: string | null }) => Promise<{ id: string; version: number; parentId: string | null }>;
-  createTask: (input: { title: string; position: string }) => Promise<{ id: string; version: number }>;
+  createTask: (input: { title: string; position: string; dueDate?: string; dueHasTime?: boolean }) => Promise<{ id: string; version: number }>;
   moveTask: (taskId: string, projectId: string | null, version: number) => Promise<void>;
   archiveProject: (projectId: string, version: number, childDisposition?: "cascade" | "orphan_to_top") => Promise<void>;
   shareProject: (projectId: string, version: number) => Promise<{ version: number }>;
@@ -185,10 +185,13 @@ export function apiAs(taskFlowUserId: string): {
     },
     async createTask(input) {
       const id = randomUUID();
-      const res = await authedFetch(`/api/tasks/${id}`, {
-        method: "PUT",
-        body: { title: input.title, position: input.position },
-      });
+      const body: Record<string, unknown> = { title: input.title, position: input.position };
+      // slice 005: seed a due date so the task lands in Today/Upcoming (the create contract pairs them).
+      if (input.dueDate !== undefined) {
+        body.dueDate = input.dueDate;
+        body.dueHasTime = input.dueHasTime ?? true;
+      }
+      const res = await authedFetch(`/api/tasks/${id}`, { method: "PUT", body });
       if (!res.ok) throw new Error(`createTask failed (${String(res.status)}): ${await res.text()}`);
       const task = (await res.json()) as { id: string; version: number };
       return task;

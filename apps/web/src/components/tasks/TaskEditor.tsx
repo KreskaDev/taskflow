@@ -143,7 +143,7 @@ export function TaskEditor({ open, task, onClose, onSave }: TaskEditorProps) {
           <button type="button" className="tf-button" onClick={save}>
             Zapisz (Ctrl+Enter)
           </button>
-          <button type="button" className="tf-button tf-button--ghost" onClick={onClose}>
+          <button type="button" className="tf-button tf-button--secondary" onClick={onClose}>
             Anuluj (Esc)
           </button>
         </div>

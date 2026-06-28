@@ -24,6 +24,7 @@ namespace TaskFlow.Domain.TaskManagement;
 public sealed class Task : AggregateRoot<TaskId>
 {
     private const int MaxTitleLength = 500;
+    private const int MaxDescriptionLength = 8000;
 
     private Task()
     {
@@ -186,6 +187,62 @@ public sealed class Task : AggregateRoot<TaskId>
     }
 
     /// <summary>
+    /// Sets the task priority to a closed-set token <c>P0</c>–<c>P3</c>, or clears it with null (slice 005,
+    /// AS-04/R2). The <c>1</c>-<c>4</c> instant mutation. A no-op-equal set still bumps <see cref="Version"/>
+    /// (consistent with the other setters); the closed-set guard is belt-and-braces behind the command validator.
+    /// </summary>
+    /// <param name="priority">A token in <c>{P0, P1, P2, P3}</c>, or null to clear.</param>
+    /// <param name="utcNow">The current UTC time (injected for testability).</param>
+    public void SetPriority(string? priority, DateTime utcNow)
+    {
+        Priority = NormalizePriority(priority);
+        Touch(utcNow);
+    }
+
+    /// <summary>
+    /// Reschedules the due date to a resolved UTC instant + <paramref name="dueHasTime"/> flag, or clears it
+    /// with both null (slice 005, AS-05/R4). The <c>T</c> reschedule; realizes the reschedule slice 003
+    /// deferred. The <c>{DueDate, DueHasTime}</c> pairing invariant (both set or both null) is enforced
+    /// upstream by the reused validator (the slice-003 rule); the aggregate sets whatever the validated
+    /// command supplies. Bumps <see cref="Version"/>.
+    /// </summary>
+    /// <param name="dueDate">The resolved due-date UTC instant, or null to clear.</param>
+    /// <param name="dueHasTime">The <c>DueDate.has_time</c> flag, or null to clear.</param>
+    /// <param name="utcNow">The current UTC time (injected for testability).</param>
+    public void Reschedule(DateTime? dueDate, bool? dueHasTime, DateTime utcNow)
+    {
+        DueDate = dueDate;
+        DueHasTime = dueHasTime;
+        Touch(utcNow);
+    }
+
+    /// <summary>
+    /// Whole-object replace of the editable fields (slice 005, AS-06/07/08, R4) — saved atomically on
+    /// <c>Ctrl+Enter</c>. Reuses <see cref="NormalizeTitle"/> for the title, the closed-set guard for the
+    /// priority, and sets the project the same way <see cref="MoveToProject"/> does (no duplicate move logic);
+    /// the pairing invariant for the due fields is enforced upstream by the command validator. A single
+    /// <see cref="Touch"/> (one mutation). The handler authorizes the task (and, on an actual project move,
+    /// the target project) before calling this; the aggregate just records the replace.
+    /// </summary>
+    /// <param name="title">The new title; trimmed-non-empty and ≤ 500 chars.</param>
+    /// <param name="description">The new description (markdown source), trimmed; whitespace-only → null; ≤ 8000 chars.</param>
+    /// <param name="priority">A token in <c>{P0, P1, P2, P3}</c>, or null.</param>
+    /// <param name="dueDate">The resolved due-date UTC instant, or null.</param>
+    /// <param name="dueHasTime">The <c>DueDate.has_time</c> flag, or null.</param>
+    /// <param name="projectId">The owning project, or null for the Inbox.</param>
+    /// <param name="utcNow">The current UTC time (injected for testability).</param>
+    public void EditTask(string title, string? description, string? priority, DateTime? dueDate, bool? dueHasTime, ProjectId? projectId, DateTime utcNow)
+    {
+        Title = NormalizeTitle(title);
+        Description = NormalizeDescription(description);
+        Priority = NormalizePriority(priority);
+        DueDate = dueDate;
+        DueHasTime = dueHasTime;
+        ProjectId = projectId;
+        Touch(utcNow);
+    }
+
+    /// <summary>
     /// Soft-deletes the task (FR-097): stamps <see cref="DeletedAt"/>. Idempotent — a second
     /// call on an already-tombstoned row is a guarded no-op (no re-stamp, no version bump).
     /// </summary>
@@ -209,6 +266,44 @@ public sealed class Task : AggregateRoot<TaskId>
         if (trimmed.Length > MaxTitleLength)
         {
             throw new ArgumentException($"Title must be {MaxTitleLength} characters or fewer.", nameof(title));
+        }
+
+        return trimmed;
+    }
+
+    /// <summary>Validates the closed priority set <c>{P0, P1, P2, P3}</c> or null (slice 005, R2).</summary>
+    private static string? NormalizePriority(string? priority)
+    {
+        if (priority is null)
+        {
+            return null;
+        }
+
+        if (priority is not ("P0" or "P1" or "P2" or "P3"))
+        {
+            throw new ArgumentException("Priority must be one of: P0, P1, P2, P3 (or null).", nameof(priority));
+        }
+
+        return priority;
+    }
+
+    /// <summary>Trims the description (markdown source); whitespace-only → null; guards ≤ 8000 chars (slice 005, R3).</summary>
+    private static string? NormalizeDescription(string? description)
+    {
+        if (description is null)
+        {
+            return null;
+        }
+
+        var trimmed = description.Trim();
+        if (trimmed.Length == 0)
+        {
+            return null;
+        }
+
+        if (trimmed.Length > MaxDescriptionLength)
+        {
+            throw new ArgumentException($"Description must be {MaxDescriptionLength} characters or fewer.", nameof(description));
         }
 
         return trimmed;
