@@ -8,6 +8,7 @@ import { UPCOMING_QUERY_KEY } from "@/hooks/useUpcomingTasks";
 import {
   rescheduleDueDateMutationOptions,
   setPriorityMutationOptions,
+  setTaskAssigneesMutationOptions,
   toggleDoneMutationOptions,
 } from "@/hooks/useTaskMutations";
 
@@ -130,6 +131,31 @@ describe("toggle-done optimistic membership removal", () => {
     await opts.onMutate({ id: "a", status: "done", version: 0 });
 
     expect(qc.getQueryData<TodayResponse>(TODAY_QUERY_KEY)!.groups.flatMap((g) => g.tasks)).toHaveLength(0);
+  });
+});
+
+describe("set-assignees optimistic surface (slice 008)", () => {
+  it("patches the task's assignees in place across the Today cache", async () => {
+    freezeNow();
+    const qc = new QueryClient();
+    const a = row({ id: "a", dueDate: "2026-06-27T10:00:00Z", dueHasTime: true, projectId: "p1", assignees: [] });
+    qc.setQueryData(TODAY_QUERY_KEY, todayCache([a]));
+
+    const opts = setTaskAssigneesMutationOptions(qc);
+    await opts.onMutate({ id: "a", assigneeIds: ["u1", "u2"], version: 0 });
+
+    const stored = qc.getQueryData<TodayResponse>(TODAY_QUERY_KEY)!.groups[0]!.tasks.find((t) => t.id === "a")!;
+    expect(stored.assignees).toEqual(["u1", "u2"]);
+  });
+
+  it("set-assignees PATCHes assigneeIds + version", async () => {
+    patchSpy.mockResolvedValue({ data: row({ id: "a", assignees: ["u1"], version: 1 }), error: undefined });
+    const qc = new QueryClient();
+    await setTaskAssigneesMutationOptions(qc).mutationFn({ id: "a", assigneeIds: ["u1"], version: 0 });
+    expect(patchSpy).toHaveBeenCalledWith("/api/tasks/{id}/assignees", {
+      params: { path: { id: "a" } },
+      body: { assigneeIds: ["u1"], version: 0 },
+    });
   });
 });
 
