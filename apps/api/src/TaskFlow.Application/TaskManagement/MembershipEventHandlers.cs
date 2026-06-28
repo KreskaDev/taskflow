@@ -61,6 +61,14 @@ public static class MembershipRevokedHandler
         ArgumentNullException.ThrowIfNull(tasks);
 
         // Still a member (a demotion editor→viewer) → keep the assignments (a viewer is a valid member).
+        //
+        // KNOWN EDGE (self-review round 2, low): the event is pure-ID (no revocation sequence), so this
+        // membership lookup cannot distinguish a demotion from a remove-then-RE-ADD that both land before the
+        // queue drains — a re-add inside that sub-second Solo-queue window is seen as "still a member" and the
+        // user's pre-removal assignments survive (and reappear, since they ARE a member again). Accepted as a
+        // narrow eventual-consistency edge: the harm is low (a legitimate current member sees stale rows) and a
+        // clean fix would require versioning the slice-007 MembershipRevoked event (skip only when the live
+        // membership is OLDER than the event) — out of slice-008 scope, deferred.
         var stillMember = await members.FindAsync(message.ProjectId, message.UserId, cancellationToken).ConfigureAwait(false);
         if (stillMember is not null)
         {

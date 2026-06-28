@@ -84,6 +84,11 @@ function rollbackViewCaches(queryClient: QueryClient, snapshot: ViewCachesSnapsh
 
 /** Reconciles the triage caches with server truth (on settle). */
 async function settleViewCaches(queryClient: QueryClient): Promise<void> {
+  // NOTE (slice 008): the TASKS_QUERY_KEY (['tasks']) invalidate is a PREFIX match (react-query default
+  // exact:false), so it ALSO invalidates the Assigned cache (['tasks','assigned']) and refetches a mounted
+  // AssignedView. This is intentionally LOAD-BEARING: it is how the operate verbs (done/priority/reschedule/
+  // edit) reconcile an assigned-only task on the "Assigned to me" surface. Do NOT add exact:true here without
+  // an explicit ASSIGNED_QUERY_KEY invalidate, or that surface goes stale.
   await queryClient.invalidateQueries({ queryKey: TASKS_QUERY_KEY });
   await queryClient.invalidateQueries({ queryKey: TODAY_QUERY_KEY });
   await queryClient.invalidateQueries({ queryKey: UPCOMING_QUERY_KEY });
