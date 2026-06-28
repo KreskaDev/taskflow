@@ -123,6 +123,7 @@ export default function WorkspaceHome() {
       onGoInbox: () => router.push("/"),
       onGoToday: () => router.push("/today"),
       onGoUpcoming: () => router.push("/upcoming"),
+      onGoAssigned: () => router.push("/assigned"),
     }),
     [tasks, selectedIndex, setTaskDone, deleteTask, reorderTask, router],
   );

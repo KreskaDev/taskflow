@@ -66,3 +66,17 @@ export const editTaskSchema = z
   });
 
 export type EditTaskInput = z.infer<typeof editTaskSchema>;
+
+/**
+ * Assignee-set validation (slice 008, R2). A set of member user ids (uuids), no duplicates, bounded — the
+ * client trust boundary mirroring the server's `SetTaskAssigneesValidator`. Membership-validity is a
+ * server-side cross-row check (the picker only offers members, so the client cannot be authoritative).
+ */
+export const MAX_ASSIGNEES = 50;
+
+export const assigneeSetSchema = z
+  .array(z.string().uuid())
+  .max(MAX_ASSIGNEES)
+  .refine((ids) => new Set(ids).size === ids.length, { message: "Assignee ids must not contain duplicates" });
+
+export type AssigneeSet = z.infer<typeof assigneeSetSchema>;

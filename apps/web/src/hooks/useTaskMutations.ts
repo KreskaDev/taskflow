@@ -7,10 +7,11 @@ import type { components } from "@/lib/api/generated/schema";
 import { buildTodayGroups, buildUpcomingGroups, flattenToday, flattenUpcoming } from "@/lib/dailyViews";
 import { newTaskId } from "@/lib/id";
 import { between } from "@/lib/position";
-import { createTaskSchema, editTaskSchema, type Priority, taskTitleSchema } from "@/lib/validation/task";
+import { assigneeSetSchema, createTaskSchema, editTaskSchema, type Priority, taskTitleSchema } from "@/lib/validation/task";
 import { TASKS_QUERY_KEY } from "@/hooks/useTasks";
 import { TODAY_QUERY_KEY } from "@/hooks/useTodayTasks";
 import { UPCOMING_QUERY_KEY } from "@/hooks/useUpcomingTasks";
+import { ASSIGNED_QUERY_KEY } from "@/hooks/useAssignedTasks";
 
 type TaskResponse = components["schemas"]["TaskResponse"];
 type TodayResponse = components["schemas"]["TodayResponse"];
@@ -942,6 +943,55 @@ export function editTaskMutationOptions(queryClient: QueryClient): ViewMutationO
   };
 }
 
+/* ──────────────────────── SET ASSIGNEES (PATCH /assignees) ──────────────────────── */
+
+export interface SetTaskAssigneesVariables {
+  id: string;
+  assigneeIds: string[];
+  version: number;
+}
+
+/**
+ * Optimistic SET-ASSIGNEES recipe (slice 008, AS-01/AS-02, R2). Re-stamps the task's `assignees` in place
+ * across the triage caches (assignees do not change Today/Upcoming membership, only the chips); the "Assigned
+ * to me" view's membership CAN change (self-assign/unassign), so it is reconciled by the onSettled
+ * invalidate rather than recomputed optimistically. Plain rollback on error (mirrors set-priority).
+ */
+export function setTaskAssigneesMutationOptions(queryClient: QueryClient): ViewMutationOptions<SetTaskAssigneesVariables> {
+  return {
+    mutationFn: async ({ id, assigneeIds, version }: SetTaskAssigneesVariables): Promise<TaskResponse> => {
+      const { data, error } = await apiClient.PATCH("/api/tasks/{id}/assignees", {
+        params: { path: { id } },
+        body: { assigneeIds, version },
+      });
+      if (error || !data) {
+        const errorCode = (error as ProblemDetails | undefined)?.errorCode;
+        throw new TaskMutationError(errorCode ?? "internal_error", mapError(errorCode).message);
+      }
+      return data;
+    },
+    onMutate: async (variables: SetTaskAssigneesVariables): Promise<ViewCachesSnapshot> => {
+      await queryClient.cancelQueries({ queryKey: TASKS_QUERY_KEY });
+      await queryClient.cancelQueries({ queryKey: TODAY_QUERY_KEY });
+      await queryClient.cancelQueries({ queryKey: UPCOMING_QUERY_KEY });
+      await queryClient.cancelQueries({ queryKey: ASSIGNED_QUERY_KEY });
+      const snapshot = snapshotViewCaches(queryClient);
+      const row = findTaskInViewCaches(queryClient, variables.id);
+      if (row) applyTaskToViewCaches(queryClient, { ...row, assignees: variables.assigneeIds }, new Date());
+      return snapshot;
+    },
+    onError: (_error, _variables, context): void => {
+      if (context) rollbackViewCaches(queryClient, context);
+    },
+    onSettled: async (data): Promise<void> => {
+      if (data) applyTaskToViewCaches(queryClient, data, new Date());
+      await settleViewCaches(queryClient);
+      // The "Assigned to me" membership can change (self-assign/unassign) — reconcile with server truth.
+      await queryClient.invalidateQueries({ queryKey: ASSIGNED_QUERY_KEY });
+    },
+  };
+}
+
 /**
  * "use client" hook wrapper. `createTask(title)` validates the title at the trust
  * boundary (Constitution VI), mints the client-side UUIDv7 id, computes the
@@ -978,6 +1028,9 @@ export function useTaskMutations() {
   );
   const editMutation = useMutation<TaskResponse, Error, EditTaskVariables, ViewCachesSnapshot>(
     editTaskMutationOptions(queryClient),
+  );
+  const setAssigneesMutation = useMutation<TaskResponse, Error, SetTaskAssigneesVariables, ViewCachesSnapshot>(
+    setTaskAssigneesMutationOptions(queryClient),
   );
 
   const currentTasks = (): TaskResponse[] => queryClient.getQueryData<TaskResponse[]>(TASKS_QUERY_KEY) ?? [];
@@ -1095,6 +1148,14 @@ export function useTaskMutations() {
     moveMutation.mutate({ id, fromProjectId, toProjectId, version: row.version });
   };
 
+  /** Sets a shared-project task's assignee set (slice 008, AS-01/AS-02). */
+  const setTaskAssignees = (id: string, assigneeIds: string[]): void => {
+    const row = findTaskInViewCaches(queryClient, id);
+    if (!row) return;
+    const parsed = assigneeSetSchema.parse(assigneeIds); // boundary parse (Constitution VI)
+    setAssigneesMutation.mutate({ id, assigneeIds: parsed, version: row.version });
+  };
+
   return {
     createTask,
     renameTask,
@@ -1105,5 +1166,6 @@ export function useTaskMutations() {
     setTaskPriority,
     rescheduleTask,
     editTask,
+    setTaskAssignees,
   };
 }

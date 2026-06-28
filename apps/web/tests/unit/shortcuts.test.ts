@@ -55,6 +55,8 @@ function makeHandlers(): { [K in Handler]-?: ReturnType<typeof vi.fn> } & Global
     onGoInbox: vi.fn(),
     onGoToday: vi.fn(),
     onGoUpcoming: vi.fn(),
+    onGoAssigned: vi.fn(),
+    onAssign: vi.fn(),
   };
 }
 
@@ -297,6 +299,27 @@ describe("createGlobalShortcutsListener — slice 005 keys (priority / reschedul
     expect(handlers.onSetPriority).not.toHaveBeenCalled();
     expect(handlers.onReschedule).not.toHaveBeenCalled();
     expect(handlers.onToggle).not.toHaveBeenCalled();
+  });
+
+  it("G A navigates to Assigned; bare A opens the assignee picker (slice 008)", () => {
+    const handlers = makeHandlers();
+    const listener = createGlobalShortcutsListener(handlers);
+
+    listener(keydown({ key: "g" }));
+    listener(keydown({ key: "a" }));
+    expect(handlers.onGoAssigned).toHaveBeenCalledTimes(1);
+    expect(handlers.onAssign).not.toHaveBeenCalled(); // G A is nav, not the bare-A picker
+
+    listener(keydown({ key: "a" }));
+    expect(handlers.onAssign).toHaveBeenCalledTimes(1);
+  });
+
+  it("bare A is suppressed while a text field is focused (FR-031)", () => {
+    const handlers = makeHandlers();
+    const listener = createGlobalShortcutsListener(handlers);
+    focusEl(textInput());
+    listener(keydown({ key: "a" }));
+    expect(handlers.onAssign).not.toHaveBeenCalled();
   });
 
   it("an aborted G-chord swallows the stray second key", () => {

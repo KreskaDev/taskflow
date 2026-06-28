@@ -46,6 +46,10 @@ export interface GlobalShortcutHandlers {
   onGoToday?: () => void;
   /** `G U` — navigate to the Upcoming view (slice 005, US-08.AS-02). */
   onGoUpcoming?: () => void;
+  /** `G A` — navigate to the "Assigned to me" view (slice 008, AS-03). */
+  onGoAssigned?: () => void;
+  /** `A` — open the assignee picker for the selected shared-project task (slice 008, AS-01). */
+  onAssign?: () => void;
 }
 
 /**
@@ -140,6 +144,11 @@ export function createGlobalShortcutsListener(
           event.preventDefault();
           handlers.onGoUpcoming?.();
           return;
+        case "a":
+        case "A":
+          event.preventDefault();
+          handlers.onGoAssigned?.();
+          return;
         default:
           return; // aborted chord — swallow the stray second key
       }
@@ -150,9 +159,18 @@ export function createGlobalShortcutsListener(
       case "G":
         // Arm the navigation chord only when a nav handler is wired (else `G` is inert, preserving the
         // slice-002 behaviour where `G` did nothing).
-        if (handlers.onGoInbox || handlers.onGoToday || handlers.onGoUpcoming) {
+        if (handlers.onGoInbox || handlers.onGoToday || handlers.onGoUpcoming || handlers.onGoAssigned) {
           event.preventDefault();
           awaitingGoto = true;
+        }
+        return;
+      case "a":
+      case "A":
+        // Bare `A` opens the assignee picker on the selected task (slice 008). Only when wired (a `G A`
+        // navigation was handled above by the chord); inert elsewhere so the key stays free.
+        if (handlers.onAssign) {
+          event.preventDefault();
+          handlers.onAssign();
         }
         return;
       case "1":

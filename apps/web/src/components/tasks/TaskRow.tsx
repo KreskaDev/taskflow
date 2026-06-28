@@ -177,6 +177,14 @@ export function TaskRow({
         // Overdue flag (slice 005, Today view): a text label, never color alone (FR-044).
         <span className="tf-task-row__overdue">zaległe</span>
       ) : null}
+      {!isRenaming && task.assignees.length > 0 ? (
+        // Assignee count (slice 008) — a text badge (never color/avatar alone, FR-044); the names live in
+        // the assignee picker. Announced with a labelled count (FR-043).
+        <span className="tf-task-row__assignees">
+          <span className="tf-sr-only">przypisani: </span>
+          {task.assignees.length}
+        </span>
+      ) : null}
       {!isRenaming && task.dueDate ? (
         // Visible, always-rendered text label (FR-046: no hover-only affordance). The
         // calendar day/time is the meaning — never color alone (FR-044) — and it carries no
