@@ -1,0 +1,250 @@
+openapi: 3.1.0
+info:
+  title: TaskFlow API — slice 006 (Labels) delta
+  version: "0.6.0"
+  description: >
+    Contract DELTA over slices 002–008. Realizes ENT-04 (Label) — a **per-user** tag
+    (Tier A, `ownerId`) — and its **many-to-many** relationship with tasks, plus the `L`
+    label selector (US-08.AS-04).
+
+    LABEL CRUD (Tier A — ownership): **createLabel** (`PUT /api/labels/{id}` — client-generated
+    id in the PATH, idempotent upsert, matching createTask/createProject), **listLabels**
+    (`GET /api/labels`), **updateLabel** (`PATCH /api/labels/{id}` — rename + recolor,
+    whole-object), **deleteLabel** (`DELETE /api/labels/{id}` — hard delete; FK cascade
+    clears applications). All scoped to `owner_id = caller`.
+
+    APPLY/REMOVE (per-user, two-sided authz): **setTaskLabels**
+    (`PATCH /api/tasks/{id}/labels`) replaces the CALLER's labels on a task — a per-user
+    whole-set replace (research R2). It is **versionless** (a per-user label toggle does NOT
+    touch the shared `Task.version`); other members' labels on a shared task are untouched.
+
+    CHANGED: `TaskResponse` gains a required **`labels`** array — the **caller's own** label
+    ids applied to the task (empty when none; caller-scoped, so a co-member's labels are
+    absent from this caller's read).
+
+    AUTHORIZATION (research R4):
+    - Label CRUD authorizes on OWNERSHIP. A label that is absent OR owned by another user →
+      **404 not_found** (uniform — never leak another user's label ids). A duplicate
+      `(owner, lower(name))` on create/update → **422 validation_failed** (field `name`).
+    - setTaskLabels is TWO-SIDED: the task side dispatches by visibility (personal →
+      ownership; shared → membership+role) via the slice-005 `TaskAccessGuards` — a viewer →
+      **403 forbidden**; a non-member, a foreign/absent task, or a personal task not owned by
+      the caller → **404 not_found**. The label side is Tier A — every id in `labelIds` MUST
+      be owned by the caller, else **422 validation_failed** (field `labelIds`), uniformly,
+      and no row is changed.
+
+    NO new errorCode — the `ProblemDetails.errorCode` enum is UNCHANGED (research R9); the
+    document transformer stamps the new operationIds + their 403/404/422 responses but edits
+    no `ErrorCodes` array. NO domain event (labels are not in the FR-079 notification trigger
+    set, research R8).
+
+    MIGRATION: this slice ships ONE EF migration (`AddLabels`, two tables: `labels` +
+    `task_labels`) — so **FR-051 backup-before-migration is LIVE** (the CI
+    backup→migrate→restore-test gate applies). Everything not listed here is UNCHANGED from
+    slices 002–008.
+
+servers:
+  - url: /
+
+paths:
+  /api/labels:
+    get:
+      operationId: listLabels
+      tags: [Labels]
+      summary: The caller's labels (roster) — the selector pick-list + chip name/color source
+      description: >
+        Caller-scoped (research R4/R6): the caller's labels (`owner_id = caller`), ordered by `name`.
+        Drives the label selector's options and supplies the name/color for the caller-scoped label
+        ids carried on `TaskResponse.labels`.
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/LabelResponse" } } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+  /api/labels/{id}:
+    parameters:
+      - $ref: "#/components/parameters/LabelId"
+    put:
+      operationId: createLabel
+      tags: [Labels]
+      summary: Create a label owned by the caller (client-generated id; idempotent upsert)
+      description: >
+        Creates a label with `ownerId = caller` (Tier A). The `id` is CLIENT-generated (UUIDv7) and
+        carried in the PATH so the selector can optimistically create + paint <16 ms (SC-003) and a
+        retried create is IDEMPOTENT — re-`PUT`ting the same id returns the existing label (200, no
+        error), matching createTask/createProject (research R3). The name MUST be unique per owner,
+        case-insensitive — a duplicate → 422 (field `name`). `color` is optional; when present it MUST be
+        a preset token (not raw hex/CSS). No 409 (idempotent create, like createProject).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateLabelRequest" }
+      responses:
+        "200": { description: Created (or the existing label on an idempotent retry), content: { application/json: { schema: { $ref: "#/components/schemas/LabelResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+    patch:
+      operationId: updateLabel
+      tags: [Labels]
+      summary: Rename and/or recolor the caller's label (whole-object replace)
+      description: >
+        Whole-object replace of the label's `name` + `color` (research R3 — one command realizes both
+        rename and recolor). Ownership-gated: a label absent or owned by another user → 404 (uniform
+        existence-hide). A duplicate `(owner, lower(name))` → 422 (field `name`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateLabelRequest" }
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { $ref: "#/components/schemas/LabelResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+    delete:
+      operationId: deleteLabel
+      tags: [Labels]
+      summary: Delete the caller's label (hard delete; cascade-removes its task applications)
+      description: >
+        Hard-deletes the label (labels are not in the FR-040/FR-097 task/project undo scope). The FK
+        cascade removes every `task_labels` row referencing it (the label vanishes from every task it was
+        applied to). Ownership-gated: a label absent or owned by another user → 404.
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/tasks/{id}/labels:
+    parameters:
+      - $ref: "#/components/parameters/TaskId"
+    patch:
+      operationId: setTaskLabels
+      tags: [Tasks]
+      summary: Set the CALLER's labels on a task (per-user whole-set replace), or clear them
+      description: >
+        Replaces the CALLER's labels on the task with `labelIds` (US-08.AS-04) — a per-user whole-set
+        replace (research R2). The server computes the caller's added/removed delta and writes only
+        caller-owned `task_labels` rows; another member's labels on a shared task are untouched.
+        VERSIONLESS — a per-user label toggle does NOT touch the shared `Task.version` (the response's
+        `version` is the task's current value, unchanged by this call).
+
+        Authorization is TWO-SIDED (research R4): (1) TASK side — the caller MUST have write access to the
+        task, dispatched by visibility (personal → ownership; shared → editor/owner). A viewer → 403; a
+        non-member, foreign/absent task, or a personal task not owned by the caller → 404. (2) LABEL side —
+        every id in `labelIds` MUST be a label OWNED by the caller, else 422 (field `labelIds`), uniformly
+        (no existence leak), and no row is changed. An empty `labelIds` clears the caller's labels on the task.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SetTaskLabelsRequest" }
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { $ref: "#/components/schemas/TaskResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+components:
+  parameters:
+    TaskId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    LabelId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  schemas:
+    LabelResponse:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, description: "The label name (≤ 50 chars). Untrusted content — output-escaped on render (FR-099)." }
+        color:
+          type: [string, "null"]
+          description: >
+            Optional preset color token (NOT raw hex/CSS). Decorative only — the chip always shows the
+            name; color is never the sole carrier of meaning (FR-044). Null = neutral default chip.
+
+    # The label id is the client-generated PATH parameter (PUT /api/labels/{id}); the body carries no id.
+    CreateLabelRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, description: "Trimmed-non-empty, ≤ 50 chars. Unique per owner, case-insensitive (duplicate → 422)." }
+        color: { type: [string, "null"], description: "Optional preset color token (else 422)." }
+
+    UpdateLabelRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, description: "Trimmed-non-empty, ≤ 50 chars. Unique per owner, case-insensitive (duplicate → 422)." }
+        color: { type: [string, "null"], description: "Optional preset color token (else 422). Whole-object replace — omitting/null clears the color." }
+
+    SetTaskLabelsRequest:
+      type: object
+      required: [labelIds]
+      properties:
+        labelIds:
+          type: array
+          uniqueItems: true
+          items: { type: string, format: uuid }
+          description: >
+            The desired FULL set of the CALLER's labels on this task (per-user whole-set replace). Each id
+            MUST be a label owned by the caller (else 422). No duplicates. An empty array clears the
+            caller's labels on the task. NO `version` field — the call is versionless (research R2).
+
+    # CHANGED — gains the required caller-scoped `labels` array (everything else unchanged from slice 008)
+    TaskResponse:
+      type: object
+      required: [id, title, status, position, version, createdAt, updatedAt, assignees, labels]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        status: { type: string, enum: [backlog, todo, in_progress, done, cancelled] }
+        position: { type: string }
+        version: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        completedAt: { type: [string, "null"], format: date-time }
+        dueDate: { type: [string, "null"], format: date-time }
+        dueHasTime: { type: [boolean, "null"] }
+        projectId: { type: [string, "null"], format: uuid }
+        priority: { type: [string, "null"], enum: [P0, P1, P2, P3, null] }
+        description: { type: [string, "null"] }
+        assignees:
+          type: array
+          items: { type: string, format: uuid }
+          description: "Slice 008 — assignee user ids; ALWAYS present, EMPTY for personal/unassigned tasks."
+        labels:
+          type: array
+          items: { type: string, format: uuid }
+          description: >
+            NEW slice 006 — the CALLER's OWN label ids applied to this task (R6). ALWAYS present; EMPTY
+            when the caller has applied none. Caller-scoped — a co-member's labels on a shared task are
+            ABSENT here. Ids only; name/color come from the listLabels roster.
+
+  responses:
+    Unauthenticated:
+      description: Authentication required (errorCode = unauthenticated)
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+    Forbidden:
+      description: The caller is a member but lacks the required role (editor/owner) to write the task — errorCode = forbidden
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+    NotFound:
+      description: >
+        Label not owned/absent, or task not owned/visible (uniform existence-hide) — errorCode = not_found
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+    ValidationFailed:
+      description: >
+        Validation failed — a duplicate label name (field `name`), a non-owned label id in a label set
+        (field `labelIds`), an invalid preset color, or a malformed/duplicate set — errorCode = validation_failed
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+
+# ProblemDetails schema + errorCode enum are UNCHANGED from slices 001/002 (research R9) — the document
+# transformer's ErrorCodes array is NOT edited; it only stamps the new operationIds + their responses.
