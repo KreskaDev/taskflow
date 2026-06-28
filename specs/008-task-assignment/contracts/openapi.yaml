@@ -1,0 +1,160 @@
+openapi: 3.1.0
+info:
+  title: TaskFlow API — slice 008 (Task Assignment) delta
+  version: "0.8.0"
+  description: >
+    Contract DELTA over slices 002–007. Adds assignment to **shared-project tasks**
+    (FR-069): a whole-set replace **setTaskAssignees** (`PATCH /api/tasks/{id}/assignees`)
+    and the **getAssignedToMe** read (`GET /api/tasks/assigned`). CHANGED: `TaskResponse`
+    gains a required **`assignees`** array (assignee user ids; empty for personal tasks).
+
+    AUTHORIZATION (dispatch-by-visibility, shared-only, research R4): assignment is
+    editor/owner-only on a SHARED-project task. A viewer → **403 forbidden**; a
+    non-member, a foreign/absent task, or a PERSONAL/Inbox task (no assignment surface) →
+    **404 not_found**; a non-member assignee id (or a malformed/duplicate set) →
+    **422 validation_failed** (field error on `assigneeIds`); a stale token →
+    **409 version_conflict**. **No new errorCode** — the `ProblemDetails.errorCode` enum is
+    UNCHANGED (research R8); the transformer stamps the new operationIds + their
+    403/404/409/422 responses but edits no `ErrorCodes` array.
+
+    DOMAIN EVENT: setTaskAssignees raises a `TaskAssigned` event (added/removed assignee
+    deltas + `actorUserId`, idempotent) consumed by slice 017 (notifications); this slice
+    raises it (no-op handler) but delivers no notifications.
+
+    MIGRATION: this slice ships ONE EF migration (`AddTaskAssignees`, the join table) — so
+    **FR-051 backup-before-migration is LIVE** (the CI backup→migrate→restore-test gate
+    applies). Everything not listed here is UNCHANGED from slices 002–007.
+
+servers:
+  - url: /
+
+paths:
+  /api/tasks/assigned:
+    get:
+      operationId: getAssignedToMe
+      tags: [Tasks]
+      summary: The "Assigned to me" view — tasks across shared projects where the caller is an assignee
+      description: >
+        Caller-scoped (research R6): the caller's non-deleted, non-done/cancelled tasks in SHARED
+        projects where the caller is BOTH a current member (or the owner) AND an assignee. Membership
+        (or ownership) dispatches access
+        (the assignee row is provenance only — FR-066), so a user who lost membership sees nothing even
+        if a stale assignee row lingered. Grouped by project; within each group the slice-005 R5 order.
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AssignedResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+  /api/tasks/{id}/assignees:
+    parameters:
+      - $ref: "#/components/parameters/TaskId"
+    patch:
+      operationId: setTaskAssignees
+      tags: [Tasks]
+      summary: Set a shared-project task's assignee set (whole-set replace), or clear it
+      description: >
+        Replaces the task's assignee set with `assigneeIds` (AS-01/AS-02). WHOLE-SET replace (research
+        R2): the server computes the added/removed delta, applies it, and raises one idempotent
+        `TaskAssigned` event (delta + actorUserId) for slice 017. Authorization (research R4): the caller
+        MUST be an editor/owner of the task's SHARED project (viewer → 403; non-member → 404; a
+        personal/Inbox task → 404, no assignment surface). Every id in `assigneeIds` MUST be a CURRENT
+        member of that project — a non-member assignee → 422 (field error on `assigneeIds`), and no
+        assignee is added. Self-assignment is allowed. Carries `version`; a stale token → 409. An empty
+        `assigneeIds` clears all assignees.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SetTaskAssigneesRequest" }
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { $ref: "#/components/schemas/TaskResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/VersionConflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+components:
+  parameters:
+    TaskId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  schemas:
+    SetTaskAssigneesRequest:
+      type: object
+      required: [assigneeIds, version]
+      properties:
+        assigneeIds:
+          type: array
+          items: { type: string, format: uuid }
+          description: >
+            The desired FULL assignee set (whole-set replace). Each id MUST be a current member of the
+            task's shared project (else 422). No duplicates. An empty array clears all assignees.
+        version: { type: integer, description: "Optimistic-concurrency token; a stale value → 409." }
+
+    # CHANGED — gains the required `assignees` array (everything else unchanged from slice 005)
+    TaskResponse:
+      type: object
+      required: [id, title, status, position, version, createdAt, updatedAt, assignees]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        status: { type: string, enum: [backlog, todo, in_progress, done, cancelled] }
+        position: { type: string }
+        version: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        completedAt: { type: [string, "null"], format: date-time }
+        dueDate: { type: [string, "null"], format: date-time }
+        dueHasTime: { type: [boolean, "null"] }
+        projectId: { type: [string, "null"], format: uuid }
+        priority: { type: [string, "null"], enum: [P0, P1, P2, P3, null] }
+        description: { type: [string, "null"] }
+        assignees:
+          type: array
+          items: { type: string, format: uuid }
+          description: >
+            NEW slice 008 — the assignee user ids (R7). ALWAYS present; EMPTY for personal-project /
+            unassigned tasks. Ids only — member names/avatars come from the project roster (no PII
+            duplication, Constitution XI/XII).
+
+    AssignedGroup:
+      type: object
+      required: [projectId, tasks]
+      properties:
+        projectId: { type: string, format: uuid, description: "The shared project the assigned tasks belong to." }
+        tasks:
+          type: array
+          items: { $ref: "#/components/schemas/TaskResponse" }
+          description: "Ordered by the slice-005 R5 task order (priority → due time → createdAt → id)."
+
+    AssignedResponse:
+      type: object
+      required: [groups]
+      properties:
+        groups:
+          type: array
+          items: { $ref: "#/components/schemas/AssignedGroup" }
+          description: "The caller's assigned tasks, grouped by shared project."
+
+  responses:
+    Unauthenticated:
+      description: Authentication required
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+    Forbidden:
+      description: The caller is a member but lacks the required role (editor/owner) — errorCode = forbidden
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+    NotFound:
+      description: Task/surface not found, not owned/visible, or assignment offered only on shared tasks (errorCode = not_found)
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+    VersionConflict:
+      description: Optimistic-concurrency token was stale; reload and retry (errorCode = version_conflict)
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+    ValidationFailed:
+      description: Validation failed (e.g. a non-member assignee id, a duplicate/malformed set) — errorCode = validation_failed
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+
+# ProblemDetails schema + errorCode enum are UNCHANGED from slices 001/002 (research R8) — the document
+# transformer's ErrorCodes array is NOT edited; it only stamps the two new operationIds + their responses.
