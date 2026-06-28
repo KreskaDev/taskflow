@@ -36,6 +36,16 @@ export interface GlobalShortcutHandlers {
   onReorderUp?: () => void;
   /** FROZEN reorder chord `Alt+ArrowDown` — move the focused task down one rank (R18). */
   onReorderDown?: () => void;
+  /** `1`-`4` — set the selected task's priority (slice 005, AS-04: `1`→P0 … `4`→P3). */
+  onSetPriority?: (priority: "P0" | "P1" | "P2" | "P3") => void;
+  /** `T` — open the reschedule input for the selected task (slice 005, AS-05). */
+  onReschedule?: () => void;
+  /** `G I` — navigate to the Inbox (slice 005, US-08.AS-01). */
+  onGoInbox?: () => void;
+  /** `G T` — navigate to the Today view (slice 005, US-02.AS-01). */
+  onGoToday?: () => void;
+  /** `G U` — navigate to the Upcoming view (slice 005, US-08.AS-02). */
+  onGoUpcoming?: () => void;
 }
 
 /**
@@ -73,6 +83,12 @@ function isTextFieldFocused(): boolean {
 export function createGlobalShortcutsListener(
   handlers: GlobalShortcutHandlers,
 ): (event: KeyboardEvent) => void {
+  // The `G`-prefix navigation chord (slice 005, R8): the first bare `G` arms a pending state; the next
+  // key (`I`/`T`/`U`) navigates. State lives in the listener closure (reset whenever the handler set
+  // changes, i.e. on re-bind). `T` is overloaded — `G T` navigates, a bare `T` reschedules — so the
+  // pending flag disambiguates.
+  let awaitingGoto = false;
+
   return (event: KeyboardEvent): void => {
     // The FROZEN reorder chord (R18). It fires ONLY while the role=listbox (not a text input)
     // has focus — so a focused capture/inline-rename input is NOT reordered out from under the
@@ -97,7 +113,60 @@ export function createGlobalShortcutsListener(
     // Bare keys are suppressed while typing — left to land as a character (FR-031/AS-09).
     if (isTextFieldFocused()) return;
 
+    // The second leg of the `G`-prefix navigation chord (slice 005, R8). Consumes `I`/`T`/`U` and
+    // resets the pending state; any other key aborts the chord. Checked BEFORE the bare-key switch so a
+    // `G T` is "go to Today", not a bare-`T` reschedule.
+    if (awaitingGoto) {
+      awaitingGoto = false;
+      switch (event.key) {
+        case "i":
+        case "I":
+          event.preventDefault();
+          handlers.onGoInbox?.();
+          return;
+        case "t":
+        case "T":
+          event.preventDefault();
+          handlers.onGoToday?.();
+          return;
+        case "u":
+        case "U":
+          event.preventDefault();
+          handlers.onGoUpcoming?.();
+          return;
+        default:
+          return; // aborted chord — swallow the stray second key
+      }
+    }
+
     switch (event.key) {
+      case "g":
+      case "G":
+        // Arm the navigation chord only when a nav handler is wired (else `G` is inert, preserving the
+        // slice-002 behaviour where `G` did nothing).
+        if (handlers.onGoInbox || handlers.onGoToday || handlers.onGoUpcoming) {
+          event.preventDefault();
+          awaitingGoto = true;
+        }
+        return;
+      case "1":
+      case "2":
+      case "3":
+      case "4":
+        // `1`→P0 … `4`→P3 (AS-04). Only handled when wired, so the key stays inert elsewhere.
+        if (handlers.onSetPriority) {
+          event.preventDefault();
+          handlers.onSetPriority((["P0", "P1", "P2", "P3"] as const)[Number(event.key) - 1]!);
+        }
+        return;
+      case "t":
+      case "T":
+        // Bare `T` reschedules the selected task (AS-05). Only when wired (a `G T` was handled above).
+        if (handlers.onReschedule) {
+          event.preventDefault();
+          handlers.onReschedule();
+        }
+        return;
       case "c":
       case "C":
         event.preventDefault();

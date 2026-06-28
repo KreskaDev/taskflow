@@ -235,3 +235,17 @@ export function parseTaskInput(raw: string, now: Date): ParseResult {
 
   return { title };
 }
+
+/**
+ * Resolves a BARE date phrase (slice 005, AS-05) — e.g. "jutro", "piatek", "30.06", "za 3 dni" — to a
+ * `{ dueDate, dueHasTime }` against an injected `now`, or `null` when the phrase is not a recognized date.
+ * Unlike {@link parseTaskInput} there is no title remainder: the whole input IS the phrase (the `T`
+ * reschedule input contains only a date). Reuses the same interpretation grammar so the reschedule and
+ * capture flows resolve dates identically (one source of truth).
+ */
+export function resolveDatePhrase(raw: string, now: Date): { dueDate: Date; dueHasTime: boolean } | null {
+  const phrase = normalize(raw.trim());
+  if (phrase.length === 0) return null;
+  const interp = interpretPhrase(phrase, toReferenceZone(now));
+  return interp.kind === "resolved" ? interp.value : null;
+}

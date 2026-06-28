@@ -58,8 +58,29 @@ interface TaskRowProps {
    * `M` shortcut targets the SELECTED row via the global gate — this is the pointer affordance.
    */
   onOpenMove?: () => void;
+  /**
+   * Whether the task is overdue (slice 005, Today view only). When true the row renders an
+   * "overdue" label — a text signal, never color alone (FR-044). Defaults to false.
+   */
+  isOverdue?: boolean;
   /** Absolute position styles supplied by the virtualizer for this row. */
   style: CSSProperties;
+}
+
+/** Maps a priority token to its human label (FR-044: text always accompanies any color cue). */
+function priorityLabel(priority: string | null | undefined): string | null {
+  switch (priority) {
+    case "P0":
+      return "P0";
+    case "P1":
+      return "P1";
+    case "P2":
+      return "P2";
+    case "P3":
+      return "P3";
+    default:
+      return null;
+  }
 }
 
 /**
@@ -89,10 +110,12 @@ export function TaskRow({
   onSelect,
   projectName,
   onOpenMove,
+  isOverdue = false,
   style,
 }: TaskRowProps) {
   const done = task.status === "done";
   const projected = task.projectId != null;
+  const priority = priorityLabel(task.priority);
 
   return (
     <div
@@ -140,6 +163,19 @@ export function TaskRow({
             {projectName ?? "Project"}
           </span>
         )
+      ) : null}
+      {!isRenaming && priority ? (
+        // Priority badge (slice 005, FR-044): the P0–P3 TEXT label always carries the meaning — a
+        // color class may accompany it, but the text is the signal, never color alone. The
+        // `data-priority` hook lets CSS tint it without the color being the sole carrier.
+        <span className="tf-task-row__priority" data-priority={task.priority}>
+          <span className="tf-sr-only">priorytet: </span>
+          {priority}
+        </span>
+      ) : null}
+      {!isRenaming && isOverdue ? (
+        // Overdue flag (slice 005, Today view): a text label, never color alone (FR-044).
+        <span className="tf-task-row__overdue">zaległe</span>
       ) : null}
       {!isRenaming && task.dueDate ? (
         // Visible, always-rendered text label (FR-046: no hover-only affordance). The

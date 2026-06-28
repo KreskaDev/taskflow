@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { ProjectSelector } from "@/components/projects/ProjectSelector";
 import { ShortcutsHelp } from "@/components/tasks/ShortcutsHelp";
@@ -32,6 +33,7 @@ export default function WorkspaceHome() {
   const isEmpty = !isPending && !isError && tasks.length === 0;
 
   const { renameTask, setTaskDone, reorderTask, deleteTask, moveTaskToProject } = useTaskMutations();
+  const router = useRouter();
 
   // The page OWNS the entire keyboard surface state. `selectedIndex` indexes `tasks`;
   // `captureOpen`/`helpOpen` drive the two controlled overlays; `renamingId` is the id of
@@ -116,8 +118,13 @@ export default function WorkspaceHome() {
         reorderTask(sel.id, aboveId, belowId);
         setSelectedIndex(selectedIndex + 1);
       },
+
+      // G-chord navigation (slice 005, US-08): G I → Inbox (here), G T → Today, G U → Upcoming.
+      onGoInbox: () => router.push("/"),
+      onGoToday: () => router.push("/today"),
+      onGoUpcoming: () => router.push("/upcoming"),
     }),
-    [tasks, selectedIndex, setTaskDone, deleteTask, reorderTask],
+    [tasks, selectedIndex, setTaskDone, deleteTask, reorderTask, router],
   );
   useGlobalShortcuts(shortcutHandlers);
 

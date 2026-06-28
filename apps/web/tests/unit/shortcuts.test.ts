@@ -50,6 +50,11 @@ function makeHandlers(): { [K in Handler]-?: ReturnType<typeof vi.fn> } & Global
     onHelp: vi.fn(),
     onReorderUp: vi.fn(),
     onReorderDown: vi.fn(),
+    onSetPriority: vi.fn(),
+    onReschedule: vi.fn(),
+    onGoInbox: vi.fn(),
+    onGoToday: vi.fn(),
+    onGoUpcoming: vi.fn(),
   };
 }
 
@@ -237,5 +242,56 @@ describe("createGlobalShortcutsListener — unmapped / no-op safety", () => {
     const listener = createGlobalShortcutsListener({ onCapture: vi.fn() });
 
     expect(() => listener(keydown({ key: " " }))).not.toThrow();
+  });
+});
+
+describe("createGlobalShortcutsListener — slice 005 keys (priority / reschedule / G-chord nav)", () => {
+  it("1-4 set P0-P3 on the selected task (AS-04)", () => {
+    const handlers = makeHandlers();
+    const listener = createGlobalShortcutsListener(handlers);
+    listener(keydown({ key: "1" }));
+    listener(keydown({ key: "4" }));
+    expect(handlers.onSetPriority).toHaveBeenNthCalledWith(1, "P0");
+    expect(handlers.onSetPriority).toHaveBeenNthCalledWith(2, "P3");
+  });
+
+  it("bare T reschedules; it is suppressed in a text field (FR-031)", () => {
+    const handlers = makeHandlers();
+    const listener = createGlobalShortcutsListener(handlers);
+    listener(keydown({ key: "T" }));
+    expect(handlers.onReschedule).toHaveBeenCalledTimes(1);
+
+    focusEl(textInput());
+    listener(keydown({ key: "t" }));
+    expect(handlers.onReschedule).toHaveBeenCalledTimes(1); // still 1 — suppressed while typing
+  });
+
+  it("G I / G T / G U navigate; the chord disambiguates bare T from G T", () => {
+    const handlers = makeHandlers();
+    const listener = createGlobalShortcutsListener(handlers);
+
+    listener(keydown({ key: "g" }));
+    listener(keydown({ key: "i" }));
+    expect(handlers.onGoInbox).toHaveBeenCalledTimes(1);
+
+    listener(keydown({ key: "g" }));
+    listener(keydown({ key: "t" }));
+    expect(handlers.onGoToday).toHaveBeenCalledTimes(1);
+    expect(handlers.onReschedule).not.toHaveBeenCalled(); // G T is nav, not a bare-T reschedule
+
+    listener(keydown({ key: "g" }));
+    listener(keydown({ key: "u" }));
+    expect(handlers.onGoUpcoming).toHaveBeenCalledTimes(1);
+  });
+
+  it("an aborted G-chord swallows the stray second key", () => {
+    const handlers = makeHandlers();
+    const listener = createGlobalShortcutsListener(handlers);
+    listener(keydown({ key: "g" }));
+    listener(keydown({ key: "x" })); // not a nav key → chord aborts, nothing fires
+    expect(handlers.onGoInbox).not.toHaveBeenCalled();
+    // The chord is reset: a subsequent bare Space still toggles.
+    listener(keydown({ key: " " }));
+    expect(handlers.onToggle).toHaveBeenCalledTimes(1);
   });
 });
