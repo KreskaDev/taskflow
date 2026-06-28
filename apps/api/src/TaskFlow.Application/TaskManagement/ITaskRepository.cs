@@ -85,6 +85,27 @@ public interface ITaskRepository
     /// </summary>
     Task<int> CountByProjectAsync(ProjectId projectId, UserId owner, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Lists the caller's non-deleted, non-done/cancelled tasks where the caller is an ASSIGNEE (slice 008,
+    /// R6) — across ALL projects; the handler then filters to the caller's readable shared projects
+    /// (memberships ∪ owned-shared) and groups. Assignees auto-load (owned collection). The caller's
+    /// assigned set is small, so the membership filter is applied in-memory (avoids an IN over the
+    /// value-converted nullable project FK — the slice-005 Npgsql lesson).
+    /// </summary>
+    Task<IReadOnlyList<TaskEntity>> ListAssignedToAsync(UserId assignee, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Clears ALL assignees of a project's tasks (slice 008 cleanup, R5) — the unshare / project-delete-to-
+    /// inbox revoke-all. A bulk, event-free delete over <c>task_assignees</c> joined to the project's tasks.
+    /// </summary>
+    Task ClearAssigneesForProjectAsync(ProjectId projectId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Clears one user's assignee rows across a project's tasks (slice 008 cleanup, R5) — the
+    /// remove-member / leave revoke. A bulk, event-free delete.
+    /// </summary>
+    Task ClearAssigneesForUserInProjectAsync(ProjectId projectId, UserId userId, CancellationToken cancellationToken);
+
     /// <summary>Stages a newly created task for insertion.</summary>
     void Add(TaskEntity task);
 

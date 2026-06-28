@@ -158,6 +158,11 @@ public static class DeleteProjectHandler
                 break;
 
             case ProjectDispositions.MoveToInbox:
+                // slice 008 (R5): clear the project's task assignees BEFORE the bulk move — moving to the
+                // Inbox makes the tasks personal (FR-069: no assignees), and the bulk ExecuteUpdate below
+                // bypasses Task.MoveToProject (the aggregate clear), so it must be done here. Clear first,
+                // while the tasks still carry this project_id (the clear joins task_assignees by project).
+                await tasks.ClearAssigneesForProjectAsync(command.Id, cancellationToken).ConfigureAwait(false);
                 await projects.MoveProjectTasksToInboxAsync(command.Id, owner, cancellationToken).ConfigureAwait(false);
                 break;
 

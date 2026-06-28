@@ -1,3 +1,4 @@
+using TaskFlow.Domain.Common;
 using TaskFlow.Domain.TaskManagement;
 using Wolverine;
 using Task = System.Threading.Tasks.Task;
@@ -31,5 +32,24 @@ internal static class DomainEventDispatch
         }
 
         project.ClearDomainEvents();
+    }
+
+    /// <summary>
+    /// Generic drain for any aggregate root (slice 008 — the <see cref="Task"/> aggregate raises
+    /// <see cref="Events.TaskAssigned"/>). Same contract: publish each recorded event through the outbox in
+    /// the per-message transaction, then clear. Wolverine routes by each event's runtime type.
+    /// </summary>
+    public static async Task PublishAndClearAsync<TId>(AggregateRoot<TId> aggregate, IMessageContext messages, CancellationToken cancellationToken)
+        where TId : struct
+    {
+        ArgumentNullException.ThrowIfNull(aggregate);
+        ArgumentNullException.ThrowIfNull(messages);
+
+        foreach (var domainEvent in aggregate.DomainEvents)
+        {
+            await messages.PublishAsync(domainEvent).ConfigureAwait(false);
+        }
+
+        aggregate.ClearDomainEvents();
     }
 }

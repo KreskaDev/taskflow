@@ -31,7 +31,14 @@ public sealed record TaskBody(
     Guid Id, string Title, string Status, string Position, int Version,
     DateTime CreatedAt, DateTime UpdatedAt, DateTime? CompletedAt,
     DateTime? DueDate = null, bool? DueHasTime = null,
-    Guid? ProjectId = null, string? Priority = null, string? Description = null);
+    Guid? ProjectId = null, string? Priority = null, string? Description = null,
+    IReadOnlyList<Guid>? Assignees = null);
+
+/// <summary>An "Assigned to me" group (slice 008): a shared project and the caller's assigned tasks in it.</summary>
+public sealed record AssignedGroupBody(Guid ProjectId, IReadOnlyList<TaskBody> Tasks);
+
+/// <summary>The <c>AssignedResponse</c> envelope (slice 008): the caller's assigned tasks grouped by project.</summary>
+public sealed record AssignedBody(IReadOnlyList<AssignedGroupBody> Groups);
 
 /// <summary>A Today row (slice 005): the lean TaskResponse fields PLUS the Today-only <c>isOverdue</c> flag.</summary>
 public sealed record TodayTaskBody(
@@ -137,6 +144,20 @@ public static class ApiResponse
         ArgumentNullException.ThrowIfNull(response);
         return (await response.Content.ReadFromJsonAsync<UpcomingBody>(Web))
             ?? throw new InvalidOperationException("Expected an UpcomingResponse body but the response was empty.");
+    }
+
+    public static async Task<IReadOnlyList<TaskBody>> ReadTaskBodiesAsync(this HttpResponseMessage response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        return (await response.Content.ReadFromJsonAsync<IReadOnlyList<TaskBody>>(Web))
+            ?? throw new InvalidOperationException("Expected a TaskResponse array but the response was empty.");
+    }
+
+    public static async Task<AssignedBody> ReadAssignedAsync(this HttpResponseMessage response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        return (await response.Content.ReadFromJsonAsync<AssignedBody>(Web))
+            ?? throw new InvalidOperationException("Expected an AssignedResponse body but the response was empty.");
     }
 
     public static async Task<ProblemBody> ReadProblemAsync(this HttpResponseMessage response)

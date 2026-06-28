@@ -89,6 +89,13 @@ public sealed class ProjectRepository(AppDbContext db) : IProjectRepository
             .Where(t => t.ProjectId == projectId && t.CreatedBy == owner && t.DeletedAt == null)
             .ExecuteUpdateAsync(setters => setters.SetProperty(t => t.ProjectId, (ProjectId?)null), cancellationToken);
 
+    public async Task<IReadOnlyList<ProjectId>> ListOwnedSharedProjectIdsAsync(UserId owner, CancellationToken cancellationToken) =>
+        await db.Projects
+            .Where(p => p.OwnerId == owner && p.Visibility == Project.SharedVisibility && p.DeletedAt == null)
+            .Select(p => p.Id)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
     public void Add(Project project)
     {
         ArgumentNullException.ThrowIfNull(project);

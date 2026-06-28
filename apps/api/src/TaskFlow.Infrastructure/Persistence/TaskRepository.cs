@@ -108,6 +108,33 @@ public sealed class TaskRepository(AppDbContext db) : ITaskRepository
     public Task<int> CountByProjectAsync(ProjectId projectId, UserId owner, CancellationToken cancellationToken) =>
         db.Tasks.CountAsync(t => t.ProjectId == projectId && t.CreatedBy == owner && t.DeletedAt == null, cancellationToken);
 
+    public async Task<IReadOnlyList<TaskEntity>> ListAssignedToAsync(UserId assignee, CancellationToken cancellationToken) =>
+        // The caller's assigned, active, non-deleted tasks across all projects. EF translates the owned
+        // Assignees.Any(...) to an EXISTS over task_assignees; assignees auto-load (owned). The handler
+        // applies the readable-shared membership filter + grouping in-memory (R6).
+        await db.Tasks
+            .Where(t => t.DeletedAt == null
+                && t.Status != TaskStatus.Done
+                && t.Status != TaskStatus.Cancelled
+                && t.Assignees.Any(a => a.UserId == assignee))
+            .OrderBy(t => t.Position)
+            .ThenBy(t => t.Id)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+    public Task ClearAssigneesForProjectAsync(ProjectId projectId, CancellationToken cancellationToken) =>
+        // Bulk, event-free revoke-all for a project's tasks (unshare / delete-to-inbox, R5). Parameterized
+        // raw SQL — a set-based delete over the owned join table (like the slice-004 ExecuteUpdate bulk ops).
+        db.Database.ExecuteSqlInterpolatedAsync(
+            $"DELETE FROM task_assignees WHERE task_id IN (SELECT id FROM tasks WHERE project_id = {projectId.Value})",
+            cancellationToken);
+
+    public Task ClearAssigneesForUserInProjectAsync(ProjectId projectId, UserId userId, CancellationToken cancellationToken) =>
+        // Bulk, event-free revoke of one user's assignments across a project's tasks (remove/leave, R5).
+        db.Database.ExecuteSqlInterpolatedAsync(
+            $"DELETE FROM task_assignees ta USING tasks t WHERE ta.task_id = t.id AND t.project_id = {projectId.Value} AND ta.user_id = {userId.Value}",
+            cancellationToken);
+
     public void Add(TaskEntity task)
     {
         ArgumentNullException.ThrowIfNull(task);

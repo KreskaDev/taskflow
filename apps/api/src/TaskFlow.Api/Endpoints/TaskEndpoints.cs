@@ -72,6 +72,18 @@ public static class TaskEndpoints
     }
 
     /// <summary>
+    /// The "Assigned to me" view (slice 008, AS-03): the caller's tasks across shared projects where they are
+    /// a current member (or owner) AND an assignee, grouped by project (research R6/FR-071). The literal
+    /// <c>/assigned</c> segment wins over <c>/{id}</c>.
+    /// </summary>
+    [WolverineGet("/api/tasks/assigned")]
+    public static Task<AssignedResponse> Assigned(IMessageBus bus)
+    {
+        ArgumentNullException.ThrowIfNull(bus);
+        return bus.InvokeAsync<AssignedResponse>(new GetAssignedToMe());
+    }
+
+    /// <summary>
     /// Rename the caller's own task under the optimistic-concurrency <c>version</c> guard (FR-001, R4).
     /// The owner is resolved from <c>ICurrentUser</c> in the handler — never the body. A foreign/absent/
     /// soft-deleted id → 404; a stale <c>version</c> → 409; an empty/>500 title → 422.
@@ -204,6 +216,24 @@ public static class TaskEndpoints
             DueDate = request.DueDate,
             DueHasTime = request.DueHasTime,
             ProjectId = request.ProjectId is { } projectId ? ProjectId.From(projectId) : null,
+            Version = request.Version,
+        });
+    }
+
+    /// <summary>
+    /// Set a shared-project task's assignee set — a whole-set replace (slice 008, AS-01/AS-02). Authorized in
+    /// the handler: editor/owner of the SHARED project (viewer → 403; non-member / personal task → 404); every
+    /// assignee MUST be a current member (else 422); stale <c>version</c> → 409. Raises <c>TaskAssigned</c>.
+    /// </summary>
+    [WolverinePatch("/api/tasks/{id}/assignees")]
+    public static Task<TaskResponse> SetAssignees(Guid id, SetTaskAssigneesRequest request, IMessageBus bus)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(bus);
+        return bus.InvokeAsync<TaskResponse>(new SetTaskAssignees
+        {
+            Id = TaskId.From(id),
+            AssigneeIds = request.AssigneeIds,
             Version = request.Version,
         });
     }

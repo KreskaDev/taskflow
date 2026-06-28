@@ -96,6 +96,11 @@ builder.Host.UseWolverine(opts =>
     opts.PublishMessage<OwnerTransferred>().ToLocalQueue("membership-events");
     opts.PublishMessage<MembershipRevoked>().ToLocalQueue("membership-events");
 
+    // slice 008: TaskAssigned (assignee delta + actor) is raised by SetTaskAssignees and routed to its own
+    // outbox-backed durable queue so the publish enrolls in the command's transaction and is observable via
+    // the tracking harness. Consumed by a no-op handler this slice (slice 017 ships the real notifier).
+    opts.PublishMessage<TaskAssigned>().ToLocalQueue("task-assignment-events");
+
     // Single-node deployment (one VPS, ~10 users): Solo durability skips the distributed
     // leader-election/agent machinery, giving faster, cleaner startup/shutdown (also avoids a
     // background-agent logger race during WebApplicationFactory teardown in integration tests).
@@ -119,7 +124,9 @@ builder.Host.UseWolverine(opts =>
             && chain.MessageType != typeof(ProjectShared)
             && chain.MessageType != typeof(ProjectUnshared)
             && chain.MessageType != typeof(OwnerTransferred)
-            && chain.MessageType != typeof(MembershipRevoked));
+            && chain.MessageType != typeof(MembershipRevoked)
+            // slice 008: TaskAssigned is consumed off the durable queue (no HttpContext) — same exemption.
+            && chain.MessageType != typeof(TaskAssigned));
 });
 
 // --- Built-in .NET 9 OpenAPI document at /openapi/v1.json (R5) ---

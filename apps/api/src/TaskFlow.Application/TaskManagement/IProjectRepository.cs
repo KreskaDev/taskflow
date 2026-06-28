@@ -86,6 +86,14 @@ public interface IProjectRepository
     /// </summary>
     Task<int> MoveProjectTasksToInboxAsync(ProjectId projectId, UserId owner, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Lists the ids of the caller's NON-deleted, <c>shared</c> projects they OWN (slice 008, R6). The
+    /// "Assigned to me" read unions these with <c>IProjectMembershipRepository.ListProjectIdsForUserAsync</c>
+    /// (the membership-row projects) because the owner holds NO membership row — without this an owner who
+    /// self-assigns would never see the task. Owner-scoped + <c>visibility = 'shared' AND deleted_at IS NULL</c>.
+    /// </summary>
+    Task<IReadOnlyList<ProjectId>> ListOwnedSharedProjectIdsAsync(UserId owner, CancellationToken cancellationToken);
+
     /// <summary>Stages a newly created project for insertion.</summary>
     void Add(Project project);
 

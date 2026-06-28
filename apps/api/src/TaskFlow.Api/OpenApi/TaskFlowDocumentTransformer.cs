@@ -70,6 +70,13 @@ internal sealed class TaskFlowDocumentTransformer : IOpenApiDocumentTransformer
         SetOperation(document, "/api/tasks/{id}/due-date", OperationType.Patch, "rescheduleTaskDueDate", 403, 404, 409, 422);
         SetOperation(document, "/api/tasks/{id}/edit", OperationType.Patch, "editTask", 403, 404, 409, 422);
 
+        // Task-assignment surface (slice 008, contracts/openapi.yaml). getAssignedToMe is a caller-scoped read
+        // (only the deny-by-default 401). setTaskAssignees dispatches by visibility: shared viewer → 403,
+        // non-member / personal task / foreign → 404, non-member assignee / bad set → 422, stale → 409. NO new
+        // errorCode — the ErrorCodes enum is UNCHANGED (R8).
+        SetOperation(document, "/api/tasks/assigned", OperationType.Get, "getAssignedToMe");
+        SetOperation(document, "/api/tasks/{id}/assignees", OperationType.Patch, "setTaskAssignees", 403, 404, 409, 422);
+
         // Project surface (slice 004, contracts/openapi.yaml). Same pattern as the task ops: success
         // bodies auto-emit from the endpoint signatures; here we stamp the stable operationIds and the
         // exception-driven ProblemDetails responses (401 always, plus the documented 404/409/422 per op)
