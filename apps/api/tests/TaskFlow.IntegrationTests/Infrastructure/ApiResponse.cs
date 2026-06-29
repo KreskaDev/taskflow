@@ -32,7 +32,10 @@ public sealed record TaskBody(
     DateTime CreatedAt, DateTime UpdatedAt, DateTime? CompletedAt,
     DateTime? DueDate = null, bool? DueHasTime = null,
     Guid? ProjectId = null, string? Priority = null, string? Description = null,
-    IReadOnlyList<Guid>? Assignees = null);
+    IReadOnlyList<Guid>? Assignees = null, IReadOnlyList<Guid>? Labels = null);
+
+/// <summary>The <c>LabelResponse</c> read model (slice 006): id + name + optional preset color. No ownerId.</summary>
+public sealed record LabelBody(Guid Id, string Name, string? Color = null);
 
 /// <summary>An "Assigned to me" group (slice 008): a shared project and the caller's assigned tasks in it.</summary>
 public sealed record AssignedGroupBody(Guid ProjectId, IReadOnlyList<TaskBody> Tasks);
@@ -45,7 +48,7 @@ public sealed record TodayTaskBody(
     Guid Id, string Title, string Status, string Position, int Version,
     DateTime CreatedAt, DateTime UpdatedAt, DateTime? CompletedAt,
     DateTime? DueDate, bool? DueHasTime, Guid? ProjectId, string? Priority, string? Description,
-    bool IsOverdue);
+    bool IsOverdue, IReadOnlyList<Guid>? Labels = null);
 
 /// <summary>A Today group (slice 005): the owning project (null = Inbox) and its ordered rows.</summary>
 public sealed record TodayGroupBody(Guid? ProjectId, IReadOnlyList<TodayTaskBody> Tasks);
@@ -158,6 +161,20 @@ public static class ApiResponse
         ArgumentNullException.ThrowIfNull(response);
         return (await response.Content.ReadFromJsonAsync<AssignedBody>(Web))
             ?? throw new InvalidOperationException("Expected an AssignedResponse body but the response was empty.");
+    }
+
+    public static async Task<LabelBody> ReadLabelAsync(this HttpResponseMessage response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        return (await response.Content.ReadFromJsonAsync<LabelBody>(Web))
+            ?? throw new InvalidOperationException("Expected a LabelResponse body but the response was empty.");
+    }
+
+    public static async Task<IReadOnlyList<LabelBody>> ReadLabelsAsync(this HttpResponseMessage response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        return (await response.Content.ReadFromJsonAsync<IReadOnlyList<LabelBody>>(Web))
+            ?? throw new InvalidOperationException("Expected a LabelResponse array but the response was empty.");
     }
 
     public static async Task<ProblemBody> ReadProblemAsync(this HttpResponseMessage response)

@@ -55,10 +55,23 @@ public sealed record TaskResponse
     /// <summary>The assignee user ids (slice 008, R7). ALWAYS present; EMPTY for personal/unassigned tasks. Ids only (names via the roster).</summary>
     public required IReadOnlyList<Guid> Assignees { get; init; }
 
-    /// <summary>Projects a <see cref="TaskEntity"/> aggregate to its lean wire model (mirrors <c>UserProfile.From</c>).</summary>
-    public static TaskResponse From(TaskEntity task)
+    /// <summary>
+    /// The CALLER's OWN label ids applied to this task (slice 006, R6). ALWAYS present; EMPTY when the caller
+    /// has applied none. Caller-scoped — a co-member's labels on a shared task are ABSENT here. Ids only;
+    /// name/color come from the listLabels roster.
+    /// </summary>
+    public required IReadOnlyList<Guid> Labels { get; init; }
+
+    /// <summary>
+    /// Projects a <see cref="TaskEntity"/> aggregate to its lean wire model. <paramref name="callerLabelIds"/>
+    /// is REQUIRED (slice 006, R6): labels are NOT on the Task aggregate (they are a per-user relation), so
+    /// every call site MUST supply the caller-scoped label ids (the compiler-enforced anti-silent-empty
+    /// defense) — an empty list when none. Resolve them via <c>ITaskLabelRepository.ListLabelIdsFor*Async</c>.
+    /// </summary>
+    public static TaskResponse From(TaskEntity task, IReadOnlyList<Guid> callerLabelIds)
     {
         ArgumentNullException.ThrowIfNull(task);
+        ArgumentNullException.ThrowIfNull(callerLabelIds);
         return new TaskResponse
         {
             Id = task.Id.Value,
@@ -75,6 +88,7 @@ public sealed record TaskResponse
             Priority = task.Priority,
             Description = task.Description,
             Assignees = task.Assignees.Select(a => a.UserId.Value).ToList(),
+            Labels = callerLabelIds,
         };
     }
 

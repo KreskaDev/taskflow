@@ -73,11 +73,13 @@ public static class ReorderTaskHandler
         ReorderTask command,
         ICurrentUser currentUser,
         ITaskRepository tasks,
+        Labels.ITaskLabelRepository taskLabels,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(currentUser);
         ArgumentNullException.ThrowIfNull(tasks);
+        ArgumentNullException.ThrowIfNull(taskLabels);
 
         var task = await tasks
             .FindOwnedAsync(command.Id, currentUser.Id, cancellationToken)
@@ -101,6 +103,7 @@ public static class ReorderTaskHandler
         // token no longer matches) is translated by the repository into a VersionConflictException (409).
         await tasks.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-        return TaskResponse.From(task);
+        var labelIds = await taskLabels.ListLabelIdsForTaskAsync(task.Id, currentUser.Id, cancellationToken).ConfigureAwait(false);
+        return TaskResponse.From(task, labelIds);
     }
 }

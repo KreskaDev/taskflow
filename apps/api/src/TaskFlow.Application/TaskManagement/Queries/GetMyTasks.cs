@@ -27,15 +27,24 @@ public static class GetMyTasksHandler
         GetMyTasks query,
         ICurrentUser currentUser,
         ITaskRepository tasks,
+        Labels.ITaskLabelRepository taskLabels,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(currentUser);
         ArgumentNullException.ThrowIfNull(tasks);
+        ArgumentNullException.ThrowIfNull(taskLabels);
 
         var owned = await tasks
             .ListOwnedAsync(currentUser.Id, cancellationToken)
             .ConfigureAwait(false);
 
-        return owned.Select(TaskResponse.From).ToList();
+        // Caller-scoped labels (slice 006, R6): ONE batched join, then project each row with its label ids.
+        var labelsByTask = await taskLabels
+            .ListLabelIdsForTasksAsync(owned.Select(t => t.Id).ToList(), currentUser.Id, cancellationToken)
+            .ConfigureAwait(false);
+
+        return owned
+            .Select(t => TaskResponse.From(t, labelsByTask.TryGetValue(t.Id, out var ids) ? ids : []))
+            .ToList();
     }
 }

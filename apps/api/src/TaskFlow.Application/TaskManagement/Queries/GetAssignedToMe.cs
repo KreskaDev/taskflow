@@ -32,18 +32,25 @@ public static class GetAssignedToMeHandler
         ITaskRepository tasks,
         IProjectMembershipRepository members,
         IProjectRepository projects,
+        Labels.ITaskLabelRepository taskLabels,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(currentUser);
         ArgumentNullException.ThrowIfNull(tasks);
         ArgumentNullException.ThrowIfNull(members);
         ArgumentNullException.ThrowIfNull(projects);
+        ArgumentNullException.ThrowIfNull(taskLabels);
 
         var memberOf = await members.ListProjectIdsForUserAsync(currentUser.Id, cancellationToken).ConfigureAwait(false);
         var ownedShared = await projects.ListOwnedSharedProjectIdsAsync(currentUser.Id, cancellationToken).ConfigureAwait(false);
         var readable = memberOf.Concat(ownedShared).ToHashSet();
 
         var assigned = await tasks.ListAssignedToAsync(currentUser.Id, cancellationToken).ConfigureAwait(false);
+
+        // Caller-scoped labels (slice 006, R6): ONE batched join over the assigned rows.
+        var labelsByTask = await taskLabels
+            .ListLabelIdsForTasksAsync(assigned.Select(t => t.Id).ToList(), currentUser.Id, cancellationToken)
+            .ConfigureAwait(false);
 
         var groups = assigned
             .Where(t => t.ProjectId is { } pid && readable.Contains(pid))
@@ -57,7 +64,7 @@ public static class GetAssignedToMeHandler
                     .ThenBy(t => t.DueDate)
                     .ThenBy(t => t.CreatedAt)
                     .ThenBy(t => t.Id.Value.ToString(), StringComparer.Ordinal)
-                    .Select(TaskResponse.From)
+                    .Select(t => TaskResponse.From(t, labelsByTask.TryGetValue(t.Id, out var ids) ? ids : []))
                     .ToList(),
             })
             .ToList();

@@ -77,6 +77,17 @@ internal sealed class TaskFlowDocumentTransformer : IOpenApiDocumentTransformer
         SetOperation(document, "/api/tasks/assigned", OperationType.Get, "getAssignedToMe");
         SetOperation(document, "/api/tasks/{id}/assignees", OperationType.Patch, "setTaskAssignees", 403, 404, 409, 422);
 
+        // Labels surface (slice 006, contracts/openapi.yaml). listLabels is a caller-scoped read (only the
+        // deny-by-default 401). createLabel is an idempotent PUT-upsert (no 409; dup name → 422). update/delete
+        // are ownership-gated (not-owned/absent → 404; dup name on update → 422). setTaskLabels is TWO-SIDED and
+        // VERSIONLESS (no 409): task write-access (viewer → 403, non-member/personal-foreign → 404) AND every
+        // label owned by the caller (else 422). NO new errorCode — the ErrorCodes enum is UNCHANGED (R9).
+        SetOperation(document, "/api/labels", OperationType.Get, "listLabels");
+        SetOperation(document, "/api/labels/{id}", OperationType.Put, "createLabel", 422);
+        SetOperation(document, "/api/labels/{id}", OperationType.Patch, "updateLabel", 404, 422);
+        SetOperation(document, "/api/labels/{id}", OperationType.Delete, "deleteLabel", 404);
+        SetOperation(document, "/api/tasks/{id}/labels", OperationType.Patch, "setTaskLabels", 403, 404, 422);
+
         // Project surface (slice 004, contracts/openapi.yaml). Same pattern as the task ops: success
         // bodies auto-emit from the endpoint signatures; here we stamp the stable operationIds and the
         // exception-driven ProblemDetails responses (401 always, plus the documented 404/409/422 per op)

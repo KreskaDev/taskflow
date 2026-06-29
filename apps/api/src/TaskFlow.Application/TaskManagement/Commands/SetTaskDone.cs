@@ -92,11 +92,13 @@ public static class SetTaskDoneHandler
         IProjectRepository projects,
         IProjectMembershipRepository members,
         IResourceAuthorizationPolicy authorization,
+        Labels.ITaskLabelRepository taskLabels,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(currentUser);
         ArgumentNullException.ThrowIfNull(tasks);
+        ArgumentNullException.ThrowIfNull(taskLabels);
 
         var task = await TaskAccessGuards
             .LoadWritableTaskAsync(command.Id, EffectiveRole.Editor, currentUser, tasks, projects, members, authorization, cancellationToken)
@@ -122,6 +124,7 @@ public static class SetTaskDoneHandler
         }
 
         await tasks.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return TaskResponse.From(task);
+        var labelIds = await taskLabels.ListLabelIdsForTaskAsync(task.Id, currentUser.Id, cancellationToken).ConfigureAwait(false);
+        return TaskResponse.From(task, labelIds);
     }
 }

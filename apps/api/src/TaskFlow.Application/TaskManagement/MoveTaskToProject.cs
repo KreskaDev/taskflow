@@ -58,12 +58,14 @@ public static class MoveTaskToProjectHandler
         ICurrentUser currentUser,
         ITaskRepository tasks,
         IProjectRepository projects,
+        Labels.ITaskLabelRepository taskLabels,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(currentUser);
         ArgumentNullException.ThrowIfNull(tasks);
         ArgumentNullException.ThrowIfNull(projects);
+        ArgumentNullException.ThrowIfNull(taskLabels);
 
         var owner = currentUser.Id;
 
@@ -96,6 +98,8 @@ public static class MoveTaskToProjectHandler
         task.MoveToProject(command.ProjectId, DateTime.UtcNow);
         await tasks.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-        return TaskResponse.From(task);
+        // Labels are project-INDEPENDENT (R5): a move does NOT clear them. Re-project the caller's labels.
+        var labelIds = await taskLabels.ListLabelIdsForTaskAsync(task.Id, owner, cancellationToken).ConfigureAwait(false);
+        return TaskResponse.From(task, labelIds);
     }
 }

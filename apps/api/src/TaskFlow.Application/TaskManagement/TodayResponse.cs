@@ -52,14 +52,21 @@ public sealed record TodayTaskResponse
     /// <summary>The assignee user ids (slice 008); empty for personal/unassigned. Ids only.</summary>
     public required IReadOnlyList<Guid> Assignees { get; init; }
 
+    /// <summary>
+    /// The CALLER's OWN label ids applied to this task (slice 006, R6). ALWAYS present; EMPTY when none.
+    /// Caller-scoped. This flattened DTO carries its own <c>labels</c> — the required <c>TaskResponse.From</c>
+    /// parameter does NOT auto-propagate here (the fields are hand-copied), so <see cref="From"/> threads it.
+    /// </summary>
+    public required IReadOnlyList<Guid> Labels { get; init; }
+
     /// <summary>True when <c>due_date</c> is before the start of today-Warsaw (overdue incomplete). Today-only.</summary>
     public required bool IsOverdue { get; init; }
 
-    /// <summary>Projects a <see cref="TaskEntity"/> + the derived overdue flag to the Today wire row.</summary>
-    public static TodayTaskResponse From(TaskEntity task, bool isOverdue)
+    /// <summary>Projects a <see cref="TaskEntity"/> + the derived overdue flag + the caller's label ids to the Today wire row.</summary>
+    public static TodayTaskResponse From(TaskEntity task, bool isOverdue, IReadOnlyList<Guid> callerLabelIds)
     {
         ArgumentNullException.ThrowIfNull(task);
-        var t = TaskResponse.From(task);
+        var t = TaskResponse.From(task, callerLabelIds);
         return new TodayTaskResponse
         {
             Id = t.Id,
@@ -76,6 +83,7 @@ public sealed record TodayTaskResponse
             Priority = t.Priority,
             Description = t.Description,
             Assignees = t.Assignees,
+            Labels = t.Labels,
             IsOverdue = isOverdue,
         };
     }

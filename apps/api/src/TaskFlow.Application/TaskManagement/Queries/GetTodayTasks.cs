@@ -33,12 +33,14 @@ public static class GetTodayTasksHandler
         ICurrentUser currentUser,
         ITaskRepository tasks,
         IProjectMembershipRepository members,
+        Labels.ITaskLabelRepository taskLabels,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(currentUser);
         ArgumentNullException.ThrowIfNull(tasks);
         ArgumentNullException.ThrowIfNull(members);
+        ArgumentNullException.ThrowIfNull(taskLabels);
         ArgumentNullException.ThrowIfNull(timeProvider);
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
@@ -51,6 +53,11 @@ public static class GetTodayTasksHandler
 
         var rows = await tasks
             .ListDueInRangeReadableAsync(currentUser.Id, sharedProjectIds, lowerInclusiveUtc: null, upperExclusiveUtc: startOfTomorrowUtc, cancellationToken)
+            .ConfigureAwait(false);
+
+        // Caller-scoped labels (slice 006, R6): ONE batched join; threaded into the flattened TodayTaskResponse.
+        var labelsByTask = await taskLabels
+            .ListLabelIdsForTasksAsync(rows.Select(t => t.Id).ToList(), currentUser.Id, cancellationToken)
             .ConfigureAwait(false);
 
         var groups = rows
@@ -67,7 +74,10 @@ public static class GetTodayTasksHandler
                     .ThenBy(t => t.DueDate)
                     .ThenBy(t => t.CreatedAt)
                     .ThenBy(t => t.Id.Value.ToString(), StringComparer.Ordinal)
-                    .Select(t => TodayTaskResponse.From(t, isOverdue: t.DueDate < startOfTodayUtc))
+                    .Select(t => TodayTaskResponse.From(
+                        t,
+                        isOverdue: t.DueDate < startOfTodayUtc,
+                        callerLabelIds: labelsByTask.TryGetValue(t.Id, out var ids) ? ids : []))
                     .ToList(),
             })
             .ToList();

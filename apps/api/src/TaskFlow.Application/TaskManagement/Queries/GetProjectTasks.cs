@@ -40,6 +40,7 @@ public static class GetProjectTasksHandler
         IProjectRepository projects,
         IProjectMembershipRepository members,
         ITaskRepository tasks,
+        Labels.ITaskLabelRepository taskLabels,
         IResourceAuthorizationPolicy authorization,
         CancellationToken cancellationToken)
     {
@@ -48,6 +49,7 @@ public static class GetProjectTasksHandler
         ArgumentNullException.ThrowIfNull(projects);
         ArgumentNullException.ThrowIfNull(members);
         ArgumentNullException.ThrowIfNull(tasks);
+        ArgumentNullException.ThrowIfNull(taskLabels);
         ArgumentNullException.ThrowIfNull(authorization);
 
         // 404-FIRST: a foreign/absent project, or a shared project the caller is not a member of, must not
@@ -76,6 +78,14 @@ public static class GetProjectTasksHandler
             .ListByProjectAsync(query.ProjectId, project.OwnerId, cancellationToken)
             .ConfigureAwait(false);
 
-        return projectTasks.Select(TaskResponse.From).ToList();
+        // Caller-scoped labels (slice 006, R6): the CALLER's own labels on these tasks (owner = the caller,
+        // not the project owner) — one batched join.
+        var labelsByTask = await taskLabels
+            .ListLabelIdsForTasksAsync(projectTasks.Select(t => t.Id).ToList(), currentUser.Id, cancellationToken)
+            .ConfigureAwait(false);
+
+        return projectTasks
+            .Select(t => TaskResponse.From(t, labelsByTask.TryGetValue(t.Id, out var ids) ? ids : []))
+            .ToList();
     }
 }

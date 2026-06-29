@@ -85,11 +85,13 @@ public static class RenameTaskHandler
         RenameTask command,
         ICurrentUser currentUser,
         ITaskRepository tasks,
+        Labels.ITaskLabelRepository taskLabels,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(currentUser);
         ArgumentNullException.ThrowIfNull(tasks);
+        ArgumentNullException.ThrowIfNull(taskLabels);
 
         var owner = currentUser.Id;
 
@@ -109,6 +111,7 @@ public static class RenameTaskHandler
         task.Rename(command.Title, DateTime.UtcNow);
         await tasks.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-        return TaskResponse.From(task);
+        var labelIds = await taskLabels.ListLabelIdsForTaskAsync(task.Id, owner, cancellationToken).ConfigureAwait(false);
+        return TaskResponse.From(task, labelIds);
     }
 }

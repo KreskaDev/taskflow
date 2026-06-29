@@ -85,6 +85,7 @@ public static class SetTaskAssigneesHandler
         IProjectRepository projects,
         IProjectMembershipRepository members,
         IResourceAuthorizationPolicy authorization,
+        Labels.ITaskLabelRepository taskLabels,
         IMessageContext messages,
         CancellationToken cancellationToken)
     {
@@ -94,6 +95,7 @@ public static class SetTaskAssigneesHandler
         ArgumentNullException.ThrowIfNull(projects);
         ArgumentNullException.ThrowIfNull(members);
         ArgumentNullException.ThrowIfNull(authorization);
+        ArgumentNullException.ThrowIfNull(taskLabels);
         ArgumentNullException.ThrowIfNull(messages);
 
         // Base dispatch-by-visibility (foreign → 404, viewer → 403, non-member → 404).
@@ -132,6 +134,7 @@ public static class SetTaskAssigneesHandler
         await DomainEventDispatch.PublishAndClearAsync(task, messages, cancellationToken).ConfigureAwait(false);
         await tasks.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-        return TaskResponse.From(task);
+        var labelIds = await taskLabels.ListLabelIdsForTaskAsync(task.Id, currentUser.Id, cancellationToken).ConfigureAwait(false);
+        return TaskResponse.From(task, labelIds);
     }
 }

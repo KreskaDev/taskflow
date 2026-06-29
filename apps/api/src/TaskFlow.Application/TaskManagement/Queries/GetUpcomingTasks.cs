@@ -32,12 +32,14 @@ public static class GetUpcomingTasksHandler
         ICurrentUser currentUser,
         ITaskRepository tasks,
         IProjectMembershipRepository members,
+        Labels.ITaskLabelRepository taskLabels,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(currentUser);
         ArgumentNullException.ThrowIfNull(tasks);
         ArgumentNullException.ThrowIfNull(members);
+        ArgumentNullException.ThrowIfNull(taskLabels);
         ArgumentNullException.ThrowIfNull(timeProvider);
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
@@ -52,6 +54,11 @@ public static class GetUpcomingTasksHandler
             .ListDueInRangeReadableAsync(currentUser.Id, sharedProjectIds, lowerInclusiveUtc: startOfTomorrowUtc, upperExclusiveUtc: startOfDayPlus8Utc, cancellationToken)
             .ConfigureAwait(false);
 
+        // Caller-scoped labels (slice 006, R6): ONE batched join over the window's rows.
+        var labelsByTask = await taskLabels
+            .ListLabelIdsForTasksAsync(rows.Select(t => t.Id).ToList(), currentUser.Id, cancellationToken)
+            .ConfigureAwait(false);
+
         var groups = rows
             .GroupBy(t => WarsawDayBounds.WarsawLocalDate(t.DueDate!.Value).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))
             .OrderBy(g => g.Key, StringComparer.Ordinal)
@@ -64,7 +71,7 @@ public static class GetUpcomingTasksHandler
                     .ThenBy(t => t.CreatedAt)
                     // Ordinal-string id tiebreak — identical to the client recompute (dailyViews.ts), FR-092.
                     .ThenBy(t => t.Id.Value.ToString(), StringComparer.Ordinal)
-                    .Select(TaskResponse.From)
+                    .Select(t => TaskResponse.From(t, labelsByTask.TryGetValue(t.Id, out var ids) ? ids : []))
                     .ToList(),
             })
             .ToList();

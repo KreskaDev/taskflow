@@ -54,6 +54,8 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 builder.Services.AddScoped<IProjectRepository, ProjectRepository>();
 builder.Services.AddScoped<IProjectMembershipRepository, ProjectMembershipRepository>();
+builder.Services.AddScoped<TaskFlow.Application.TaskManagement.Labels.ILabelRepository, LabelRepository>();
+builder.Services.AddScoped<TaskFlow.Application.TaskManagement.Labels.ITaskLabelRepository, TaskLabelRepository>();
 
 // The wall clock (slice 005): the Today/Upcoming queries resolve "now" through TimeProvider so the Warsaw
 // day boundary is testable (integration tests freeze it via the ConfigureTestServices hook). Default = system.

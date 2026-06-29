@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using TaskFlow.Application.TaskManagement;
 using TaskFlow.Application.TaskManagement.Commands;
+using TaskFlow.Application.TaskManagement.Labels;
 using TaskFlow.Application.TaskManagement.Queries;
 using Wolverine;
 using Wolverine.Http;
@@ -235,6 +236,24 @@ public static class TaskEndpoints
             Id = TaskId.From(id),
             AssigneeIds = request.AssigneeIds,
             Version = request.Version,
+        });
+    }
+
+    /// <summary>
+    /// Set the CALLER's labels on a task — a per-user whole-set replace (slice 006, US-08.AS-04). VERSIONLESS.
+    /// Authorized in the handler (two-sided): task write-access by visibility (viewer → 403; non-member /
+    /// personal-foreign → 404) AND every label owned by the caller (else 422). Returns the task's read model
+    /// with the caller-scoped <c>labels</c>.
+    /// </summary>
+    [WolverinePatch("/api/tasks/{id}/labels")]
+    public static Task<TaskResponse> SetLabels(Guid id, SetTaskLabelsRequest request, IMessageBus bus)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(bus);
+        return bus.InvokeAsync<TaskResponse>(new SetTaskLabels
+        {
+            Id = TaskId.From(id),
+            LabelIds = request.LabelIds,
         });
     }
 

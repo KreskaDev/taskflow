@@ -138,20 +138,37 @@ public static class CreateTaskHandler
         CreateTask command,
         ICurrentUser currentUser,
         ITaskRepository tasks,
+        Labels.ITaskLabelRepository taskLabels,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(currentUser);
         ArgumentNullException.ThrowIfNull(tasks);
+        ArgumentNullException.ThrowIfNull(taskLabels);
 
         var owner = currentUser.Id;
+
+        // Idempotent-replay resolution. The id is the caller's own already-soft-deleted row → 404 (spent id);
+        // otherwise return the existing row UNCHANGED, carrying the caller's labels (slice 006, R6).
+        async Task<TaskResponse> ResolveAsync(TaskEntity existingTask)
+        {
+            if (existingTask.DeletedAt is not null)
+            {
+                throw new NotFoundException();
+            }
+
+            var existingLabels = await taskLabels
+                .ListLabelIdsForTaskAsync(existingTask.Id, owner, cancellationToken)
+                .ConfigureAwait(false);
+            return TaskResponse.From(existingTask, existingLabels);
+        }
 
         var existing = await tasks
             .FindOwnedIncludingDeletedAsync(command.Id, owner, cancellationToken)
             .ConfigureAwait(false);
         if (existing is not null)
         {
-            return Resolve(existing);
+            return await ResolveAsync(existing).ConfigureAwait(false);
         }
 
         // No row for this caller (absent, or owned by another user). Attempt the insert; the PK on
@@ -163,7 +180,7 @@ public static class CreateTaskHandler
         try
         {
             await tasks.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-            return TaskResponse.From(created);
+            return TaskResponse.From(created, []); // a freshly created task has no labels yet.
         }
         catch (DuplicateTaskIdException)
         {
@@ -178,19 +195,7 @@ public static class CreateTaskHandler
                 throw new NotFoundException();
             }
 
-            return Resolve(resolved);
+            return await ResolveAsync(resolved).ConfigureAwait(false);
         }
-    }
-
-    private static TaskResponse Resolve(TaskEntity existing)
-    {
-        // The id is the caller's own already-soft-deleted row: the id is spent, treat as not-found.
-        if (existing.DeletedAt is not null)
-        {
-            throw new NotFoundException();
-        }
-
-        // Idempotent replay: return the existing row UNCHANGED (no overwrite, no version bump).
-        return TaskResponse.From(existing);
     }
 }
