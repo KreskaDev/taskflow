@@ -92,7 +92,16 @@ public static class UpdateLabelHandler
         }
 
         label.Edit(command.Name, command.Color, DateTime.UtcNow);
-        await labels.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await labels.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DuplicateLabelException)
+        {
+            // A concurrent rename to a now-duplicate name lost the race against ux_labels_owner_name (the
+            // pre-check's TOCTOU window) → the same recoverable 422 the pre-check yields.
+            throw new ValidationException("A label with this name already exists.");
+        }
 
         return LabelResponse.From(label);
     }

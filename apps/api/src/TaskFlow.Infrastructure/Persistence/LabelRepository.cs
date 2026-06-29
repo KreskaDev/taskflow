@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using TaskFlow.Application.Errors;
 using TaskFlow.Application.TaskManagement.Labels;
 using TaskFlow.Domain.IdentityAccess;
 using Label = TaskFlow.Domain.TaskManagement.Label;
@@ -44,5 +46,27 @@ public sealed class LabelRepository(AppDbContext db) : ILabelRepository
 
     public void Remove(Label label) => db.Labels.Remove(label);
 
-    public Task SaveChangesAsync(CancellationToken cancellationToken) => db.SaveChangesAsync(cancellationToken);
+    public async Task SaveChangesAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            // `labels` has TWO unique constraints: PK_labels (id) and ux_labels_owner_name (owner_id,
+            // name_normalized). A concurrent same-id PUT or a concurrent same-name create/rename loses the
+            // race here (the in-handler pre-check has a TOCTOU window the DB index closes). DETACH the rejected
+            // entity (it is tracked Added/Modified, so Wolverine's AutoApplyTransactions would re-attempt the
+            // write → an uncaught 500, and EF identity-resolution would shadow the handler's re-resolve), then
+            // translate to the Application-layer signal the handlers re-resolve/map (mirrors the slice-002
+            // DuplicateTaskIdException translation; clean-architecture dependency direction).
+            foreach (var entry in ex.Entries)
+            {
+                entry.State = EntityState.Detached;
+            }
+
+            throw new DuplicateLabelException("A label uniqueness constraint was violated.", ex);
+        }
+    }
 }

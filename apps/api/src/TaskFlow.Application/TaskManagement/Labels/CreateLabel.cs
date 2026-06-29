@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using FluentValidation;
 using TaskFlow.Application.Authorization;
+using TaskFlow.Application.Errors;
 using Label = TaskFlow.Domain.TaskManagement.Label;
 using LabelId = TaskFlow.Domain.TaskManagement.LabelId;
 
@@ -98,8 +99,24 @@ public static class CreateLabelHandler
 
         var label = Label.Create(command.Id, owner, command.Name, command.Color, DateTime.UtcNow);
         labels.Add(label);
-        await labels.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await labels.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            return LabelResponse.From(label);
+        }
+        catch (DuplicateLabelException)
+        {
+            // Lost the race to a concurrent insert (the pre-check's TOCTOU window). Re-resolve through the
+            // same find-then-decide path as CreateTask: an own live row now present → idempotent replay (200);
+            // else a name collision (or a vanishingly rare foreign-id PK collision) → 422, uniform — no 500
+            // and no cross-user existence oracle.
+            var resolved = await labels.FindOwnedAsync(command.Id, owner, cancellationToken).ConfigureAwait(false);
+            if (resolved is not null)
+            {
+                return LabelResponse.From(resolved);
+            }
 
-        return LabelResponse.From(label);
+            throw new ValidationException("A label with this name already exists.");
+        }
     }
 }

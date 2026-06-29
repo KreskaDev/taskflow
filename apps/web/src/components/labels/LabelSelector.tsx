@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { Dialog } from "@/components/ui/Dialog";
 import { useLabelMutations, useLabelRoster } from "@/hooks/useLabels";
@@ -33,6 +33,14 @@ export function LabelSelector({ open, current, onClose, onSubmit }: LabelSelecto
   const { createLabel, deleteLabel } = useLabelMutations();
   const [selected, setSelected] = useState<Set<string>>(() => new Set(current));
   const [draft, setDraft] = useState("");
+  const createInputRef = useRef<HTMLInputElement>(null);
+
+  const removeFromSelected = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
 
   const toggle = (id: string) =>
     setSelected((prev) => {
@@ -92,7 +100,14 @@ export function LabelSelector({ open, current, onClose, onSubmit }: LabelSelecto
                   type="button"
                   className="tf-button tf-button--secondary"
                   aria-label={`Usuń etykietę ${label.name}`}
-                  onClick={() => void deleteLabel(label.id)}
+                  onClick={() => {
+                    // Prune the id from the pending set so Save can't commit a just-deleted label (→ 422),
+                    // and move focus to a stable element inside the dialog — the deleted row unmounts, so
+                    // without this focus would fall to <body> and break the FR-101 focus trap.
+                    removeFromSelected(label.id);
+                    createInputRef.current?.focus();
+                    deleteLabel(label.id).catch(() => {}); // the global announcer surfaces any error (FR-049)
+                  }}
                 >
                   Usuń
                 </button>
@@ -106,6 +121,7 @@ export function LabelSelector({ open, current, onClose, onSubmit }: LabelSelecto
             Nowa etykieta
           </label>
           <input
+            ref={createInputRef}
             id="label-create"
             type="text"
             className="tf-input"
@@ -114,9 +130,12 @@ export function LabelSelector({ open, current, onClose, onSubmit }: LabelSelecto
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter") {
+              // Plain Enter creates the draft; Ctrl/Meta+Enter is the Save chord (let it bubble to the
+              // wrapper) — without this guard Ctrl+Enter would BOTH create and save, applying the set
+              // before the new label's create lands.
+              if (event.key === "Enter" && !event.ctrlKey && !event.metaKey) {
                 event.preventDefault();
-                void createFromDraft();
+                createFromDraft().catch(() => {}); // the global announcer surfaces any error (FR-049)
               }
             }}
           />

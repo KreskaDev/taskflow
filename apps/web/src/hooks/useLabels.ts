@@ -37,10 +37,11 @@ export function useLabelRoster() {
 }
 
 /**
- * Label create/update/delete mutations (slice 006, full CRUD). Create is a client-id idempotent PUT-upsert
- * with an optimistic roster insert (SC-003); update (rename + recolor) and delete patch the roster optimistically.
- * Delete additionally invalidates the task caches so the deleted label drops from every row's chips (the server
- * FK cascade removed its applications).
+ * Label create + delete mutations (slice 006). Create is a client-id idempotent PUT-upsert with an optimistic
+ * roster insert (SC-003); delete patches the roster optimistically and invalidates the task caches so the
+ * deleted label drops from every row's chips (the server FK cascade removed its applications). Rename/recolor
+ * (UpdateLabel) are backend-complete + tested but have NO UI this slice (the chosen scope — research R11), so
+ * no web mutation is wired for them.
  */
 export function useLabelMutations() {
   const queryClient = useQueryClient();
@@ -54,7 +55,8 @@ export function useLabelMutations() {
       if (error || !data) throw errorFrom(error);
       return data;
     },
-    onMutate: ({ id, name, color }) => {
+    onMutate: async ({ id, name, color }) => {
+      await queryClient.cancelQueries({ queryKey: LABELS_QUERY_KEY }); // stop an in-flight refetch clobbering the insert
       const previous = queryClient.getQueryData<LabelResponse[]>(LABELS_QUERY_KEY);
       // Optimistic roster insert (R11) with the SAME client id the PUT upserts, so the placeholder and the
       // server row share identity (onSettled re-fetches to reconcile name/color).
@@ -71,28 +73,13 @@ export function useLabelMutations() {
     },
   });
 
-  const updateMutation = useMutation<LabelResponse, Error, { id: string; name: string; color?: string | null }>({
-    mutationFn: async ({ id, name, color }): Promise<LabelResponse> => {
-      const { data, error } = await apiClient.PATCH("/api/labels/{id}", {
-        params: { path: { id } },
-        body: { name, color: color ?? null },
-      });
-      if (error || !data) throw errorFrom(error);
-      return data;
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: LABELS_QUERY_KEY });
-      // Rename/recolor changes the chip text/color rendered from the roster — the task caches hold ids only,
-      // so no task-cache invalidation is needed (the chips resolve the new name from the refreshed roster).
-    },
-  });
-
   const deleteMutation = useMutation<void, Error, { id: string }, { previous: LabelResponse[] | undefined }>({
     mutationFn: async ({ id }): Promise<void> => {
       const { error } = await apiClient.DELETE("/api/labels/{id}", { params: { path: { id } } });
       if (error) throw errorFrom(error);
     },
-    onMutate: ({ id }) => {
+    onMutate: async ({ id }) => {
+      await queryClient.cancelQueries({ queryKey: LABELS_QUERY_KEY }); // stop an in-flight refetch clobbering the removal
       const previous = queryClient.getQueryData<LabelResponse[]>(LABELS_QUERY_KEY);
       queryClient.setQueryData<LabelResponse[]>(LABELS_QUERY_KEY, (old) => (old ?? []).filter((l) => l.id !== id));
       return { previous };
@@ -111,8 +98,6 @@ export function useLabelMutations() {
   return {
     /** Creates a label (client-id idempotent upsert) and returns it — the selector adds its id to the set. */
     createLabel: (name: string, color?: string | null) => createMutation.mutateAsync({ id: newLabelId(), name, color }),
-    /** Renames and/or recolors a label (whole-object). */
-    updateLabel: (id: string, name: string, color?: string | null) => updateMutation.mutateAsync({ id, name, color }),
     /** Hard-deletes a label (the server cascade clears its task applications). */
     deleteLabel: (id: string) => deleteMutation.mutateAsync({ id }),
   };

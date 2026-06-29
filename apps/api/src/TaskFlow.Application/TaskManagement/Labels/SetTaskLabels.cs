@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using FluentValidation;
 using TaskFlow.Application.Authorization;
+using TaskFlow.Application.Errors;
 using LabelId = TaskFlow.Domain.TaskManagement.LabelId;
 using TaskId = TaskFlow.Domain.TaskManagement.TaskId;
 
@@ -105,7 +106,16 @@ public static class SetTaskLabelsHandler
         }
 
         // Per-user whole-set replace (caller-owned rows only; other members' labels on a shared task untouched).
-        await taskLabels.SetForOwnerAsync(command.Id, owner, desired, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await taskLabels.SetForOwnerAsync(command.Id, owner, desired, cancellationToken).ConfigureAwait(false);
+        }
+        catch (DuplicateLabelException)
+        {
+            // A label in the set was concurrently deleted between the ownership check and the insert (FK race)
+            // → the same uniform 422 the ownership pre-check yields (the label is no longer a valid target).
+            throw new ValidationException("Every label must be one you own.");
+        }
 
         // VERSIONLESS: no Task mutation, no SaveChanges on the task aggregate. The caller's labels are exactly
         // the just-committed set (validated owned + set-replaced), so reuse it without a re-query.

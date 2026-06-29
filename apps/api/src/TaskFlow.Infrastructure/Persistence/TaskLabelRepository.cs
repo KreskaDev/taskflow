@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using TaskFlow.Application.Errors;
 using TaskFlow.Application.TaskManagement.Labels;
 using TaskFlow.Domain.IdentityAccess;
 using LabelId = TaskFlow.Domain.TaskManagement.LabelId;
@@ -43,7 +45,23 @@ public sealed class TaskLabelRepository(AppDbContext db) : ITaskLabelRepository
             db.TaskLabels.Add(new TaskLabel(taskId, labelId));
         }
 
-        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation })
+        {
+            // A label in the desired set was concurrently deleted between the handler's ownership validation
+            // and this insert → the task_labels.label_id FK violates. Detach the rejected rows (Wolverine's
+            // AutoApplyTransactions would otherwise re-attempt) and signal the handler to map it to the same
+            // recoverable 422 the ownership pre-check yields (the label is no longer a valid target).
+            foreach (var entry in ex.Entries)
+            {
+                entry.State = EntityState.Detached;
+            }
+
+            throw new DuplicateLabelException("A referenced label no longer exists.", ex);
+        }
     }
 
     public async Task<IReadOnlyList<Guid>> ListLabelIdsForTaskAsync(TaskId taskId, UserId owner, CancellationToken cancellationToken) =>

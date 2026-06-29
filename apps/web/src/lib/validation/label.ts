@@ -12,9 +12,6 @@ export const labelNameSchema = z.string().trim().min(1).max(MAX_LABEL_NAME_LENGT
 
 export type LabelName = z.infer<typeof labelNameSchema>;
 
-/** The optional preset color token, or null. Membership is validated server-side (closed preset set). */
-export const labelColorSchema = z.string().min(1).nullable();
-
 /**
  * Label-set validation (slice 006, R2): a set of the caller's label ids (uuids), no duplicates, bounded —
  * the client trust boundary mirroring the server's `SetTaskLabelsValidator`. Label OWNERSHIP is a server-side

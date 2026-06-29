@@ -193,6 +193,7 @@ components:
         labelIds:
           type: array
           uniqueItems: true
+          maxItems: 50
           items: { type: string, format: uuid }
           description: >
             The desired FULL set of the CALLER's labels on this task (per-user whole-set replace). Each id

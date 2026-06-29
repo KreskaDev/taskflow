@@ -179,6 +179,39 @@ public sealed class SetTaskLabelsTests : SharingTestBase
         (await LoadTaskLabelIdsAsync(taskId)).Should().BeEmpty("the rejected set changed nothing");
     }
 
+    [Fact]
+    public async Task Deny_a_non_owned_label_on_a_shared_task_is_422()
+    {
+        // The label-ownership side of the AND must hold even when the TASK gate passes (a shared-project editor).
+        var owner = await CreateUserAsync("g-stl-sh-o", "stlsho@example.com", "Owner");
+        var editor = await CreateUserAsync("g-stl-sh-e", "stlshe@example.com", "Editor");
+        var ownerToken = TokenFor(owner);
+        var project = await ShareProjectAsync(ownerToken, await CreateProjectAsync(ownerToken));
+        await SeedMembershipAsync(project.Id, editor, MembershipRoles.Editor);
+        var taskId = await SeedTaskAsync(owner, "Shared task", projectId: project.Id);
+        var ownerLabel = await CreateLabelAsync(ownerToken, "OwnerTag"); // a co-member's label, not the editor's
+
+        using var response = await SendAsync(HttpMethod.Patch, LabelsPath(taskId), TokenFor(editor), new { labelIds = new[] { ownerLabel } });
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity, "label-ownership is enforced even when the task gate passes");
+        (await response.ReadProblemAsync()).ErrorCode.Should().Be("validation_failed");
+        (await LoadTaskLabelIdsAsync(taskId)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Deny_no_valid_session_is_401_and_writes_no_row()
+    {
+        var user = await CreateUserAsync("g-stl-401", "stl401@example.com", "Owner");
+        var taskId = await SeedTaskAsync(user, "Personal task");
+        var label = await CreateLabelAsync(TokenFor(user), "Urgent");
+
+        using var response = await SendAsync(HttpMethod.Patch, LabelsPath(taskId), TestJwtHelper.WrongKey("nobody"), new { labelIds = new[] { label } });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await response.ReadProblemAsync()).ErrorCode.Should().Be("unauthenticated");
+        (await LoadTaskLabelIdsAsync(taskId)).Should().BeEmpty("deny-by-default must weave on the label-on-task route — no row written");
+    }
+
     private async Task<IReadOnlyList<Guid>> LoadTaskLabelIdsAsync(Guid taskId)
     {
         using var scope = Services.CreateScope();

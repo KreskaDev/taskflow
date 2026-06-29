@@ -191,7 +191,7 @@ This is the slice's main cross-cutting touch (mechanical for the directly-typed 
 **Rationale**: every piece has a slice-004/005/008 precedent (the project selector `M`, the assignee picker `A`, the optimistic recipe, the chip pattern). The client-generated `LabelId` is what makes create-then-apply paint instantly.
 
 **Alternatives considered**:
-- **(a) A separate label-management screen** — rejected this slice (no FR/scenario for it; YAGNI). CRUD is exercised through the selector (create/rename/recolor/delete inline) + the roster; a dedicated management view is a later concern.
+- **(a) A separate label-management screen** — rejected this slice (no FR/scenario for it; YAGNI). The web selector exposes **create + apply/remove + delete**; **rename/recolor (UpdateLabel) are backend-complete and tested but have NO web UI this slice** — this matches the chosen scope (the "full CRUD" option was explicitly "commands + tests with no UI surface this slice"). The entity's full lifecycle is realized at the API; a dedicated management/edit UI (and the `color`-picker that makes ENT-04's optional color settable) is a later concern. (Consequently no `updateLabel` web mutation or `labelColorSchema` is shipped — they would be dead code.)
 - **(b) Reuse the `M` project-selector component** — rejected; labels are multi-select toggles with create-in-place, structurally different from the single-select project move. A dedicated `LabelSelector` is clearer.
 
 ---

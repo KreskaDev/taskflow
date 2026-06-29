@@ -2,7 +2,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  labelColorSchema,
   labelNameSchema,
   labelSetSchema,
   MAX_LABEL_NAME_LENGTH,
@@ -20,16 +19,6 @@ describe("labelNameSchema", () => {
 
   it("rejects a name longer than the max", () => {
     expect(labelNameSchema.safeParse("x".repeat(MAX_LABEL_NAME_LENGTH + 1)).success).toBe(false);
-  });
-});
-
-describe("labelColorSchema", () => {
-  it("accepts a preset token string", () => {
-    expect(labelColorSchema.parse("red")).toBe("red");
-  });
-
-  it("accepts null (optional color)", () => {
-    expect(labelColorSchema.parse(null)).toBeNull();
   });
 });
 
