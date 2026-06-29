@@ -17,7 +17,7 @@ vi.mock("@/hooks/useLabels", () => ({
     isPending: false,
     isError: false,
   }),
-  useLabelMutations: () => ({ createLabel, updateLabel: vi.fn(), deleteLabel: vi.fn() }),
+  useLabelMutations: () => ({ createLabel, deleteLabel: vi.fn() }),
 }));
 
 import { LabelSelector } from "@/components/labels/LabelSelector";

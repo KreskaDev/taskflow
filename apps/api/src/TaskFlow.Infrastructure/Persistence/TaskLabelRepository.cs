@@ -62,6 +62,27 @@ public sealed class TaskLabelRepository(AppDbContext db) : ITaskLabelRepository
 
             throw new DuplicateLabelException("A referenced label no longer exists.", ex);
         }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            // A concurrent apply of the SAME (task, label) won the race and already reached the desired
+            // "present" state (PK_task_labels). The per-user set-replace is idempotent, so this is a benign
+            // no-op: detach the rejected inserts (else Wolverine's commit re-attempts → an uncaught 500) and
+            // treat as success — the client's onSettled invalidate reconciles to the authoritative set.
+            foreach (var entry in ex.Entries)
+            {
+                entry.State = EntityState.Detached;
+            }
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            // A concurrent set-replace (or a DeleteLabel FK cascade) already removed a row this call also
+            // tried to remove → a 0-rows-affected delete. The desired "absent" state is already reached:
+            // detach and treat as a benign idempotent no-op, reconciled by the client's onSettled invalidate.
+            foreach (var entry in ex.Entries)
+            {
+                entry.State = EntityState.Detached;
+            }
+        }
     }
 
     public async Task<IReadOnlyList<Guid>> ListLabelIdsForTaskAsync(TaskId taskId, UserId owner, CancellationToken cancellationToken) =>
