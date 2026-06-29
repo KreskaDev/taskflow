@@ -46,6 +46,7 @@ function makeHandlers(): { [K in Handler]-?: ReturnType<typeof vi.fn> } & Global
     onToggle: vi.fn(),
     onRename: vi.fn(),
     onMove: vi.fn(),
+    onLabel: vi.fn(),
     onDelete: vi.fn(),
     onHelp: vi.fn(),
     onReorderUp: vi.fn(),
@@ -178,6 +179,8 @@ describe("createGlobalShortcutsListener — gate (b): bare keys dispatch outside
     ["uppercase E -> onRename", { key: "E" }, "onRename"],
     ["M -> onMove", { key: "m" }, "onMove"],
     ["uppercase M -> onMove", { key: "M" }, "onMove"],
+    ["L -> onLabel", { key: "l" }, "onLabel"],
+    ["uppercase L -> onLabel", { key: "L" }, "onLabel"],
     ["Delete -> onDelete", { key: "Delete" }, "onDelete"],
     ["? -> onHelp", { key: "?", shiftKey: true }, "onHelp"],
   ];

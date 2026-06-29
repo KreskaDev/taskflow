@@ -90,6 +90,7 @@ function makeTask(overrides: Partial<TaskResponse> & Pick<TaskResponse, "id" | "
     updatedAt: overrides.updatedAt ?? "2026-06-20T00:00:00.000Z",
     completedAt: overrides.completedAt ?? null,
     assignees: overrides.assignees ?? [],
+    labels: overrides.labels ?? [],
   };
 }
 

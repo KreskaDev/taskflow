@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { LabelSelector } from "@/components/labels/LabelSelector";
 import { ProjectSelector } from "@/components/projects/ProjectSelector";
 import { ShortcutsHelp } from "@/components/tasks/ShortcutsHelp";
 import { TaskCapture } from "@/components/tasks/TaskCapture";
@@ -32,7 +33,7 @@ export default function WorkspaceHome() {
   const tasks = useMemo(() => data ?? [], [data]);
   const isEmpty = !isPending && !isError && tasks.length === 0;
 
-  const { renameTask, setTaskDone, reorderTask, deleteTask, moveTaskToProject } = useTaskMutations();
+  const { renameTask, setTaskDone, reorderTask, deleteTask, moveTaskToProject, setTaskLabels } = useTaskMutations();
   const router = useRouter();
 
   // The page OWNS the entire keyboard surface state. `selectedIndex` indexes `tasks`;
@@ -45,6 +46,8 @@ export default function WorkspaceHome() {
   // The id of the task whose move-to-project selector is open (or null). The selector reads the
   // live task by id so a concurrent list change can't strand a stale row reference.
   const [movingId, setMovingId] = useState<string | null>(null);
+  // The id of the task whose label selector is open (or null). Read live by id (concurrent-change safe).
+  const [labelingId, setLabelingId] = useState<string | null>(null);
 
   // Keep `selectedIndex` in range as the list shrinks (delete) or grows. A fixed index would
   // otherwise dangle past the end after a delete and select nothing — clamp to the last row.
@@ -85,6 +88,14 @@ export default function WorkspaceHome() {
         const sel = tasks[selectedIndex];
         if (!sel) return;
         setMovingId(sel.id);
+      },
+
+      // L — open the label selector for the selected task (slice 006, US-08.AS-04). Per-user labels apply to
+      // any task (incl. personal Inbox tasks), so it is offered here unconditionally on a selected row.
+      onLabel: () => {
+        const sel = tasks[selectedIndex];
+        if (!sel) return;
+        setLabelingId(sel.id);
       },
 
       // Del — soft-delete the selected task (optimistic remove + rollback-in-place; the
@@ -155,6 +166,20 @@ export default function WorkspaceHome() {
           if (movingId !== null) moveTaskToProject(movingId, projectId, null);
         }}
       />
+      {(() => {
+        const labelingTask = labelingId !== null ? tasks.find((t) => t.id === labelingId) : undefined;
+        return labelingTask ? (
+          <LabelSelector
+            open
+            current={labelingTask.labels}
+            onClose={() => setLabelingId(null)}
+            onSubmit={(ids) => {
+              setTaskLabels(labelingTask.id, ids);
+              setLabelingId(null);
+            }}
+          />
+        ) : null;
+      })()}
 
       {isError ? (
         // `role="alert"` announces the load failure assertively (it's a direct response to

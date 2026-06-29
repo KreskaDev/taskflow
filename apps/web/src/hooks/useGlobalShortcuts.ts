@@ -28,6 +28,8 @@ export interface GlobalShortcutHandlers {
   onRename?: () => void;
   /** `M` — open the move-to-project selector for the selected task (T041; FR-021/AS-05). */
   onMove?: () => void;
+  /** `L` — open the label selector for the selected task (slice 006, US-08.AS-04). */
+  onLabel?: () => void;
   /** `Delete` — delete the focused task. */
   onDelete?: () => void;
   /** `?` — open the shortcuts help. */
@@ -207,6 +209,16 @@ export function createGlobalShortcutsListener(
         // capture / inline-rename input (FR-031). Opens the move-to-project selector (AS-05).
         event.preventDefault();
         handlers.onMove?.();
+        return;
+      case "l":
+      case "L":
+        // Bare `L` opens the label selector on the selected task (slice 006, US-08.AS-04). Suppressed
+        // mid-word by the text-field guard above (FR-031); does not collide with native AT bindings
+        // (FR-045 — same class as E/M/A). Only when wired, so the key stays inert elsewhere.
+        if (handlers.onLabel) {
+          event.preventDefault();
+          handlers.onLabel();
+        }
         return;
       case "ArrowUp":
         event.preventDefault();

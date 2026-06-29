@@ -2,6 +2,7 @@
 
 import { type CSSProperties, useState } from "react";
 
+import { LabelChips } from "@/components/labels/LabelChips";
 import type { TaskResponse } from "@/hooks/useTasks";
 import { formatInReferenceZone } from "@/lib/timezone";
 import { taskTitleSchema } from "@/lib/validation/task";
@@ -184,6 +185,11 @@ export function TaskRow({
           <span className="tf-sr-only">przypisani: </span>
           {task.assignees.length}
         </span>
+      ) : null}
+      {!isRenaming ? (
+        // Label chips (slice 006, US-08.AS-04): the caller's own labels by NAME (resolved from the roster);
+        // renders nothing when the task carries none. Name is the carrier, color decorative (FR-044/FR-099).
+        <LabelChips labelIds={task.labels} />
       ) : null}
       {!isRenaming && task.dueDate ? (
         // Visible, always-rendered text label (FR-046: no hover-only affordance). The

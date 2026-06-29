@@ -7,6 +7,7 @@ import { TaskRow, taskOptionId } from "@/components/tasks/TaskRow";
 import { TaskEditor, type TaskEditorFields } from "@/components/tasks/TaskEditor";
 import { RescheduleInput } from "@/components/tasks/RescheduleInput";
 import { AssigneePicker } from "@/components/tasks/AssigneePicker";
+import { LabelSelector } from "@/components/labels/LabelSelector";
 import type { components } from "@/lib/api/generated/schema";
 import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
@@ -44,13 +45,14 @@ interface DailyViewProps {
  */
 export function DailyView({ label, groups, projectName, emptyMessage }: DailyViewProps) {
   const router = useRouter();
-  const { setTaskDone, setTaskPriority, rescheduleTask, editTask, setTaskAssignees } = useTaskMutations();
+  const { setTaskDone, setTaskPriority, rescheduleTask, editTask, setTaskAssignees, setTaskLabels } = useTaskMutations();
 
   const flat = useMemo(() => groups.flatMap((g) => g.tasks), [groups]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [editorOpen, setEditorOpen] = useState(false);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [labelOpen, setLabelOpen] = useState(false);
 
   // Keep the selection in range as the list changes (a reschedule/toggle can drop the row out of view).
   useEffect(() => {
@@ -80,6 +82,10 @@ export function DailyView({ label, groups, projectName, emptyMessage }: DailyVie
       // `A` opens the assignee picker for the selected SHARED-project task (slice 008, AS-01).
       onAssign: () => {
         if (selected?.projectId) setAssignOpen(true);
+      },
+      // `L` opens the label selector for the selected task (slice 006, US-08.AS-04) — any task (per-user labels).
+      onLabel: () => {
+        if (selected) setLabelOpen(true);
       },
       onGoInbox: () => router.push("/"),
       onGoToday: () => router.push("/today"),
@@ -165,6 +171,18 @@ export function DailyView({ label, groups, projectName, emptyMessage }: DailyVie
           onSubmit={(ids) => {
             setTaskAssignees(selected.id, ids);
             setAssignOpen(false);
+          }}
+        />
+      ) : null}
+
+      {selected && labelOpen ? (
+        <LabelSelector
+          open={labelOpen}
+          current={selected.labels}
+          onClose={() => setLabelOpen(false)}
+          onSubmit={(ids) => {
+            setTaskLabels(selected.id, ids);
+            setLabelOpen(false);
           }}
         />
       ) : null}

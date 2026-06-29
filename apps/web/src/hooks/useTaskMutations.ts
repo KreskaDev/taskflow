@@ -8,6 +8,7 @@ import { buildTodayGroups, buildUpcomingGroups, flattenToday, flattenUpcoming } 
 import { newTaskId } from "@/lib/id";
 import { between } from "@/lib/position";
 import { assigneeSetSchema, createTaskSchema, editTaskSchema, type Priority, taskTitleSchema } from "@/lib/validation/task";
+import { labelSetSchema } from "@/lib/validation/label";
 import { TASKS_QUERY_KEY } from "@/hooks/useTasks";
 import { TODAY_QUERY_KEY } from "@/hooks/useTodayTasks";
 import { UPCOMING_QUERY_KEY } from "@/hooks/useUpcomingTasks";
@@ -70,6 +71,25 @@ function applyTaskToViewCaches(queryClient: QueryClient, updated: TaskResponse, 
     flat.push(updated);
     return buildUpcomingGroups(flat, now);
   });
+}
+
+/**
+ * Patches ONLY the `labels` field of a task across the triage caches (slice 006, R11). Used by the
+ * VERSIONLESS setTaskLabels recipe in BOTH onMutate and onSettled — NEVER `applyTaskToViewCaches`, because the
+ * versionless server response carries possibly-stale non-label fields with an UNCHANGED version, so a
+ * whole-object writeback would clobber a concurrent in-flight title/priority edit. A labels-only merge leaves
+ * every other field (and the version) intact. Labels do not affect Today/Upcoming membership or order, so the
+ * grouped caches are mapped in place (not rebuilt).
+ */
+function patchLabelsInViewCaches(queryClient: QueryClient, taskId: string, labels: string[]): void {
+  const patch = <T extends { id: string; labels: string[] }>(t: T): T => (t.id === taskId ? { ...t, labels } : t);
+  queryClient.setQueryData<TaskResponse[]>(TASKS_QUERY_KEY, (old) => old?.map(patch));
+  queryClient.setQueryData<TodayResponse>(TODAY_QUERY_KEY, (old) =>
+    old == null ? old : { groups: old.groups.map((g) => ({ ...g, tasks: g.tasks.map(patch) })) });
+  queryClient.setQueryData<UpcomingResponse>(UPCOMING_QUERY_KEY, (old) =>
+    old == null ? old : { groups: old.groups.map((g) => ({ ...g, tasks: g.tasks.map(patch) })) });
+  queryClient.setQueryData<AssignedResponse>(ASSIGNED_QUERY_KEY, (old) =>
+    old == null ? old : { groups: old.groups.map((g) => ({ ...g, tasks: g.tasks.map(patch) })) });
 }
 
 /** Rolls the triage caches back to a pre-mutation snapshot (on error). */
@@ -218,6 +238,7 @@ export function createTaskMutationOptions(queryClient: QueryClient): OptimisticC
         dueDate: variables.dueDate ?? null,
         dueHasTime: variables.dueHasTime ?? null,
         assignees: [], // a freshly captured (Inbox) task has no assignees (slice 008)
+        labels: [], // a freshly captured task has no labels (slice 006)
       };
 
       // Newest-first: the rank already sorts before the current head, so prepend verbatim.
@@ -1021,6 +1042,58 @@ export function setTaskAssigneesMutationOptions(queryClient: QueryClient): ViewM
   };
 }
 
+/* ──────────────────────── SET LABELS (PATCH /labels) ──────────────────────── */
+
+export interface SetTaskLabelsVariables {
+  id: string;
+  labelIds: string[];
+}
+
+/**
+ * Optimistic SET-LABELS recipe (slice 006, US-08.AS-04, R2/R11). The CALLER's per-user label set on the task —
+ * VERSIONLESS (no `version` carried; the shared `Task.version` is never bumped). onMutate/onSettled both do a
+ * LABELS-ONLY merge ({@link patchLabelsInViewCaches}), NEVER `applyTaskToViewCaches(data)`: the versionless
+ * response carries possibly-stale non-label fields with an unchanged version, so a whole-object writeback would
+ * clobber a concurrent in-flight title/priority edit on the same task. Plain rollback on error.
+ */
+export function setTaskLabelsMutationOptions(queryClient: QueryClient): ViewMutationOptions<SetTaskLabelsVariables> {
+  return {
+    mutationFn: async ({ id, labelIds }: SetTaskLabelsVariables): Promise<TaskResponse> => {
+      const { data, error } = await apiClient.PATCH("/api/tasks/{id}/labels", {
+        params: { path: { id } },
+        body: { labelIds },
+      });
+      if (error || !data) {
+        const errorCode = (error as ProblemDetails | undefined)?.errorCode;
+        throw new TaskMutationError(errorCode ?? "internal_error", mapError(errorCode).message);
+      }
+      return data;
+    },
+    onMutate: async (variables: SetTaskLabelsVariables): Promise<ViewCachesSnapshot> => {
+      await queryClient.cancelQueries({ queryKey: TASKS_QUERY_KEY });
+      await queryClient.cancelQueries({ queryKey: TODAY_QUERY_KEY });
+      await queryClient.cancelQueries({ queryKey: UPCOMING_QUERY_KEY });
+      await queryClient.cancelQueries({ queryKey: ASSIGNED_QUERY_KEY });
+      const snapshot = snapshotViewCaches(queryClient);
+      snapshot.previousAssigned = queryClient.getQueryData<AssignedResponse>(ASSIGNED_QUERY_KEY);
+      // LABELS-ONLY optimistic paint (<16 ms, SC-003) — never a whole-object writeback (R11).
+      patchLabelsInViewCaches(queryClient, variables.id, variables.labelIds);
+      return snapshot;
+    },
+    onError: (_error, _variables, context): void => {
+      if (context) rollbackViewCaches(queryClient, context);
+    },
+    onSettled: async (data): Promise<void> => {
+      // LABELS-ONLY merge from the authoritative caller-scoped server set — NOT applyTaskToViewCaches (R11:
+      // the versionless response's non-label fields may predate a concurrent un-acked edit and can't be
+      // version-guarded, so a whole-object writeback would clobber it).
+      if (data) patchLabelsInViewCaches(queryClient, data.id, data.labels);
+      await settleViewCaches(queryClient);
+      await queryClient.invalidateQueries({ queryKey: ASSIGNED_QUERY_KEY });
+    },
+  };
+}
+
 /**
  * "use client" hook wrapper. `createTask(title)` validates the title at the trust
  * boundary (Constitution VI), mints the client-side UUIDv7 id, computes the
@@ -1060,6 +1133,9 @@ export function useTaskMutations() {
   );
   const setAssigneesMutation = useMutation<TaskResponse, Error, SetTaskAssigneesVariables, ViewCachesSnapshot>(
     setTaskAssigneesMutationOptions(queryClient),
+  );
+  const setLabelsMutation = useMutation<TaskResponse, Error, SetTaskLabelsVariables, ViewCachesSnapshot>(
+    setTaskLabelsMutationOptions(queryClient),
   );
 
   const currentTasks = (): TaskResponse[] => queryClient.getQueryData<TaskResponse[]>(TASKS_QUERY_KEY) ?? [];
@@ -1185,6 +1261,12 @@ export function useTaskMutations() {
     setAssigneesMutation.mutate({ id, assigneeIds: parsed, version: row.version });
   };
 
+  /** Sets the caller's labels on a task — the `L` selector commit (slice 006, US-08.AS-04). Versionless. */
+  const setTaskLabels = (id: string, labelIds: string[]): void => {
+    const parsed = labelSetSchema.parse(labelIds); // boundary parse (Constitution VI)
+    setLabelsMutation.mutate({ id, labelIds: parsed });
+  };
+
   return {
     createTask,
     renameTask,
@@ -1196,5 +1278,6 @@ export function useTaskMutations() {
     rescheduleTask,
     editTask,
     setTaskAssignees,
+    setTaskLabels,
   };
 }

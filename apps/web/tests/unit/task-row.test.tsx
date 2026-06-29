@@ -1,4 +1,6 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
+import { createElement } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { TaskRow } from "@/components/tasks/TaskRow";
@@ -32,20 +34,27 @@ function makeTask(overrides: Partial<TaskResponse> = {}): TaskResponse {
     dueDate: null,
     dueHasTime: null,
     assignees: [],
+    labels: [],
     ...overrides,
   };
 }
 
 function renderRow(task: TaskResponse) {
+  // TaskRow renders LabelChips, which reads the ['labels'] roster via TanStack Query — wrap in a client.
+  const queryClient = new QueryClient();
   return render(
-    <TaskRow
-      task={task}
-      selected={false}
-      isRenaming={false}
-      onCommitRename={() => {}}
-      onCancelRename={() => {}}
-      style={{}}
-    />,
+    createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      <TaskRow
+        task={task}
+        selected={false}
+        isRenaming={false}
+        onCommitRename={() => {}}
+        onCancelRename={() => {}}
+        style={{}}
+      />,
+    ),
   );
 }
 

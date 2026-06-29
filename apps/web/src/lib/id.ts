@@ -20,3 +20,12 @@ export function newTaskId(): string {
 export function newProjectId(): string {
   return v7();
 }
+
+/**
+ * Mints a new label id as a UUIDv7 (slice 006). Same rationale as {@link newTaskId}: a client-minted,
+ * time-ordered id lets an optimistic label create carry its own stable identity into the `['labels']` cache
+ * and the idempotent `PUT /api/labels/{id}` request (SC-003).
+ */
+export function newLabelId(): string {
+  return v7();
+}

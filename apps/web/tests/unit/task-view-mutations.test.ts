@@ -10,6 +10,7 @@ import {
   rescheduleDueDateMutationOptions,
   setPriorityMutationOptions,
   setTaskAssigneesMutationOptions,
+  setTaskLabelsMutationOptions,
   toggleDoneMutationOptions,
 } from "@/hooks/useTaskMutations";
 
@@ -50,6 +51,7 @@ function row(overrides: Partial<TaskResponse> & Pick<TaskResponse, "id">): TaskR
     priority: overrides.priority ?? null,
     description: overrides.description ?? null,
     assignees: overrides.assignees ?? [],
+    labels: overrides.labels ?? [],
   };
 }
 
@@ -170,6 +172,69 @@ describe("set-assignees optimistic surface (slice 008)", () => {
     expect(patchSpy).toHaveBeenCalledWith("/api/tasks/{id}/assignees", {
       params: { path: { id: "a" } },
       body: { assigneeIds: ["u1"], version: 0 },
+    });
+  });
+});
+
+describe("set-labels optimistic surface (slice 006)", () => {
+  it("patches the task's labels in place across the Today cache", async () => {
+    freezeNow();
+    const qc = new QueryClient();
+    const a = row({ id: "a", dueDate: "2026-06-27T10:00:00Z", dueHasTime: true, labels: [] });
+    qc.setQueryData(TODAY_QUERY_KEY, todayCache([a]));
+
+    await setTaskLabelsMutationOptions(qc).onMutate({ id: "a", labelIds: ["l1", "l2"] });
+
+    const stored = qc.getQueryData<TodayResponse>(TODAY_QUERY_KEY)!.groups[0]!.tasks.find((t) => t.id === "a")!;
+    expect(stored.labels).toEqual(["l1", "l2"]);
+  });
+
+  it("onSettled does a labels-ONLY merge — it does NOT revert a concurrent title/priority edit (R11 clobber guard)", async () => {
+    freezeNow();
+    const qc = new QueryClient();
+    // The cache holds a CONCURRENTLY-edited row: a newer title + priority + bumped version (a title edit acked).
+    const concurrent = row({
+      id: "a", title: "Edited title", priority: "P0", version: 5,
+      dueDate: "2026-06-27T10:00:00Z", dueHasTime: true, labels: ["l1"],
+    });
+    qc.setQueryData(TODAY_QUERY_KEY, todayCache([concurrent]));
+
+    // The versionless setTaskLabels server response PREDATES the title edit: old title/priority, unchanged
+    // version, plus the new label set. A whole-object writeback would clobber the concurrent edit; the
+    // labels-only merge must not.
+    const stale = row({
+      id: "a", title: "Old title", priority: null, version: 0,
+      dueDate: "2026-06-27T10:00:00Z", dueHasTime: true, labels: ["l1", "l2"],
+    });
+    await setTaskLabelsMutationOptions(qc).onSettled(stale, null, { id: "a", labelIds: ["l1", "l2"] }, undefined as never);
+
+    const stored = qc.getQueryData<TodayResponse>(TODAY_QUERY_KEY)!.groups[0]!.tasks.find((t) => t.id === "a")!;
+    expect(stored.labels).toEqual(["l1", "l2"]); // labels merged from the server response
+    expect(stored.title).toBe("Edited title"); // the concurrent edit is preserved (NOT clobbered)
+    expect(stored.priority).toBe("P0");
+    expect(stored.version).toBe(5);
+  });
+
+  it("rolls back the labels on error", async () => {
+    freezeNow();
+    const qc = new QueryClient();
+    const a = row({ id: "a", dueDate: "2026-06-27T10:00:00Z", dueHasTime: true, labels: ["l1"] });
+    qc.setQueryData(TODAY_QUERY_KEY, todayCache([a]));
+
+    const opts = setTaskLabelsMutationOptions(qc);
+    const ctx = await opts.onMutate({ id: "a", labelIds: ["l1", "l2"] });
+    opts.onError(new Error("boom"), { id: "a", labelIds: ["l1", "l2"] }, ctx);
+
+    expect(qc.getQueryData<TodayResponse>(TODAY_QUERY_KEY)!.groups[0]!.tasks[0]!.labels).toEqual(["l1"]);
+  });
+
+  it("set-labels PATCHes labelIds (versionless — no version in the body)", async () => {
+    patchSpy.mockResolvedValue({ data: row({ id: "a", labels: ["l1"] }), error: undefined });
+    const qc = new QueryClient();
+    await setTaskLabelsMutationOptions(qc).mutationFn({ id: "a", labelIds: ["l1"] });
+    expect(patchSpy).toHaveBeenCalledWith("/api/tasks/{id}/labels", {
+      params: { path: { id: "a" } },
+      body: { labelIds: ["l1"] },
     });
   });
 });

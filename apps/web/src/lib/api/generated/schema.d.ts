@@ -24,6 +24,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/labels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GET_api_labels
+         * @description GET_api_labels
+         */
+        get: operations["listLabels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/labels/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * PUT_api_labels_id
+         * @description PUT_api_labels_id
+         */
+        put: operations["createLabel"];
+        post?: never;
+        /**
+         * DELETE_api_labels_id
+         * @description DELETE_api_labels_id
+         */
+        delete: operations["deleteLabel"];
+        options?: never;
+        head?: never;
+        /**
+         * PATCH_api_labels_id
+         * @description PATCH_api_labels_id
+         */
+        patch: operations["updateLabel"];
+        trace?: never;
+    };
     "/api/projects/{id}/members": {
         parameters: {
             query?: never;
@@ -524,6 +572,26 @@ export interface paths {
         patch: operations["setTaskAssignees"];
         trace?: never;
     };
+    "/api/tasks/{id}/labels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * PATCH_api_tasks_id_labels
+         * @description PATCH_api_tasks_id_labels
+         */
+        patch: operations["setTaskLabels"];
+        trace?: never;
+    };
     "/api/users/ensure": {
         parameters: {
             query?: never;
@@ -618,6 +686,10 @@ export interface components {
             /** Format: int32 */
             version: number;
         };
+        CreateLabelRequest: {
+            name: string;
+            color?: string | null;
+        };
         CreateProjectRequest: {
             name: string;
             color: string;
@@ -666,6 +738,12 @@ export interface components {
             version: number;
         };
         IResult: Record<string, never>;
+        LabelResponse: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            color?: string | null;
+        };
         MemberResponse: {
             /** Format: uuid */
             userId: string;
@@ -732,6 +810,9 @@ export interface components {
             /** Format: int32 */
             version: number;
         };
+        SetTaskLabelsRequest: {
+            labelIds: string[];
+        };
         SetTaskStatusRequest: {
             status: string;
             /** Format: int32 */
@@ -759,6 +840,7 @@ export interface components {
             priority?: string | null;
             description?: string | null;
             assignees: string[];
+            labels: string[];
         };
         TodayGroup: {
             /** Format: uuid */
@@ -790,6 +872,7 @@ export interface components {
             priority?: string | null;
             description?: string | null;
             assignees: string[];
+            labels: string[];
             isOverdue: boolean;
         };
         TransferOwnershipRequest: {
@@ -804,6 +887,10 @@ export interface components {
         };
         UpcomingResponse: {
             groups: components["schemas"]["UpcomingGroup"][];
+        };
+        UpdateLabelRequest: {
+            name: string;
+            color?: string | null;
         };
         UserProfile: {
             /** Format: uuid */
@@ -852,6 +939,190 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    listLabels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabelResponse"][];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    createLabel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLabelRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabelResponse"];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Request validation failed (errorCode = validation_failed). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    deleteLabel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The resource does not exist, is soft-deleted, or the caller is not permitted to observe it (errorCode = not_found). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    updateLabel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLabelRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabelResponse"];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The resource does not exist, is soft-deleted, or the caller is not permitted to observe it (errorCode = not_found). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Request validation failed (errorCode = validation_failed). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
         };
@@ -2486,6 +2757,68 @@ export interface operations {
             };
             /** @description A state conflict: a stale version (errorCode = version_conflict) or the last-owner guard (errorCode = last_owner). */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Request validation failed (errorCode = validation_failed). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    setTaskLabels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetTaskLabelsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The caller is a member but lacks the required role for this operation (errorCode = forbidden). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The resource does not exist, is soft-deleted, or the caller is not permitted to observe it (errorCode = not_found). */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
