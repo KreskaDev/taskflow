@@ -103,6 +103,17 @@ builder.Host.UseWolverine(opts =>
     // the tracking harness. Consumed by a no-op handler this slice (slice 017 ships the real notifier).
     opts.PublishMessage<TaskAssigned>().ToLocalQueue("task-assignment-events");
 
+    // slice 009: UserMentioned (added-mention delta + author) is raised by Post/EditComment and routed to
+    // its own outbox-backed durable queue so the publish enrolls in the command's transaction and is
+    // observable via the tracking harness. Consumed by a no-op handler this slice (slice 017 ships the
+    // real notifier — the TaskAssigned posture, R7).
+    opts.PublishMessage<UserMentioned>().ToLocalQueue("comment-mention-events");
+
+    // slice 009: ReapDeletedComment is published (30s-delayed) from DeleteComment's soft-delete and
+    // processed off a durable local queue (mirrors task-reaper) to give the deferred hard-delete an
+    // outbox-backed, transactional destination — the Constitution VII 30s-undo window (R5).
+    opts.PublishMessage<ReapDeletedComment>().ToLocalQueue("comment-reaper");
+
     // Single-node deployment (one VPS, ~10 users): Solo durability skips the distributed
     // leader-election/agent machinery, giving faster, cleaner startup/shutdown (also avoids a
     // background-agent logger race during WebApplicationFactory teardown in integration tests).
@@ -128,7 +139,12 @@ builder.Host.UseWolverine(opts =>
             && chain.MessageType != typeof(OwnerTransferred)
             && chain.MessageType != typeof(MembershipRevoked)
             // slice 008: TaskAssigned is consumed off the durable queue (no HttpContext) — same exemption.
-            && chain.MessageType != typeof(TaskAssigned));
+            && chain.MessageType != typeof(TaskAssigned)
+            // slice 009: UserMentioned (no-op consumer) + ReapDeletedComment (the deferred comment reaper,
+            // no caller) are processed off the durable queue (no HttpContext) — same exemption as
+            // ReapDeletedTask / the membership events (R5/R7).
+            && chain.MessageType != typeof(UserMentioned)
+            && chain.MessageType != typeof(ReapDeletedComment));
 });
 
 // --- Built-in .NET 9 OpenAPI document at /openapi/v1.json (R5) ---
