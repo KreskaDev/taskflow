@@ -68,5 +68,21 @@ public sealed class LabelRepository(AppDbContext db) : ILabelRepository
 
             throw new DuplicateLabelException("A label uniqueness constraint was violated.", ex);
         }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            // The label aggregate is VERSIONLESS (no concurrency token), but EF still raises this on ANY
+            // 0-rows-affected UPDATE/DELETE of a tracked entity. It happens when the row vanished between this
+            // handler's FindOwnedAsync and its commit — a concurrent DeleteLabel racing another DeleteLabel
+            // (double-click/two tabs) or an UpdateLabel racing a delete. The truthful mapping is "the row no
+            // longer exists" → NotFoundException → 404 (contract-legal for delete/update; mirrors the
+            // DbUpdateConcurrencyException translation in TaskRepository/ProjectRepository). Detach the rejected
+            // entity so Wolverine's AutoApplyTransactions commit-flush cannot re-attempt the 0-row write → 500.
+            foreach (var entry in ex.Entries)
+            {
+                entry.State = EntityState.Detached;
+            }
+
+            throw new NotFoundException();
+        }
     }
 }

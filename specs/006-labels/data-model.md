@@ -17,13 +17,13 @@ A reusable tag owned by a single User, applied to many tasks (R1). `AggregateRoo
 | `Id` | `LabelId` (UUIDv7) | **NEW** | **Client-generated** (`ValueGeneratedNever`, mirrors `TaskId`) so the selector creates + paints optimistically <16 ms (SC-003, R3). |
 | `OwnerId` | `UserId` | **NEW** | The owning User (FR-065 Tier A). Immutable; set at create, never reassigned. The ownership authorization key. |
 | `Name` | `string` | **NEW** | Required, trimmed-non-empty, **≤ 50 chars** (R7). Untrusted content — output-escaped on render (FR-099). The display value (preserves the owner's casing). |
-| `NameNormalized` | `string` | **NEW** | The trimmed name **lower-cased in C# (`ToLowerInvariant`)**, set by the aggregate whenever `Name` is set. Backs the **case-insensitive per-owner uniqueness** via a **plain** unique index `(owner_id, name_normalized)` — EF Core 9 cannot model a functional `lower(name)` index (R7), so a normalized column keeps the constraint EF-native and snapshot-clean. Not exposed in `LabelResponse`. |
+| `NameNormalized` | `string` | **NEW** | The trimmed name **case-folded in C# (`ToUpperInvariant`, the CA1308 round-trip-safe fold)**, set by the aggregate whenever `Name` is set. Backs the **case-insensitive per-owner uniqueness** via a **plain** unique index `(owner_id, name_normalized)` — EF Core 9 cannot model a functional `lower(name)` index (R7), so a normalized column keeps the constraint EF-native and snapshot-clean. Not exposed in `LabelResponse`. |
 | `Color` | `string?` | **NEW** | **Optional** (ENT-04). When set, a **closed-set preset token** (the slice-004 `Project.Color` posture — not raw hex/CSS), preset membership validated upstream (R7). Never the sole carrier of meaning (FR-044). |
 | `CreatedAt` | `DateTime` (UTC) | **NEW** | Set at create. `timestamptz` (Constitution X). |
 | `UpdatedAt` | `DateTime` (UTC) | **NEW** | Stamped at create and on every edit. `timestamptz`. |
 
 **Aggregate behavior**:
-- `Create(LabelId id, UserId owner, string name, string? color, DateTime utcNow)` — normalizes/validates `name` (trim, non-empty, ≤50) and sets `NameNormalized = name.Trim().ToLowerInvariant()`; records `color` (preset validated upstream by the command validator); stamps `CreatedAt`/`UpdatedAt`. Uniqueness is a cross-row rule → enforced at the handler (a normalized-name pre-check) + the DB unique index (not in the aggregate).
+- `Create(LabelId id, UserId owner, string name, string? color, DateTime utcNow)` — normalizes/validates `name` (trim, non-empty, ≤50) and sets `NameNormalized = name.Trim().ToUpperInvariant()`; records `color` (preset validated upstream by the command validator); stamps `CreatedAt`/`UpdatedAt`. Uniqueness is a cross-row rule → enforced at the handler (a normalized-name pre-check) + the DB unique index (not in the aggregate).
 - `Edit(string name, string? color, DateTime utcNow)` — **whole-object replace** (R3) realizing **rename + recolor**; re-normalizes `name` (and `NameNormalized`), sets `color`, stamps `UpdatedAt`.
 - (No delete behavior on the aggregate — delete is a repository hard-delete; FK cascade clears applications.)
 

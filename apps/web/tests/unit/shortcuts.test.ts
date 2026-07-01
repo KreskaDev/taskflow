@@ -115,6 +115,8 @@ const SUPPRESSED_BARE_KEYS: ReadonlyArray<readonly [string, KeyboardEventInit]> 
   ["E", { key: "E" }],
   ["m", { key: "m" }],
   ["M", { key: "M" }],
+  ["l", { key: "l" }], // slice 006: the label selector key — must be typeable, not a shortcut, while editing.
+  ["L", { key: "L" }],
   ["Space", { key: " " }],
   ["Delete", { key: "Delete" }],
   ["? (Shift+/)", { key: "?", shiftKey: true }], // Shift is NOT a bypass modifier — `?` is bare.

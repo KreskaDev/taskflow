@@ -79,7 +79,10 @@ function applyTaskToViewCaches(queryClient: QueryClient, updated: TaskResponse, 
  * versionless server response carries possibly-stale non-label fields with an UNCHANGED version, so a
  * whole-object writeback would clobber a concurrent in-flight title/priority edit. A labels-only merge leaves
  * every other field (and the version) intact. Labels do not affect Today/Upcoming membership or order, so the
- * grouped caches are mapped in place (not rebuilt).
+ * grouped caches are mapped in place (not rebuilt). NOTE: the project-board cache (`['projects',id,'tasks']`)
+ * is intentionally NOT patched here — the project board renders no label chips and the `L` selector is
+ * unreachable there this slice, so there is no visible inconsistency. If a future slice renders labels on the
+ * board, add `projectTasksQueryKey(projectId)` here (as `applyTaskToViewCaches` does) or this becomes stale.
  */
 function patchLabelsInViewCaches(queryClient: QueryClient, taskId: string, labels: string[]): void {
   const patch = <T extends { id: string; labels: string[] }>(t: T): T => (t.id === taskId ? { ...t, labels } : t);

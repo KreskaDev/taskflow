@@ -52,13 +52,12 @@ public sealed class TaskLabelRepository(AppDbContext db) : ITaskLabelRepository
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation })
         {
             // A label in the desired set was concurrently deleted between the handler's ownership validation
-            // and this insert → the task_labels.label_id FK violates. Detach the rejected rows (Wolverine's
-            // AutoApplyTransactions would otherwise re-attempt) and signal the handler to map it to the same
-            // recoverable 422 the ownership pre-check yields (the label is no longer a valid target).
-            foreach (var entry in ex.Entries)
-            {
-                entry.State = EntityState.Detached;
-            }
+            // and this insert → the task_labels.label_id FK violates. Detach EVERY pending row (not just the
+            // rejected one) — a failed SaveChanges rolls back the whole batch but leaves the sibling
+            // adds/removes tracked, which Wolverine's AutoApplyTransactions commit-flush would re-attempt →
+            // an uncaught 500. Then signal the handler to map this to the same recoverable 422 the ownership
+            // pre-check yields (the label is no longer a valid target).
+            DetachPendingTaskLabels();
 
             throw new DuplicateLabelException("A referenced label no longer exists.", ex);
         }
@@ -66,22 +65,37 @@ public sealed class TaskLabelRepository(AppDbContext db) : ITaskLabelRepository
         {
             // A concurrent apply of the SAME (task, label) won the race and already reached the desired
             // "present" state (PK_task_labels). The per-user set-replace is idempotent, so this is a benign
-            // no-op: detach the rejected inserts (else Wolverine's commit re-attempts → an uncaught 500) and
-            // treat as success — the client's onSettled invalidate reconciles to the authoritative set.
-            foreach (var entry in ex.Entries)
-            {
-                entry.State = EntityState.Detached;
-            }
+            // no-op. Detach EVERY pending row — NOT just ex.Entries: the failed SaveChanges rolled back the
+            // whole batch, so any sibling add/remove from a MIXED set-replace is still tracked and Wolverine's
+            // commit-flush would re-attempt it (a 0-row delete or a duplicate insert → an uncaught 500, or a
+            // silent partial write after a 200 was returned). The client's onSettled invalidate reconciles to
+            // the authoritative set.
+            DetachPendingTaskLabels();
         }
-        catch (DbUpdateConcurrencyException ex)
+        catch (DbUpdateConcurrencyException)
         {
             // A concurrent set-replace (or a DeleteLabel FK cascade) already removed a row this call also
-            // tried to remove → a 0-rows-affected delete. The desired "absent" state is already reached:
-            // detach and treat as a benign idempotent no-op, reconciled by the client's onSettled invalidate.
-            foreach (var entry in ex.Entries)
-            {
-                entry.State = EntityState.Detached;
-            }
+            // tried to remove → a 0-rows-affected delete. Same handling as the unique-violation swallow:
+            // detach EVERY pending row so the commit-flush cannot re-attempt a sibling, then treat as a benign
+            // idempotent no-op reconciled by the client's onSettled invalidate.
+            DetachPendingTaskLabels();
+        }
+    }
+
+    /// <summary>
+    /// Detaches every pending <see cref="TaskLabel"/> add/remove from the change tracker. Called on the race
+    /// catch paths: a failed <c>SaveChanges</c> rolls back the batch but leaves its entities tracked, and
+    /// Wolverine's commit-time re-flush (AutoApplyTransactions) would otherwise re-attempt them — re-raising
+    /// the same conflict OUTSIDE any catch (→ 500). Detaching the whole pending delta (not just the rejected
+    /// row) keeps a MIXED add+remove set-replace safe under a race.
+    /// </summary>
+    private void DetachPendingTaskLabels()
+    {
+        foreach (var entry in db.ChangeTracker.Entries<TaskLabel>()
+            .Where(e => e.State is EntityState.Added or EntityState.Deleted)
+            .ToList())
+        {
+            entry.State = EntityState.Detached;
         }
     }
 
