@@ -1,0 +1,337 @@
+openapi: 3.1.0
+info:
+  title: TaskFlow API — slice 009 (Comments & @Mentions) delta
+  version: "0.9.0"
+  description: >
+    Contract DELTA over slices 002–008. Adds the **Comment** (ENT-08) surface on
+    tasks in **shared** projects (FR-072/073/075): a thread read
+    **listTaskComments** (`GET /api/tasks/{taskId}/comments`), a **postTaskComment**
+    (`POST /api/tasks/{taskId}/comments`), and author-only **editComment**
+    (`PATCH /api/comments/{commentId}`) / **deleteComment**
+    (`DELETE /api/comments/{commentId}`). This is the product's FIRST free-form
+    user-content surface and a stored-XSS target (Constitution XII).
+
+    AGGREGATE (research R1): a `Comment` is its OWN aggregate root with a
+    SERVER-MINTED UUIDv7 `id` (contrast client-minted task ids) — hence
+    post is `taskId`-scoped (mint under the thread) while edit/delete are the
+    flat `commentId`-scoped shape.
+
+    CONCURRENCY (research R2): comments are **versionless** — last-write-wins
+    (Constitution Principle III). NO request/response carries a `version` field
+    and **`version_conflict`(409) is NOT used** by this slice.
+
+    AUTHORIZATION (dispatch-by-visibility, reuse slice 007 — research R3/R4):
+    comments exist ONLY on tasks in SHARED projects. Read the thread = any current
+    member (viewer+); post = editor|owner (viewer → **403 forbidden**). Edit/delete
+    run a STRICT two-step gate — `RequireRole(editor)` FIRST, then author-equality:
+    a viewer or a NON-AUTHOR of any role (INCLUDING the project owner) → **403**
+    (project role does NOT override authorship, FR-075). A non-member, a former
+    member, a foreign/absent task or comment, or a PERSONAL/Inbox task (no comment
+    surface) → **404 not_found** (existence not disclosed across the membership
+    boundary — Constitution XII). Because membership is resolved LIVE in step 1, a
+    former member is 404'd BEFORE the author check — so FR-066 (membership loss
+    revokes ALL) structurally beats FR-075 (author grant).
+
+    CONTENT SAFETY (research R8): `body` is REQUIRED, not whitespace-only, and
+    `≤ 4000` chars — a violation, OR a mention id that is NOT a current project
+    member, → **422 validation_failed** (field error on `body` / `mentionedUserIds`;
+    an empty body creates no thread entry). @mentions are STRUCTURED tokens
+    (`mentionedUserIds`), never scraped from prose. Output sanitization to the safe
+    subset (plain text + safe markdown) is a WEB render-boundary concern; the
+    API stores/echoes raw `body`. CSP + security headers (FR-099) already exist
+    (SecurityHeadersMiddleware + next.config.ts) — reused, not part of this contract.
+
+    DOMAIN EVENT (research R7): post/edit raises a `UserMentioned` event (pure ids;
+    delta-on-edit = newly-added mentions only) to the Wolverine outbox — this slice
+    registers a no-op routable handler; slice 017 (notifications) consumes it and
+    creates ENT-09 Notifications. Live remote-comment propagation into an open
+    thread is slice 016 (real-time) — both are named seams, NOT built here.
+
+    NO new errorCode (research R9) — the `ProblemDetails.errorCode` enum is
+    UNCHANGED (the transformer's `ErrorCodes` array is NOT edited; it only stamps
+    the four new operationIds + their 403/404/422 responses). The web
+    `ERROR_UX satisfies Record<ErrorCode, ErrorUx>` map is likewise unchanged.
+
+    MIGRATION: this slice ships ONE EF migration (`AddComments` — the `comments` +
+    `comment_mentions` tables) — so **FR-051 backup-before-migration is LIVE** (the
+    CI backup→migrate→restore-test gate applies). Everything not listed here is
+    UNCHANGED from slices 002–008.
+
+servers:
+  - url: /
+
+paths:
+  # ───────────────────── Thread on a task (read + post) ─────────────────────
+  /api/tasks/{taskId}/comments:
+    parameters:
+      - $ref: "#/components/parameters/TaskId"
+    get:
+      operationId: listTaskComments
+      tags: [Comments]
+      summary: List a shared-project task's comment thread (chronological)
+      description: >
+        Readable by ANY current member of the task's SHARED project (viewer+,
+        research R3). Returns the thread ordered by `createdAt`. Each item carries
+        author identity (tombstone-safe — `authorDisplayName` = "Deleted user" when
+        `authorId` is null after erasure, research R11/R15), the typed @mention
+        tokens (id + displayName), `createdAt`/`editedAt`, and a server-computed
+        `canEdit` (= caller is the author) that gates the client edit/delete
+        affordances (NOT the security boundary — FR-068). Emails are NEVER echoed
+        (Constitution XI). A viewer receives the full thread but the client renders
+        NO composer (AS-03). A non-member / former member, a foreign/absent task, or
+        a PERSONAL/Inbox task (no comment surface) → **404** (existence not
+        disclosed), NOT an empty thread.
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/CommentListResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      operationId: postTaskComment
+      tags: [Comments]
+      summary: Post a comment on a shared-project task
+      description: >
+        Editor/owner-only on the task's SHARED project (viewer → **403**;
+        non-member / foreign/absent task / PERSONAL/Inbox task → **404**, research
+        R3). The server MINTS the `CommentId` (UUIDv7 — not client-supplied),
+        stamps `createdAt`, and persists the de-duplicated @mention set. `body` is
+        REQUIRED, not whitespace-only, `≤ 4000` chars — else **422** (field error on
+        `body`; an empty body creates NO thread entry). Every id in
+        `mentionedUserIds` MUST be a CURRENT member of the task's project — a
+        non-member (or former-member) mention → **422** (field error on
+        `mentionedUserIds`), and NO comment is created. A self-mention is permitted
+        but is not notified. Posting raises a `UserMentioned` event (added mentions,
+        pure ids) for slice 017 (research R7).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PostCommentRequest" }
+      responses:
+        "200": { description: Comment posted, content: { application/json: { schema: { $ref: "#/components/schemas/CommentResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  # ───────────────── A single comment (author-only edit / delete) ─────────────────
+  /api/comments/{commentId}:
+    parameters:
+      - $ref: "#/components/parameters/CommentId"
+    patch:
+      operationId: editComment
+      tags: [Comments]
+      summary: Edit your OWN comment (author-only, whole-body + whole-mention-set replace)
+      description: >
+        The comment's AUTHOR — and ONLY the author — may edit it (FR-075). The
+        handler loads the comment (absent → **404**), then its parent task/project
+        for the STRICT two-step gate (research R4): (1) `RequireRole(editor)` on the
+        parent shared project — a viewer → **403**, a non-member / former member /
+        foreign / now-PERSONAL parent task → **404**; (2) author-equality —
+        `authorId == caller` else **403** (a NON-AUTHOR of any role, INCLUDING the
+        project owner, is denied; role does NOT override authorship). Because step 1
+        runs first on LIVE membership, a former member is 404'd before the author
+        check — FR-066 beats FR-075. WHOLE replace: `body` overwrites the stored
+        body and `mentionedUserIds` overwrites the whole mention set (the
+        anti-silent-null discipline). Same content rules as post (`body` non-empty
+        `≤ 4000`, mentions must be current members) → **422**. Stamps `editedAt`.
+        LAST-WRITE-WINS — NO `version` and NO **409** (research R2). Raises
+        `UserMentioned` for NEWLY-ADDED mentions only (delta; removals emit nothing —
+        research R7).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EditCommentRequest" }
+      responses:
+        "200": { description: Comment updated, content: { application/json: { schema: { $ref: "#/components/schemas/CommentResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+    delete:
+      operationId: deleteComment
+      tags: [Comments]
+      summary: Delete your OWN comment (author-only, soft-delete + 30s-undo reaper)
+      description: >
+        The comment's AUTHOR — and ONLY the author — may delete it (FR-075). Same
+        STRICT two-step gate as edit (research R4): (1) `RequireRole(editor)` on the
+        parent shared project — viewer → **403**, non-member / former member /
+        foreign / now-PERSONAL parent task → **404**; (2) author-equality else
+        **403** (a NON-AUTHOR of any role, INCLUDING the owner, is denied). A former
+        member is 404'd at step 1 before the author check (FR-066 > FR-075).
+        SOFT-deletes the row (stamps `deleted_at`) and publishes a scheduled
+        `ReapDeletedComment` (+30s) to the outbox — the comment leaves the thread
+        IMMEDIATELY (the thread read filters `deleted_at IS NULL` — AS-04) while the
+        row lingers for the Constitution-VII 30s undo window, then the reaper
+        HARD-purges it (its owned `comment_mentions` cascade at that point). This is
+        the `DeleteTask`/`ReapDeletedTask` mirror. Version-free / IDEMPOTENT: the
+        caller's OWN already-deleted comment replays as an idempotent **204** no-op
+        (LAST-WRITE-WINS — NO `version`, NO **409**, research R2). The user-facing
+        restore/undo is the slice-014 seam (NOT built here — no restore endpoint).
+        NOTE: author ACCOUNT erasure is the SEPARATE slice-015 tombstone path
+        (author_id → NULL, the comment SURVIVES where it anchors a thread) — distinct
+        from this delete soft-delete/reaper; the two do not interact.
+      responses:
+        "204": { description: Comment deleted }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+components:
+  parameters:
+    TaskId:
+      name: taskId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+      description: The parent task the comment thread hangs on (must be in a shared project)
+    CommentId:
+      name: commentId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+      description: The server-minted (UUIDv7) comment id — its own aggregate (research R1)
+
+  schemas:
+    # ── requests ──
+    PostCommentRequest:
+      type: object
+      required: [body]
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          description: >
+            The comment text (research R8). REQUIRED, not whitespace-only (trimmed
+            → non-empty), `≤ 4000` chars — else 422 (field error on `body`; an empty
+            body creates NO thread entry, FR-098). Stored RAW; untrusted input
+            sanitized to a safe subset at the WEB render boundary (Constitution XII).
+        mentionedUserIds:
+          type: array
+          default: []
+          items: { type: string, format: uuid }
+          description: >
+            The typed @mention set (research R6) — structured User-id tokens, NEVER
+            scraped from prose. Each id MUST be a CURRENT member of the task's shared
+            project (else 422 on this field; no comment is created). De-duplicated;
+            a self-mention is allowed but not notified. Omitted/empty = no mentions.
+            The client @mention picker sources candidates from the EXISTING slice-007
+            `GET /api/projects/{id}/members` roster — this slice adds NO
+            candidate-lookup endpoint.
+
+    EditCommentRequest:
+      type: object
+      required: [body]
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          description: >
+            WHOLE-body replace (research R5) — overwrites the stored body. Same rules
+            as post (non-empty, `≤ 4000`); stamps `editedAt`. LAST-WRITE-WINS.
+        mentionedUserIds:
+          type: array
+          default: []
+          items: { type: string, format: uuid }
+          description: >
+            WHOLE mention-set replace — overwrites the comment's whole @mention set
+            (anti-silent-null). Each id MUST be a current project member (else 422).
+            `UserMentioned` is raised only for NEWLY-ADDED ids (delta — research R7).
+
+    # ── responses ──
+    CommentResponse:
+      type: object
+      required: [id, taskId, authorId, authorDisplayName, body, mentions, createdAt, editedAt, canEdit]
+      properties:
+        id: { type: string, format: uuid, description: "Server-minted UUIDv7 (research R1)" }
+        taskId: { type: string, format: uuid, description: "The parent task the thread hangs on" }
+        authorId:
+          type: [string, "null"]
+          format: uuid
+          description: >
+            The author's User id — NULLABLE (research R11): after author account
+            erasure it becomes null (tombstone), the comment SURVIVES where it
+            anchors a thread (FR-085). Provenance, not identity of the row.
+        authorDisplayName:
+          type: string
+          description: >
+            Author display name — tombstone-safe: renders a neutral "Deleted user"
+            when `authorId` is null (research R11/R15). NEVER the author's email
+            (Constitution XI).
+        body:
+          type: string
+          description: "The RAW stored text; the WEB sanitizes to the safe subset on render (research R8)."
+        mentions:
+          type: array
+          items: { $ref: "#/components/schemas/CommentMention" }
+          description: "The typed @mention tokens (research R6), resolved id → displayName at read; tombstone-safe for erased users."
+        createdAt: { type: string, format: date-time, description: "UTC; relative display against Europe/Warsaw on the web (research R10)" }
+        editedAt:
+          type: [string, "null"]
+          format: date-time
+          description: "UTC; NULL until the first edit — drives the 'edited' affordance (FR-073, research R5)."
+        canEdit:
+          type: boolean
+          description: >
+            Server-computed convenience (= caller is the author, research R15) that
+            gates the client edit/delete affordances. NOT the security boundary — the
+            author-only server gate (research R4) is authoritative (FR-068).
+
+    CommentMention:
+      type: object
+      required: [userId, displayName]
+      properties:
+        userId:
+          type: [string, "null"]
+          format: uuid
+          description: "The mentioned member's User id — nullable (tombstone) after erasure (research R11)."
+        displayName:
+          type: string
+          description: "The mentioned member's display name (tombstone-safe; NOT their email — Constitution XI)."
+
+    CommentListResponse:
+      type: object
+      required: [taskId, comments]
+      properties:
+        taskId: { type: string, format: uuid }
+        comments:
+          type: array
+          items: { $ref: "#/components/schemas/CommentResponse" }
+          description: "The thread, ordered chronologically by `createdAt` (research R5/R15)."
+
+  responses:
+    Unauthenticated:
+      description: Authentication required (401 `unauthenticated`)
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+    Forbidden:
+      description: >
+        The caller IS a current member but is DENIED (403 `forbidden`, research
+        R3/R4): a viewer attempting to post/edit/delete (insufficient role,
+        FR-067/072); OR a NON-AUTHOR of any role — INCLUDING the project owner —
+        attempting to edit/delete (project role does NOT override authorship,
+        FR-075). Existence is already known to the member, so the honest answer is a
+        403, NOT a 404.
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+    NotFound:
+      description: >
+        404 `not_found` — the task or comment is absent/foreign, the caller is a
+        NON-MEMBER or a FORMER member of the parent project (membership loss revokes
+        ALL — FR-066, structurally beats the author grant), or the parent task is
+        PERSONAL/Inbox (no comment surface — FR-072). Existence is NOT disclosed
+        across the membership boundary (Constitution XII).
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+    ValidationFailed:
+      description: >
+        422 `validation_failed` — an empty/whitespace-only or over-length (`> 4000`)
+        `body`, or a `mentionedUserIds` entry that is NOT a current project member
+        (FR-098; the human specifics ride in the field-`errors` envelope, FR-049).
+        No comment is created/updated on a validation failure.
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/ProblemDetails" } } }
+
+# NOTE (research R2/R9): this slice uses NO `version_conflict`(409) — comments are
+# versionless (last-write-wins, Constitution Principle III). The ProblemDetails schema
+# + `errorCode` enum are UNCHANGED from slices 001/002 — the document transformer's
+# `ErrorCodes` array is NOT edited; it only stamps the four new operationIds
+# (listTaskComments, postTaskComment, editComment, deleteComment) + their responses.
