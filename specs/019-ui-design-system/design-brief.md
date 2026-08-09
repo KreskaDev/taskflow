@@ -47,19 +47,43 @@ skrótu):
 | `border-strong` | `#524C47` | `#524C47` | `#C9C0B0` | `#C9C0B0` |
 | `surface-elevated` | `rgba(255,255,255,.06)` | j.w. | `rgba(0,0,0,.04)` | j.w. |
 
-\* w aplikacji (gęste panele, drawer) karty w trybie light mogą używać `#FFFFFF` z borderem —
-do rozstrzygnięcia w spec; blog używa `bg-secondary` jako tła kart.
+\* ROZSTRZYGNIĘTE (mockup v3): w trybie light powierzchnie podniesione (karty, drawer,
+menu, modal) = `#FFFFFF` z borderem, a blogowe `bg-secondary` pełni rolę `bg-deep`
+(tło chrome/topbar). W dark mapowanie bez zmian: `bg-secondary` = `bg-elevated`.
 
-Rozszerzenia TaskFlow (aplikacja potrzebuje więcej niż blog; nazwy w konwencji bloga):
-`--color-bg-hover` `rgba(255,255,255,.05)` / `rgba(0,0,0,.045)`, `--color-bg-active`
-`rgba(255,255,255,.08)` / `rgba(0,0,0,.08)`, `--color-warning` `#C9B850` (dark) / `#A89640`
-(light), `--color-accent-strong` `#356D97` (tło primary button w dark-cool — `#5290BD`
-z białym tekstem nie domyka 4.5:1; w light accent-strong = accent). Kandydaci do „common"
-przy ekstrakcji.
+Rozszerzenia TaskFlow (aplikacja potrzebuje więcej niż blog; nazwy w konwencji bloga;
+wartości zweryfikowane w review kontrastu 2026-08-09). Kandydaci do „common" przy ekstrakcji:
 
-Zasady: kontrast weryfikowany **osobno w każdej z 4 palet**; kolor funkcjonalny zawsze
-z ikoną/tekstem; `::selection` na `accent-soft`; focus ring 2px `accent` + offset; scrim
-modali/draweru 40–60% czerni + blur 4px (jak `::backdrop` bloga).
+- `--color-bg-deep` — tło chrome (topbar) o pół tonu głębsze niż `bg-primary`:
+  `#141414` / `#161412` (dark), w light = blogowe `bg-secondary`.
+- `--color-bg-hover` `rgba(255,255,255,.05)` / `rgba(0,0,0,.045)`; `--color-bg-active`
+  `rgba(255,255,255,.08)` / `rgba(0,0,0,.08)`.
+- `--color-warning` `#C9B850` (dark) / **`#8F7F36`** (light — blogowe `#A89640` daje tylko
+  2.8:1 na jasnym tle, poniżej 3:1 dla elementów niebędących tekstem).
+- `--color-accent-strong` + `--color-accent-strong-hover` — tło primary buttonów;
+  hover MUSI iść **ciemniej**, nie w `accent-hover` (w dark `accent-hover` to tint TEKSTU,
+  jaśnieje — biały tekst na nim spada do 2.4–4.0:1): dark-cool `#356D97`→`#2D5E7E`,
+  warm `#9D4754`→`#844050`, light-cool `#3A7194`→`#2D5E7E`.
+- `--color-danger-strong` + `--color-danger-strong-hover` — tło destructive buttonów,
+  osobno od accent (destructive jest bordowy w KAŻDEJ palecie, także cool): `#9D4754`→
+  `#844050` we wszystkich 4 paletach (blogowe burgundy/light-warm accent-hover).
+- Obrys kontrolek, których granica jest jedynym identyfikatorem (checkbox/radio):
+  `--color-fg-disabled` (~4.2:1), NIE `border-strong` (~2:1 — łamie WCAG 1.4.11).
+- `--color-selection` — w dark `accent-soft` jest niewidoczny na tle (1.05–1.08:1), więc
+  selection = półprzezroczysty akcent `rgba(accent,.30)`; w light = `accent-soft`.
+- `--avatar-*` — paleta awatarów ograniczona do wartości AA-safe dla białych inicjałów
+  (≥4.5:1), np. `#356D97`, `#4A7C57`, `#A05A20`; deterministyczny wybór z userId losuje
+  wyłącznie z tej listy.
+
+Zasady: kontrast weryfikowany **osobno w każdej z 4 palet** (tekst ≥4.5:1, elementy
+graficzne/focus ≥3:1, stany hover TEŻ); kolor funkcjonalny zawsze z ikoną/tekstem;
+`::selection` na `--color-selection`; focus ring 2px `accent` + offset; scrim
+modali/draweru 40–60% czerni + blur 4px (jak `::backdrop` bloga); menu kontekstowe
+(`role="menu"` ⇒ obowiązkowa nawigacja strzałkami + `aria-expanded` na triggerze),
+modale (native `<dialog>`: focus trap, Esc, powrót fokusa) i toasty (`role="status"`,
+nie kradną fokusa) są częścią design systemu. Toasty informacyjne auto-dismiss 3–5s;
+toast z przyciskiem **Cofnij** po operacji destrukcyjnej żyje przez całe okno undo
+(30 s — Konstytucja VII) i ma przycisk zamknięcia.
 
 ## Typografia (stack bloga)
 
@@ -82,16 +106,24 @@ modali/draweru 40–60% czerni + blur 4px (jak `::backdrop` bloga).
 - **Sidebar 240px, zwijany** (przycisk collapse) — nawigacja: Inbox / Today / Upcoming /
   Assigned / projekty, każda pozycja ikona + etykieta + licznik; aktywna pozycja wyraźnie
   podświetlona (accent + waga).
-- **Drawer szczegółów taska z prawej, 420–480px** — pełna edycja pól + komentarze; Esc zamyka,
-  focus trap, powrót fokusa do wywołującego (kontrakt dialogowy z Konstytucji II).
+- **Drawer szczegółów taska z prawej, 420–480px** — pełna edycja pól + komentarze. Drawer
+  jest **niemodalny**: Esc zamyka i fokus wraca do wywołującego, ale BEZ focus trapa — lista
+  pozostaje interaktywna (pełny kontrakt dialogowy z Konstytucji II — initial focus, trap,
+  Esc, powrót fokusa — obowiązuje modale: potwierdzenia, palety poleceń).
 - Promienie: 6px kontrolki, 8px karty/drawer/menu (web — nie 16px z wariantu mobile).
-- Z-index skala: 0 / 10 (sticky) / 20 (sidebar) / 40 (drawer) / 100 (modal) / 1000 (toast).
+- Z-index skala: 0 / 10 (sticky) / 20 (sidebar) / 40 (drawer) / 60 (menu, popover) /
+  100 (modal) / 1000 (toast).
+- Nie przyciemniać `accent-soft` w light-warm — ikona warning na wierszu selected
+  przechodzi 3:1 z małym zapasem (3.21:1).
+- Hover na powierzchni elevated rozjaśnia tło ⇒ tekst akcentowy/danger na niej idzie
+  równolegle w wariant hover (`accent-hover`, `--color-danger-hover` `#D9959C` dark /
+  `#844050` light), inaczej dark-cool spada poniżej 4.5:1.
 - Desktop + sensowne zachowanie od ~768px wzwyż; bez poziomego scrolla.
 
 ## Ikony i grafika
 
-- **Lucide** wszędzie w chrome aplikacji; rozmiar 16px (gęste wiersze) / 18–20px (nagłówki),
-  stroke 1.5–2 spójnie, jeden styl (outline). Emoji WYŁĄCZNIE jako opcjonalne ikonki projektów.
+- **Lucide** wszędzie w chrome aplikacji; rozmiar 14–16px (gęste wiersze) / 18–20px
+  (nagłówki), stroke 1.5–2 spójnie, jeden styl (outline). Emoji WYŁĄCZNIE jako opcjonalne ikonki projektów.
 - Ikony-przyciski zawsze z `aria-label`; hit area ≥ 32px (desktop, wskaźnik precyzyjny)
   mimo mniejszej ikony.
 - Awatary: zdjęcie z Google, fallback inicjały w kolorowym kółku (kolor deterministyczny
@@ -114,7 +146,11 @@ modali/draweru 40–60% czerni + blur 4px (jak `::backdrop` bloga).
   akcjami + drawer jako pełna edycja. Menu „⋯" osiągalne z klawiatury (Tab/Enter).
 - Puste stany: hint + przycisk akcji (bez wizardów).
 - Hotkeys jednoznakowe usunięte (decyzja G1); zostaje standardowa operowalność klawiaturowa
-  WCAG: Tab/Shift+Tab, Enter/Space, Esc, strzałki w listach i menu.
+  WCAG: Tab/Shift+Tab, Enter/Space, Esc, strzałki w menu (mockup demonstruje) oraz w listach
+  (roving tabindex — zakres implementacji, nie mockupu).
+- Toast: tekst wstrzykiwany do TRWAŁEGO live regionu (`role="status"` istniejącego od
+  załadowania strony — toggle `display` z gotową treścią bywa nieodczytywany przez SR);
+  po zamknięciu toastu fokus nie może wylądować na elemencie `display:none`.
 
 ## Checklist przed oddaniem każdego ekranu (z skilla, dostosowane)
 

@@ -7,49 +7,68 @@
 <style>
   /* ══ System tokenów wg kreskadev.github.io (ADR-041 dual-palette):
      2 tryby (dark/light) × 2 palety (cool blue / warm red) = 4 kombinacje.
-     Klasa na <html> przełącza całość; komponenty znają TYLKO tokeny semantyczne. ══ */
+     Wartości blogowe 1:1; rozszerzenia aplikacyjne (bg-deep, bg-hover/active,
+     warning, accent-strong[-hover], selection, avatar-*) — kandydaci do "common". ══ */
 
   html.dark-cool{
     --bg-deep:#141414; --bg-base:#181818; --bg-elevated:#222222;
     --bg-hover:rgba(255,255,255,.05); --bg-active:rgba(255,255,255,.08);
     --fg-primary:#E8E4DC; --fg-secondary:#B5B0A6; --fg-disabled:#8A857C;
-    --accent:#5290BD; --accent-strong:#356D97; --accent-hover:#4285B3;
-    --accent-soft:#11212D; --on-accent:#FFFFFF;
+    --accent:#5290BD; --accent-hover:#7AAACF; --accent-soft:#11212D;
+    --accent-strong:#356D97; --accent-strong-hover:#2D5E7E; --on-accent:#FFFFFF;
     --border:#383330; --border-strong:#524C47;
-    --danger:#C97E87; --success:#7BA887; --warning:#C9B850;
+    --danger:#C97E87; --danger-hover:#D9959C;
+    --danger-strong:#9D4754; --danger-strong-hover:#844050;
+    --success:#7BA887; --warning:#C9B850;
+    --selection:rgba(82,144,189,.30);
     color-scheme:dark;
   }
   html.dark-warm{
     --bg-deep:#161412; --bg-base:#1A1816; --bg-elevated:#221F1C;
     --bg-hover:rgba(255,255,255,.05); --bg-active:rgba(255,255,255,.08);
     --fg-primary:#E8E4DC; --fg-secondary:#B5B0A6; --fg-disabled:#8A857C;
-    --accent:#C97E87; --accent-strong:#9D4754; --accent-hover:#D9959C;
-    --accent-soft:#2F1518; --on-accent:#FFFFFF;
+    --accent:#C97E87; --accent-hover:#D9959C; --accent-soft:#2F1518;
+    --accent-strong:#9D4754; --accent-strong-hover:#844050; --on-accent:#FFFFFF;
     --border:#383330; --border-strong:#524C47;
-    --danger:#C97E87; --success:#7BA887; --warning:#C9B850;
+    --danger:#C97E87; --danger-hover:#D9959C;
+    --danger-strong:#9D4754; --danger-strong-hover:#844050;
+    --success:#7BA887; --warning:#C9B850;
+    --selection:rgba(201,126,135,.30);
     color-scheme:dark;
   }
   html.light-cool{
     --bg-deep:#F2F2F2; --bg-base:#FAFAFA; --bg-elevated:#FFFFFF;
     --bg-hover:rgba(0,0,0,.045); --bg-active:rgba(0,0,0,.08);
     --fg-primary:#2A2520; --fg-secondary:#5C5A55; --fg-disabled:#807B72;
-    --accent:#3A7194; --accent-strong:#3A7194; --accent-hover:#2D5E7E;
-    --accent-soft:#E5EFF6; --on-accent:#FFFFFF;
+    --accent:#3A7194; --accent-hover:#2D5E7E; --accent-soft:#E5EFF6;
+    --accent-strong:#3A7194; --accent-strong-hover:#2D5E7E; --on-accent:#FFFFFF;
     --border:#E5E0D8; --border-strong:#C9C0B0;
-    --danger:#9D4754; --success:#4A7C57; --warning:#A89640;
+    --danger:#9D4754; --danger-hover:#844050;
+    --danger-strong:#9D4754; --danger-strong-hover:#844050;
+    --success:#4A7C57; --warning:#8F7F36;
+    --selection:#E5EFF6;
     color-scheme:light;
   }
   html.light-warm{
     --bg-deep:#F2EFE8; --bg-base:#FAF7F2; --bg-elevated:#FFFFFF;
     --bg-hover:rgba(0,0,0,.045); --bg-active:rgba(0,0,0,.08);
     --fg-primary:#2A2520; --fg-secondary:#5C5A55; --fg-disabled:#807B72;
-    --accent:#9D4754; --accent-strong:#9D4754; --accent-hover:#844050;
-    --accent-soft:#F1E3E5; --on-accent:#FFFFFF;
+    --accent:#9D4754; --accent-hover:#844050; --accent-soft:#F1E3E5;
+    --accent-strong:#9D4754; --accent-strong-hover:#844050; --on-accent:#FFFFFF;
     --border:#E5E0D8; --border-strong:#C9C0B0;
-    --danger:#9D4754; --success:#4A7C57; --warning:#A89640;
+    --danger:#9D4754; --danger-hover:#844050;
+    --danger-strong:#9D4754; --danger-strong-hover:#844050;
+    --success:#4A7C57; --warning:#8F7F36;
+    --selection:#F1E3E5;
     color-scheme:light;
   }
-  :root{ --r-ctrl:6px; --r-card:8px }
+  :root{
+    --r-ctrl:6px; --r-card:8px;
+    /* Awatary: stałe, AA-safe dla białych inicjałów (≥4.5:1) — spec ograniczy
+       deterministyczną paletę per userId do takich wartości. */
+    --avatar-a:#356D97; --avatar-b:#4A7C57; --avatar-c:#A05A20;
+    --font-mono:"JetBrains Mono",Menlo,Consolas,monospace;
+  }
 
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
@@ -59,12 +78,17 @@
     background:var(--bg-deep);overflow:hidden;
     transition:background 150ms ease-out,color 150ms ease-out;
   }
-  ::selection{background:var(--accent-soft);color:var(--fg-primary)}
+  ::selection{background:var(--selection);color:var(--fg-primary)}
   button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
-  button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--r-ctrl)}
+  /* border-radius:inherit jak na blogu — okrągłe kontrolki (checkbox, avatar)
+     zachowują kształt pod fokusem. */
+  button:focus-visible,a:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:inherit}
   svg{flex:none;display:block}
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{transition-duration:0ms!important;animation:none!important}
+  }
 
-  .app{display:grid;grid-template-columns:240px 1fr;grid-template-rows:44px 1fr;height:100vh;transition:grid-template-columns 150ms ease-out}
+  .app{display:grid;grid-template-columns:240px 1fr;grid-template-rows:44px 1fr;height:100vh}
   .app.collapsed{grid-template-columns:0 1fr}
 
   /* ── Top bar ─────────────────────────── */
@@ -72,19 +96,27 @@
   .icon-btn{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:var(--r-ctrl);color:var(--fg-secondary)}
   .icon-btn:hover{background:var(--bg-hover);color:var(--fg-primary)}
   .crumb{font-weight:600;font-size:13px}
-  .search{flex:1;max-width:340px;margin-left:auto;display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--r-ctrl);color:var(--fg-secondary)}
+  .search{flex:1;max-width:340px;margin-left:auto;display:flex;align-items:center;gap:8px;height:32px;padding:0 12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--r-ctrl);color:var(--fg-secondary)}
   .search input{flex:1;background:none;border:0;color:var(--fg-primary);font:inherit;min-width:0}
   .search input::placeholder{color:var(--fg-secondary)}
-  .btn-primary{display:flex;align-items:center;gap:6px;height:30px;padding:0 12px;background:var(--accent-strong);color:var(--on-accent);font-weight:600;border-radius:var(--r-ctrl);transition:background 100ms ease-out}
-  .btn-primary:hover{background:var(--accent-hover)}
+  .btn-primary{display:flex;align-items:center;gap:8px;height:32px;padding:0 12px;background:var(--accent-strong);color:var(--on-accent);font-weight:600;border-radius:var(--r-ctrl);transition:background 100ms ease-out}
+  .btn-primary:hover{background:var(--accent-strong-hover)}
+  .btn-secondary{display:flex;align-items:center;height:32px;padding:0 12px;border:1px solid var(--border-strong);border-radius:var(--r-ctrl);font-weight:500}
+  .btn-secondary:hover{background:var(--bg-hover)}
+  .btn-danger{display:flex;align-items:center;height:32px;padding:0 12px;background:var(--danger-strong);color:#fff;font-weight:600;border-radius:var(--r-ctrl)}
+  .btn-danger:hover{background:var(--danger-strong-hover)}
   .avatar{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;flex:none}
+  .topbar .avatar{width:32px;height:32px;font-size:12px}
 
-  /* Przełączniki motywu (mockup-only, docelowo w Settings) */
+  /* Przełączniki motywu (mockup-only; docelowo Settings — slice 018) */
   .theme-ctl{display:flex;align-items:center;gap:2px;padding:2px;border:1px solid var(--border);border-radius:var(--r-ctrl)}
-  .theme-ctl button{display:flex;align-items:center;justify-content:center;width:26px;height:24px;border-radius:4px;color:var(--fg-secondary)}
+  .theme-ctl button{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:4px;color:var(--fg-secondary)}
   .theme-ctl button:hover{background:var(--bg-hover);color:var(--fg-primary)}
   .theme-ctl button[aria-pressed="true"]{background:var(--bg-active);color:var(--fg-primary)}
-  .pal-dot{width:12px;height:12px;border-radius:50%}
+  /* Obrys fg-disabled = identyfikator niezależny od koloru kropki (WCAG 1.4.11
+     w trybach light). */
+  .pal-dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--fg-disabled)}
+  /* Kolory reprezentują SAME palety — celowo stałe, nie tokeny. */
   .pal-dot.cool{background:#5290BD} .pal-dot.warm{background:#C97E87}
 
   /* ── Sidebar ─────────────────────────── */
@@ -92,13 +124,13 @@
   .app.collapsed .sidebar{display:none}
   .side-head{display:flex;align-items:center;gap:8px;padding:4px 8px 12px;font-weight:400;font-size:16px;font-family:"Instrument Serif",Georgia,serif}
   .logo{width:20px;height:20px;border-radius:5px;background:var(--accent-strong);display:flex;align-items:center;justify-content:center;color:var(--on-accent);font-size:11px;font-weight:700;font-family:Geist,Inter,system-ui,sans-serif}
-  .nav-item{display:flex;align-items:center;gap:8px;height:30px;padding:0 8px;border-radius:var(--r-ctrl);color:var(--fg-secondary);font-weight:500;width:100%;text-align:left}
+  .nav-item{display:flex;align-items:center;gap:8px;height:32px;padding:0 8px;border-radius:var(--r-ctrl);color:var(--fg-secondary);font-weight:500;width:100%;text-align:left}
   .nav-item:hover{background:var(--bg-hover);color:var(--fg-primary)}
-  .nav-item.active{background:var(--bg-active);color:var(--fg-primary)}
+  .nav-item.active{background:var(--bg-active);color:var(--fg-primary);font-weight:600}
   .nav-item.active svg{color:var(--accent)}
   .nav-item .count{margin-left:auto;font-size:11px;color:var(--fg-secondary);font-variant-numeric:tabular-nums}
-  .nav-section{margin:14px 8px 4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--fg-secondary);display:flex;align-items:center}
-  .nav-section .icon-btn{width:22px;height:22px;margin-left:auto}
+  .nav-section{margin:16px 8px 4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--fg-secondary);display:flex;align-items:center}
+  .nav-section .icon-btn{width:32px;height:32px;margin:-8px -4px -8px auto}
   .proj-dot{width:9px;height:9px;border-radius:3px;flex:none}
   .proj-emoji{width:16px;text-align:center;flex:none;font-size:12px}
 
@@ -107,53 +139,88 @@
   .main.drawer-closed{grid-template-columns:1fr 0}
   .list-pane{overflow-y:auto;min-width:0}
 
-  .quick-add{display:flex;align-items:center;gap:8px;margin:12px 16px 4px;height:34px;padding:0 10px;border:1px dashed var(--border-strong);border-radius:var(--r-ctrl);color:var(--fg-secondary)}
+  .quick-add{display:flex;align-items:center;gap:8px;margin:12px 16px 4px;height:36px;padding:0 12px;border:1px dashed var(--border-strong);border-radius:var(--r-ctrl);color:var(--fg-secondary)}
   .quick-add input{flex:1;background:none;border:0;color:var(--fg-primary);font:inherit}
   .quick-add input::placeholder{color:var(--fg-secondary)}
 
-  .group-head{display:flex;align-items:center;gap:6px;padding:14px 16px 6px;font-size:11px;font-weight:600;color:var(--fg-secondary);text-transform:uppercase;letter-spacing:.04em}
-  .row{display:flex;align-items:center;gap:10px;height:36px;padding:0 16px;border-left:2px solid transparent;position:relative}
+  .group-head{display:flex;align-items:center;gap:8px;padding:16px 16px 4px;font-size:11px;font-weight:600;color:var(--fg-secondary);text-transform:uppercase;letter-spacing:.04em}
+  .row{display:flex;align-items:center;gap:8px;height:36px;padding:0 16px;border-left:2px solid transparent;position:relative}
   .row:hover{background:var(--bg-hover)}
   .row.selected{background:var(--accent-soft);border-left-color:var(--accent)}
-  .chk{width:15px;height:15px;border-radius:50%;border:1.5px solid var(--border-strong);flex:none}
-  .chk:hover{border-color:var(--accent)}
-  .chk.done{background:var(--success);border-color:var(--success)}
-  .prio{width:14px;color:var(--fg-secondary);flex:none}
+  /* Hit area 28px (wizualnie 16px kółko przez ::after — wzór „padded hit area").
+     Obrys = jedyny identyfikator kontrolki → ≥3:1 (WCAG 1.4.11): fg-disabled
+     daje ~4.2:1, border-strong tylko ~2:1. */
+  .chk{width:32px;height:32px;margin:0 -7px;border-radius:50%;flex:none;position:relative}
+  .chk::after{content:"";position:absolute;inset:8px;border-radius:50%;border:1.5px solid var(--fg-disabled)}
+  .chk:hover::after{border-color:var(--accent)}
+  .chk.done::after{background:var(--success);border-color:var(--success)}
+  .chk svg{position:absolute;inset:0;margin:auto;stroke:var(--bg-elevated);z-index:1}
+  .prio{width:16px;color:var(--fg-secondary);flex:none}
   .prio.p1{color:var(--danger)} .prio.p2{color:var(--warning)}
-  .row .title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-  .row .title .done-text{color:var(--fg-secondary);text-decoration:line-through}
-  .chip{font-size:11px;padding:1px 7px;border-radius:99px;border:1px solid var(--border);color:var(--fg-secondary);flex:none}
-  .chip .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:0}
-  .due{margin-left:auto;font-size:12px;color:var(--fg-secondary);font-variant-numeric:tabular-nums;flex:none}
+  .row-title{flex:1;min-width:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;height:100%;display:flex;align-items:center;border-radius:0}
+  .row-title .done-text{color:var(--fg-secondary);text-decoration:line-through}
+  .chip{font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid var(--border);color:var(--fg-secondary);flex:none}
+  .chip .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;vertical-align:0}
+  .due{font-size:12px;color:var(--fg-secondary);font-variant-numeric:tabular-nums;flex:none}
   .due.overdue{color:var(--danger)}
   .row .avatar{width:20px;height:20px;font-size:9px}
-  .row-actions{display:none;position:absolute;right:12px;align-items:center;gap:2px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--r-ctrl);padding:2px;box-shadow:0 4px 12px rgba(0,0,0,.25)}
-  .row:hover .row-actions,.row:focus-within .row-actions{display:flex}
-  .row-actions .icon-btn{width:26px;height:26px}
+  /* Pasek akcji: zawsze w DOM (opacity, nie display) → Tab i Shift+Tab
+     działają symetrycznie; widoczny przy hover ORAZ przy fokusie wewnątrz. */
+  .row-actions{opacity:0;pointer-events:none;position:absolute;right:12px;display:flex;align-items:center;gap:2px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--r-ctrl);padding:0 2px;box-shadow:0 4px 12px rgba(0,0,0,.25);transition:opacity 100ms ease-out}
+  .row:hover .row-actions,.row:focus-within .row-actions{opacity:1;pointer-events:auto}
+
+  /* ── Menu kontekstowe „⋯" ────────────── */
+  .menu{position:fixed;z-index:60;min-width:200px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--r-card);box-shadow:0 8px 24px rgba(0,0,0,.35);padding:4px;display:none}
+  .menu.open{display:block}
+  .menu-item{display:flex;align-items:center;gap:8px;width:100%;height:32px;padding:0 8px;border-radius:var(--r-ctrl);text-align:left;color:var(--fg-primary)}
+  .menu-item svg{color:var(--fg-secondary)}
+  .menu-item:hover{background:var(--bg-hover)}
+  .menu-item .hint{margin-left:auto;font-size:11px;color:var(--fg-secondary)}
+  .menu-sep{height:1px;background:var(--border);margin:4px 8px}
+  .menu-item.danger,.menu-item.danger svg{color:var(--danger)}
+  .menu-item.danger:hover,.menu-item.danger:hover svg{color:var(--danger-hover)}
+
+  /* ── Modal (native dialog, wzór: blog ::backdrop) ── */
+  dialog.modal{margin:auto;border:1px solid var(--border);border-radius:var(--r-card);background:var(--bg-elevated);color:var(--fg-primary);padding:0;max-width:420px;width:calc(100vw - 32px)}
+  dialog.modal::backdrop{background:rgba(0,0,0,.55);backdrop-filter:blur(4px)}
+  .modal-body{padding:20px}
+  .modal-title{font-size:15px;font-weight:600;margin-bottom:8px}
+  .modal-text{color:var(--fg-secondary);font-size:13px}
+  .modal-text strong{color:var(--fg-primary);font-weight:600}
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;border-top:1px solid var(--border)}
+
+  /* ── Toast ───────────────────────────── */
+  .toast{position:fixed;right:16px;bottom:16px;z-index:1000;display:none;align-items:center;gap:12px;background:var(--bg-elevated);border:1px solid var(--border);border-left:3px solid var(--success);border-radius:var(--r-card);box-shadow:0 8px 24px rgba(0,0,0,.35);padding:10px 12px;max-width:360px}
+  .toast.open{display:flex}
+  .toast .undo{color:var(--accent);font-weight:600;padding:4px 8px;border-radius:var(--r-ctrl)}
+  /* Hover rozjaśnia tło elevated → tekst też idzie w hover-tint, inaczej
+     dark-cool spada do 3.99:1. */
+  .toast .undo:hover{background:var(--bg-hover);color:var(--accent-hover)}
 
   /* ── Drawer ──────────────────────────── */
   .drawer{background:var(--bg-elevated);border-left:1px solid var(--border);overflow-y:auto;min-width:0}
   .main.drawer-closed .drawer{display:none}
-  .drawer-head{display:flex;align-items:center;gap:4px;padding:10px 12px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg-elevated)}
+  .drawer-head{display:flex;align-items:center;gap:4px;padding:8px 12px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg-elevated)}
   .drawer-head .spacer{flex:1}
+  .task-id{font-size:12px;color:var(--fg-secondary);font-family:var(--font-mono)}
   .drawer-body{padding:16px}
-  .task-title{font-size:16px;font-weight:600;line-height:1.35;margin-bottom:14px}
+  .task-title{font-size:16px;font-weight:600;line-height:1.35;margin-bottom:16px}
   .fields{display:grid;grid-template-columns:96px 1fr;gap:8px 12px;margin-bottom:16px}
-  .f-label{color:var(--fg-secondary);font-size:12px;display:flex;align-items:center;height:26px}
-  .f-value{display:flex;align-items:center;gap:6px;min-height:26px;flex-wrap:wrap}
-  .f-pill{display:flex;align-items:center;gap:6px;height:26px;padding:0 9px;border:1px solid var(--border);border-radius:var(--r-ctrl);font-size:12px;background:var(--bg-base)}
+  .f-label{color:var(--fg-secondary);font-size:12px;display:flex;align-items:center;height:28px}
+  .f-value{display:flex;align-items:center;gap:8px;min-height:28px;flex-wrap:wrap}
+  .f-pill{display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border:1px solid var(--border);border-radius:var(--r-ctrl);font-size:12px;background:var(--bg-base)}
   .f-pill:hover{background:var(--bg-hover);border-color:var(--border-strong)}
-  .desc{font-size:14px;color:var(--fg-primary);border-left:2px solid var(--accent);padding-left:12px;margin-bottom:18px}
-  .desc p{margin-top:6px;color:var(--fg-secondary)}
-  .section-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--fg-secondary);margin-bottom:10px;border-top:1px solid var(--border);padding-top:14px}
-  .comment{display:flex;gap:10px;margin-bottom:14px}
+  .desc{font-size:14px;color:var(--fg-primary);border-left:2px solid var(--accent);padding-left:12px;margin-bottom:16px}
+  .desc p{margin-top:8px;color:var(--fg-secondary)}
+  .section-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--fg-secondary);margin-bottom:12px;border-top:1px solid var(--border);padding-top:16px}
+  .comment{display:flex;gap:8px;margin-bottom:16px}
   .comment .body{font-size:13px;min-width:0}
   .comment .meta{display:flex;gap:8px;align-items:baseline;margin-bottom:2px}
   .comment .who{font-weight:600}
   .comment .when{font-size:11px;color:var(--fg-secondary)}
   .mention{color:var(--accent);font-weight:500}
-  .composer{display:flex;gap:10px;margin-top:14px}
-  .composer .box{flex:1;border:1px solid var(--border-strong);border-radius:var(--r-card);padding:8px 10px;color:var(--fg-secondary);background:var(--bg-base)}
+  .composer{display:flex;gap:8px;margin-top:16px}
+  .composer .box{flex:1;border:1px solid var(--border-strong);border-radius:var(--r-card);padding:8px 12px;color:var(--fg-secondary);background:var(--bg-base)}
 </style>
 </head>
 <body>
@@ -161,22 +228,22 @@
 
   <!-- Top bar -->
   <header class="topbar">
-    <button class="icon-btn" aria-label="Zwiń sidebar" onclick="document.getElementById('app').classList.toggle('collapsed')">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="9" y1="4" x2="9" y2="20"/></svg>
+    <button class="icon-btn" id="btn-collapse" aria-label="Zwiń sidebar" aria-expanded="true" aria-controls="sidebar" onclick="toggleSidebar()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="9" y1="4" x2="9" y2="20"/></svg>
     </button>
     <span class="crumb">Inbox</span>
     <div class="search">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
       <input placeholder="Szukaj…" aria-label="Szukaj">
     </div>
 
-    <!-- Przełącznik: tryb (dark/light) × paleta (cool/warm) -->
-    <div class="theme-ctl" role="group" aria-label="Motyw">
+    <!-- Przełącznik: tryb (dark/light) × paleta (cool/warm); docelowo Settings (slice 018) -->
+    <div class="theme-ctl" role="group" aria-label="Tryb">
       <button id="btn-dark" aria-pressed="true" aria-label="Tryb ciemny" onclick="setTheme('dark',null)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
       </button>
       <button id="btn-light" aria-pressed="false" aria-label="Tryb jasny" onclick="setTheme('light',null)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="4.9" y1="4.9" x2="7" y2="7"/><line x1="17" y1="17" x2="19.1" y2="19.1"/><line x1="4.9" y1="19.1" x2="7" y2="17"/><line x1="17" y1="7" x2="19.1" y2="4.9"/></svg>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="4.9" y1="4.9" x2="7" y2="7"/><line x1="17" y1="17" x2="19.1" y2="19.1"/><line x1="4.9" y1="19.1" x2="7" y2="17"/><line x1="17" y1="7" x2="19.1" y2="4.9"/></svg>
       </button>
     </div>
     <div class="theme-ctl" role="group" aria-label="Paleta">
@@ -185,37 +252,37 @@
     </div>
 
     <button class="btn-primary">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       Nowy task
     </button>
-    <button class="avatar" style="background:#356D97" aria-label="Konto: Kreska">KR</button>
+    <button class="avatar" style="background:var(--avatar-a)" aria-label="Konto: Kreska">KR</button>
   </header>
 
   <!-- Sidebar -->
-  <nav class="sidebar" aria-label="Nawigacja główna">
-    <div class="side-head"><span class="logo">T</span> TaskFlow</div>
+  <nav class="sidebar" id="sidebar" aria-label="Nawigacja główna">
+    <div class="side-head"><span class="logo" aria-hidden="true">T</span> TaskFlow</div>
     <button class="nav-item active">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13l3.5 7v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/></svg>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13l3.5 7v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/></svg>
       Inbox <span class="count">12</span>
     </button>
     <button class="nav-item">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
       Today <span class="count">3</span>
     </button>
     <button class="nav-item">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
       Upcoming <span class="count">8</span>
     </button>
     <button class="nav-item">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/><path d="M16 3.8a3.5 3.5 0 0 1 0 8.4"/><path d="M17.8 13.9c2.2.9 3.7 3 3.7 6.1"/></svg>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/><path d="M16 3.8a3.5 3.5 0 0 1 0 8.4"/><path d="M17.8 13.9c2.2.9 3.7 3 3.7 6.1"/></svg>
       Assigned <span class="count">2</span>
     </button>
     <div class="nav-section">Projekty
-      <button class="icon-btn" aria-label="Nowy projekt"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+      <button class="icon-btn" aria-label="Nowy projekt"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
     </div>
-    <button class="nav-item"><span class="proj-dot" style="background:#5290BD"></span> Website Redesign <span class="count">14</span></button>
-    <button class="nav-item"><span class="proj-emoji">🚀</span> Launch Q3 <span class="count">6</span></button>
-    <button class="nav-item"><span class="proj-dot" style="background:#7BA887"></span> Backlog produktu <span class="count">31</span></button>
+    <button class="nav-item"><span class="proj-dot" style="background:var(--accent)"></span> Website Redesign <span class="count">14</span></button>
+    <button class="nav-item"><span class="proj-emoji" aria-hidden="true">🚀</span> Launch Q3 <span class="count">6</span></button>
+    <button class="nav-item"><span class="proj-dot" style="background:var(--success)"></span> Backlog produktu <span class="count">31</span></button>
   </nav>
 
   <!-- Main: list + drawer -->
@@ -223,91 +290,110 @@
     <section class="list-pane" aria-label="Lista tasków">
 
       <div class="quick-add">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        <input placeholder="Dodaj task do Inbox… (tytuł, potem szczegóły w panelu)" aria-label="Dodaj task">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <input placeholder="Dodaj task do Inbox…" aria-label="Dodaj task">
       </div>
 
       <div class="group-head">Zaległe · 2</div>
 
       <div class="row">
         <button class="chk" aria-label="Oznacz jako zrobione"></button>
-        <svg class="prio p1" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-label="Priorytet: pilny"><path d="M3 20h3V10H3v10zm7.5 0h3V4h-3v16zM18 20h3v-7h-3v7z"/></svg>
-        <span class="title">Naprawić walidację terminu w formularzu edycji</span>
-        <span class="chip"><span class="dot" style="background:#C97E87"></span>bug</span>
+        <svg class="prio p1" role="img" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-label="Priorytet: pilny"><path d="M3 20h3V10H3v10zm7.5 0h3V4h-3v16zM18 20h3v-7h-3v7z"/></svg>
+        <button class="row-title" onclick="openDrawer(this)">Naprawić walidację terminu w formularzu edycji</button>
+        <span class="chip"><span class="dot" style="background:var(--danger)"></span>bug</span>
         <span class="due overdue">6 sie</span>
-        <span class="avatar" style="background:#6AA572">AS</span>
+        <span class="avatar" style="background:var(--avatar-b)">AS</span>
         <span class="row-actions">
-          <button class="icon-btn" aria-label="Zrobione"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>
-          <button class="icon-btn" aria-label="Edytuj"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg></button>
-          <button class="icon-btn" aria-label="Więcej akcji"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
+          <button class="icon-btn" aria-label="Zrobione"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></button>
+          <button class="icon-btn" aria-label="Edytuj"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg></button>
+          <button class="icon-btn" aria-label="Więcej akcji" aria-haspopup="menu" aria-expanded="false" aria-controls="ctx-menu" onclick="toggleMenu(event)"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
         </span>
       </div>
       <div class="row">
         <button class="chk" aria-label="Oznacz jako zrobione"></button>
-        <svg class="prio p2" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-label="Priorytet: wysoki"><path d="M3 20h3v-6H3v6zm7.5 0h3V8h-3v12zM18 20h3V12h-3v8z"/></svg>
-        <span class="title">Przejrzeć zgłoszenia z feedbacku sprintu</span>
+        <svg class="prio p2" role="img" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-label="Priorytet: wysoki"><path d="M3 20h3v-6H3v6zm7.5 0h3V8h-3v12zM18 20h3V12h-3v8z"/></svg>
+        <button class="row-title" onclick="openDrawer(this)">Przejrzeć zgłoszenia z feedbacku sprintu</button>
         <span class="due overdue">7 sie</span>
         <span class="row-actions">
-          <button class="icon-btn" aria-label="Zrobione"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>
-          <button class="icon-btn" aria-label="Edytuj"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg></button>
-          <button class="icon-btn" aria-label="Więcej akcji"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
+          <button class="icon-btn" aria-label="Zrobione"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></button>
+          <button class="icon-btn" aria-label="Edytuj"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg></button>
+          <button class="icon-btn" aria-label="Więcej akcji" aria-haspopup="menu" aria-expanded="false" aria-controls="ctx-menu" onclick="toggleMenu(event)"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
         </span>
       </div>
 
       <div class="group-head">Dzisiaj · 3</div>
 
-      <div class="row selected" aria-current="true">
+      <div class="row selected">
         <button class="chk" aria-label="Oznacz jako zrobione"></button>
-        <svg class="prio p2" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-label="Priorytet: wysoki"><path d="M3 20h3v-6H3v6zm7.5 0h3V8h-3v12zM18 20h3V12h-3v8z"/></svg>
-        <span class="title">Przygotować design system — tokeny kolorów i typografia</span>
-        <span class="chip"><span class="dot" style="background:#5290BD"></span>design</span>
+        <svg class="prio p2" role="img" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-label="Priorytet: wysoki"><path d="M3 20h3v-6H3v6zm7.5 0h3V8h-3v12zM18 20h3V12h-3v8z"/></svg>
+        <button class="row-title" aria-current="true" onclick="openDrawer(this)">Przygotować design system — tokeny kolorów i typografia</button>
+        <span class="chip"><span class="dot" style="background:var(--accent)"></span>design</span>
         <span class="due">dziś</span>
-        <span class="avatar" style="background:#356D97">KR</span>
-      </div>
-      <div class="row">
-        <button class="chk" aria-label="Oznacz jako zrobione"></button>
-        <span class="prio" style="width:14px" aria-label="Bez priorytetu"></span>
-        <span class="title">Zaktualizować dokumentację API po zmianach w komentarzach</span>
-        <span class="chip"><span class="dot" style="background:#C9B850"></span>docs</span>
-        <span class="due">dziś</span>
+        <span class="avatar" style="background:var(--avatar-a)">KR</span>
         <span class="row-actions">
-          <button class="icon-btn" aria-label="Zrobione"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>
-          <button class="icon-btn" aria-label="Edytuj"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg></button>
-          <button class="icon-btn" aria-label="Więcej akcji"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
+          <button class="icon-btn" aria-label="Zrobione"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></button>
+          <button class="icon-btn" aria-label="Edytuj"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg></button>
+          <button class="icon-btn" aria-label="Więcej akcji" aria-haspopup="menu" aria-expanded="false" aria-controls="ctx-menu" onclick="toggleMenu(event)"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
         </span>
       </div>
       <div class="row">
-        <button class="chk done" aria-label="Cofnij zrobione"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#181818" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" style="margin:1px"><polyline points="20 6 9 17 4 12"/></svg></button>
-        <span class="prio" style="width:14px"></span>
-        <span class="title"><span class="done-text">Wysłać zaproszenia do zespołu</span></span>
+        <button class="chk" aria-label="Oznacz jako zrobione"></button>
+        <span class="prio" aria-hidden="true"></span>
+        <button class="row-title" onclick="openDrawer(this)">Zaktualizować dokumentację API po zmianach w komentarzach</button>
+        <span class="chip"><span class="dot" style="background:var(--warning)"></span>docs</span>
         <span class="due">dziś</span>
+        <span class="row-actions">
+          <button class="icon-btn" aria-label="Zrobione"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></button>
+          <button class="icon-btn" aria-label="Edytuj"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg></button>
+          <button class="icon-btn" aria-label="Więcej akcji" aria-haspopup="menu" aria-expanded="false" aria-controls="ctx-menu" onclick="toggleMenu(event)"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
+        </span>
+      </div>
+      <div class="row">
+        <button class="chk done" aria-label="Cofnij zrobione"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></button>
+        <span class="prio" aria-hidden="true"></span>
+        <button class="row-title" onclick="openDrawer(this)"><span class="done-text">Wysłać zaproszenia do zespołu</span></button>
+        <span class="due">dziś</span>
+        <span class="row-actions">
+          <button class="icon-btn" aria-label="Cofnij zrobione"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/></svg></button>
+          <button class="icon-btn" aria-label="Więcej akcji" aria-haspopup="menu" aria-expanded="false" aria-controls="ctx-menu" onclick="toggleMenu(event)"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
+        </span>
       </div>
 
       <div class="group-head">Później · 7</div>
       <div class="row">
         <button class="chk" aria-label="Oznacz jako zrobione"></button>
-        <span class="prio" style="width:14px"></span>
-        <span class="title">Zbadać wydajność listy przy 10k tasków</span>
-        <span class="chip"><span class="dot" style="background:#7BA887"></span>perf</span>
+        <span class="prio" aria-hidden="true"></span>
+        <button class="row-title" onclick="openDrawer(this)">Zbadać wydajność listy przy 10k tasków</button>
+        <span class="chip"><span class="dot" style="background:var(--success)"></span>perf</span>
         <span class="due">12 sie</span>
+        <span class="row-actions">
+          <button class="icon-btn" aria-label="Zrobione"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></button>
+          <button class="icon-btn" aria-label="Edytuj"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg></button>
+          <button class="icon-btn" aria-label="Więcej akcji" aria-haspopup="menu" aria-expanded="false" aria-controls="ctx-menu" onclick="toggleMenu(event)"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
+        </span>
       </div>
       <div class="row">
         <button class="chk" aria-label="Oznacz jako zrobione"></button>
-        <span class="prio" style="width:14px"></span>
-        <span class="title">Szkic architektury widoku board (slice 010)</span>
+        <span class="prio" aria-hidden="true"></span>
+        <button class="row-title" onclick="openDrawer(this)">Szkic architektury widoku board (slice 010)</button>
         <span class="due">15 sie</span>
-        <span class="avatar" style="background:#C87A3A">MK</span>
+        <span class="avatar" style="background:var(--avatar-c)">MK</span>
+        <span class="row-actions">
+          <button class="icon-btn" aria-label="Zrobione"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></button>
+          <button class="icon-btn" aria-label="Edytuj"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg></button>
+          <button class="icon-btn" aria-label="Więcej akcji" aria-haspopup="menu" aria-expanded="false" aria-controls="ctx-menu" onclick="toggleMenu(event)"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
+        </span>
       </div>
     </section>
 
     <!-- Drawer szczegółów -->
     <aside class="drawer" aria-label="Szczegóły taska">
       <div class="drawer-head">
-        <span style="font-size:12px;color:var(--fg-secondary)">TSK-142</span>
+        <span class="task-id">TSK-142</span>
         <span class="spacer"></span>
-        <button class="icon-btn" aria-label="Więcej akcji"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
-        <button class="icon-btn" aria-label="Zamknij panel" onclick="document.getElementById('main').classList.add('drawer-closed')">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+        <button class="icon-btn" aria-label="Więcej akcji" aria-haspopup="menu" aria-expanded="false" aria-controls="ctx-menu" onclick="toggleMenu(event)"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
+        <button class="icon-btn" aria-label="Zamknij panel" onclick="closeDrawer()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
         </button>
       </div>
       <div class="drawer-body">
@@ -315,15 +401,15 @@
 
         <div class="fields">
           <span class="f-label">Status</span>
-          <span class="f-value"><button class="f-pill"><span class="proj-dot" style="background:#C9B850;border-radius:50%"></span> W toku</button></span>
+          <span class="f-value"><button class="f-pill"><span class="proj-dot" style="background:var(--warning);border-radius:50%"></span> W toku</button></span>
           <span class="f-label">Priorytet</span>
-          <span class="f-value"><button class="f-pill"><svg class="prio p2" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M3 20h3v-6H3v6zm7.5 0h3V8h-3v12zM18 20h3V12h-3v8z"/></svg> Wysoki</button></span>
+          <span class="f-value"><button class="f-pill"><svg class="prio p2" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 20h3v-6H3v6zm7.5 0h3V8h-3v12zM18 20h3V12h-3v8z"/></svg> Wysoki</button></span>
           <span class="f-label">Termin</span>
           <span class="f-value"><button class="f-pill">dziś, 9 sie</button></span>
           <span class="f-label">Etykiety</span>
-          <span class="f-value"><button class="f-pill"><span class="dot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#5290BD"></span> design</button><button class="f-pill" style="color:var(--fg-secondary)">+ dodaj</button></span>
+          <span class="f-value"><button class="f-pill"><span class="dot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent)"></span> design</button><button class="f-pill" style="color:var(--fg-secondary)">+ dodaj</button></span>
           <span class="f-label">Przypisani</span>
-          <span class="f-value"><button class="f-pill"><span class="avatar" style="width:16px;height:16px;font-size:8px;background:#356D97">KR</span> Kreska</button><button class="f-pill" style="color:var(--fg-secondary)">+ przypisz</button></span>
+          <span class="f-value"><button class="f-pill"><span class="avatar" style="width:16px;height:16px;font-size:8px;background:var(--avatar-a)">KR</span> Kreska</button><button class="f-pill" style="color:var(--fg-secondary)">+ przypisz</button></span>
         </div>
 
         <div class="desc">
@@ -333,21 +419,21 @@
 
         <div class="section-label">Komentarze · 2</div>
         <div class="comment">
-          <span class="avatar" style="background:#6AA572">AS</span>
+          <span class="avatar" style="background:var(--avatar-b)">AS</span>
           <div class="body">
             <div class="meta"><span class="who">Ada Sowińska</span><span class="when">wczoraj 16:42</span></div>
             <div><span class="mention">@Kreska</span> pamiętaj o walidacji kontrastu dla tekstu drugorzędnego — osobno w każdej z 4 palet.</div>
           </div>
         </div>
         <div class="comment">
-          <span class="avatar" style="background:#356D97">KR</span>
+          <span class="avatar" style="background:var(--avatar-a)">KR</span>
           <div class="body">
             <div class="meta"><span class="who">Kreska</span><span class="when">dziś 09:15</span></div>
-            <div>Jest w briefie — tokeny przeniesione 1:1 z bloga (ADR-039/ADR-041), kontrasty do weryfikacji per paleta. ✔</div>
+            <div>Jest w briefie — tokeny przeniesione 1:1 z bloga (ADR-039/ADR-041), kontrasty zweryfikowane per paleta. ✔</div>
           </div>
         </div>
         <div class="composer">
-          <span class="avatar" style="background:#356D97">KR</span>
+          <span class="avatar" style="background:var(--avatar-a)">KR</span>
           <div class="box">Napisz komentarz… (@ aby wspomnieć)</div>
         </div>
       </div>
@@ -355,8 +441,42 @@
   </div>
 </div>
 
+<!-- Menu kontekstowe „⋯" (wspólne; pozycjonowane przy przycisku, który je otworzył) -->
+<div class="menu" id="ctx-menu" role="menu" aria-label="Akcje taska">
+  <button class="menu-item" role="menuitem" onclick="closeMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg> Oznacz jako zrobione</button>
+  <button class="menu-item" role="menuitem" onclick="closeMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg> Edytuj</button>
+  <button class="menu-item" role="menuitem" onclick="closeMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg> Przenieś do projektu…</button>
+  <button class="menu-item" role="menuitem" onclick="closeMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 20h3v-6H3v6zm7.5 0h3V8h-3v12zM18 20h3V12h-3v8z"/></svg> Priorytet <span class="hint">›</span></button>
+  <button class="menu-item" role="menuitem" onclick="closeMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg> Termin <span class="hint">›</span></button>
+  <button class="menu-item" role="menuitem" onclick="closeMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M20 12l-8 8-8-8 8-8z" transform="rotate(45 12 12)"/></svg> Etykiety <span class="hint">›</span></button>
+  <button class="menu-item" role="menuitem" onclick="closeMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.6 3.1-6.5 7-6.5s7 2.9 7 6.5"/></svg> Przypisz <span class="hint">›</span></button>
+  <button class="menu-item" role="menuitem" onclick="closeMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg> Duplikuj</button>
+  <div class="menu-sep" role="separator"></div>
+  <button class="menu-item danger" role="menuitem" onclick="openConfirm()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> Usuń</button>
+</div>
+
+<!-- Modal potwierdzenia (native dialog: focus trap, Esc, powrót fokusa — za darmo) -->
+<dialog class="modal" id="confirm-dialog" aria-labelledby="confirm-title">
+  <div class="modal-body">
+    <div class="modal-title" id="confirm-title">Usunąć task?</div>
+    <p class="modal-text"><strong>„Przygotować design system — tokeny kolorów i typografia"</strong>
+    zostanie usunięty wraz z 2 komentarzami. Możesz cofnąć tę operację przez 30 sekund.</p>
+  </div>
+  <div class="modal-actions">
+    <button class="btn-secondary" onclick="document.getElementById('confirm-dialog').close()">Anuluj</button>
+    <button class="btn-danger" onclick="confirmDelete()">Usuń</button>
+  </div>
+</dialog>
+
+<!-- Toast z undo (aria-live przez role=status; nie kradnie fokusa) -->
+<div class="toast" id="toast" role="status">
+  <span id="toast-msg"></span>
+  <button class="undo" onclick="hideToast()">Cofnij</button>
+  <button class="icon-btn" aria-label="Zamknij powiadomienie" onclick="hideToast()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+</div>
+
 <script>
-  // Mockup-only: klasa na <html> steruje wszystkimi tokenami (jak next-themes na blogu).
+  // Mockup-only JS: interakcje demo. Docelowo React + TanStack Query + optimistic UI.
   let mode='dark', palette='cool';
   function setTheme(m,p){
     if(m) mode=m;
@@ -364,6 +484,91 @@
     document.documentElement.className = mode+'-'+palette;
     for(const [id,on] of [['btn-dark',mode==='dark'],['btn-light',mode==='light'],['btn-cool',palette==='cool'],['btn-warm',palette==='warm']])
       document.getElementById(id).setAttribute('aria-pressed',String(on));
+  }
+  function toggleSidebar(){
+    const app=document.getElementById('app'), btn=document.getElementById('btn-collapse');
+    const collapsed=app.classList.toggle('collapsed');
+    btn.setAttribute('aria-expanded',String(!collapsed));
+    btn.setAttribute('aria-label',collapsed?'Rozwiń sidebar':'Zwiń sidebar');
+  }
+
+  /* Drawer: niemodalny panel — Esc zamyka, fokus wraca do wywołującego;
+     bez focus trapa (lista pozostaje interaktywna; trap dotyczy modali). */
+  let drawerOpener=null;
+  function openDrawer(opener){
+    drawerOpener=opener||null;
+    document.getElementById('main').classList.remove('drawer-closed');
+  }
+  function closeDrawer(){
+    document.getElementById('main').classList.add('drawer-closed');
+    if(drawerOpener){ drawerOpener.focus(); drawerOpener=null; }
+  }
+  function drawerIsOpen(){ return !document.getElementById('main').classList.contains('drawer-closed'); }
+
+  const menu=document.getElementById('ctx-menu');
+  let menuAnchor=null;
+  function toggleMenu(e){
+    e.stopPropagation();
+    if(menu.classList.contains('open') && menuAnchor===e.currentTarget){ closeMenu(); return; }
+    if(menuAnchor) menuAnchor.setAttribute('aria-expanded','false');
+    menuAnchor=e.currentTarget;
+    menuAnchor.setAttribute('aria-expanded','true');
+    // Najpierw pokazać, potem mierzyć — offsetHeight elementu display:none = 0.
+    menu.classList.add('open');
+    const r=menuAnchor.getBoundingClientRect();
+    menu.style.top=Math.min(r.bottom+4,window.innerHeight-menu.offsetHeight-8)+'px';
+    menu.style.left=Math.min(r.left,window.innerWidth-menu.offsetWidth-16)+'px';
+    menu.querySelector('.menu-item').focus();
+  }
+  function closeMenu(){
+    menu.classList.remove('open');
+    if(menuAnchor){ menuAnchor.setAttribute('aria-expanded','false'); menuAnchor.focus(); menuAnchor=null; }
+  }
+  document.addEventListener('click',ev=>{ if(menu.classList.contains('open') && !menu.contains(ev.target)) closeMenu(); });
+
+  // Strzałki w menu (role=menu obiecuje nawigację strzałkami), Esc: menu → drawer.
+  document.addEventListener('keydown',ev=>{
+    const dialogOpen=document.getElementById('confirm-dialog').open;
+    if(menu.classList.contains('open')){
+      const items=[...menu.querySelectorAll('.menu-item')];
+      const i=items.indexOf(document.activeElement);
+      if(ev.key==='ArrowDown'){ ev.preventDefault(); items[(i+1)%items.length].focus(); }
+      else if(ev.key==='ArrowUp'){ ev.preventDefault(); items[i<0?items.length-1:(i-1+items.length)%items.length].focus(); }
+      else if(ev.key==='Home'){ ev.preventDefault(); items[0].focus(); }
+      else if(ev.key==='End'){ ev.preventDefault(); items[items.length-1].focus(); }
+      else if(ev.key==='Escape'){ closeMenu(); }
+      else if(ev.key==='Tab'){ closeMenu(); }
+      return;
+    }
+    // Esc w polu tekstowym = porzucenie wpisywania, nie zamknięcie draweru.
+    const inField=/^(INPUT|TEXTAREA)$/.test(ev.target.tagName);
+    if(ev.key==='Escape' && !dialogOpen && !inField && drawerIsOpen()) closeDrawer();
+  });
+
+  function openConfirm(){
+    closeMenu();
+    document.getElementById('confirm-dialog').showModal();
+  }
+  let toastTimer=null;
+  function confirmDelete(){
+    document.getElementById('confirm-dialog').close();
+    const t=document.getElementById('toast');
+    // Treść WSTRZYKIWANA do trwałego live regionu po pokazaniu — toggle display
+    // z gotowym tekstem bywa nieodczytywany przez czytniki ekranu.
+    document.getElementById('toast-msg').textContent='';
+    t.classList.add('open');
+    setTimeout(()=>{document.getElementById('toast-msg').textContent='Task usunięty.';},30);
+    clearTimeout(toastTimer);
+    // Toast z Cofnij żyje przez całe okno undo (30 s — Konstytucja VII);
+    // limit 3–5 s dotyczy toastów czysto informacyjnych.
+    toastTimer=setTimeout(hideToast,30000);
+  }
+  function hideToast(){
+    clearTimeout(toastTimer);
+    const t=document.getElementById('toast');
+    // Fokus nie może zostać na elemencie display:none — wraca do listy.
+    if(t.contains(document.activeElement)) document.querySelector('button.row-title')?.focus();
+    t.classList.remove('open');
   }
 </script>
 </body>
