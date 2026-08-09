@@ -22,6 +22,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The parallelism cap MUST reach the output dir or xUnit silently runs at full CPU width
+         and the CI runner OOMs (see xunit.runner.json for the rationale). -->
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\TaskFlow.Api\TaskFlow.Api.csproj" />
     <ProjectReference Include="..\..\src\TaskFlow.Application\TaskFlow.Application.csproj" />
     <ProjectReference Include="..\..\src\TaskFlow.Infrastructure\TaskFlow.Infrastructure.csproj" />

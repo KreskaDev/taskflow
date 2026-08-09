@@ -1,0 +1,7 @@
+{
+  "$schema": "https://xunit.net/schema/current/xunit.runner.schema.json",
+  "//": "Each [Fact] in this assembly boots a throwaway Postgres container + a full WebApplicationFactory host (IAsyncLifetime per test instance). At xUnit's default parallelism (maxParallelThreads = CPU count) a 4-core CI runner runs 4+ such stacks concurrently, which exhausts the GitHub runner's 7 GB and kills the test host (MSB4166 'child node exited prematurely'). Capping collection parallelism at 2 keeps peak memory bounded while still overlapping container boots.",
+  "parallelizeTestCollections": true,
+  "maxParallelThreads": 2,
+  "longRunningTestSeconds": 120
+}

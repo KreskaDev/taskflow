@@ -38,8 +38,15 @@ jobs:
       - run: dotnet restore apps/api/TaskFlow.sln
       # Analyzers-as-errors enforced via Directory.Build.props (Constitution VI).
       - run: dotnet build apps/api/TaskFlow.sln -c Release --no-restore
-      # Testcontainers uses the Docker daemon available on GitHub runners.
-      - run: dotnet test apps/api/TaskFlow.sln -c Release --no-build
+      # Testcontainers uses the Docker daemon available on GitHub runners. The two test projects run
+      # as SEPARATE sequential steps (not `dotnet test` on the solution): the solution form runs both
+      # assemblies in parallel MSBuild nodes, and the integration assembly alone boots a Postgres
+      # container + a full API host per test — concurrent with the unit run this exhausted the 7 GB
+      # runner and killed the test host (MSB4166 "child node exited prematurely"). The integration
+      # assembly's xunit.runner.json additionally caps collection parallelism at 2 for the same reason.
+      - run: dotnet test apps/api/tests/TaskFlow.UnitTests -c Release --no-build
+      - run: dotnet test apps/api/tests/TaskFlow.IntegrationTests -c Release --no-build
+        timeout-minutes: 45
 
   openapi-sync:
     name: openapi client in sync
