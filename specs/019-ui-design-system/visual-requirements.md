@@ -163,8 +163,36 @@ Konsekwencje (potwierdzone):
 **I2. Logo:** → „TaskFlow" tekstem wystarczy *(default — do akceptacji)*
 **I3. Coś jeszcze:** → —
 
+## J. Werdykt po przeglądzie mockupu (2026-08-09)
+
+**J1. Ocena użytkownika:** mockup `mockup-inbox.html` **spełnia oczekiwania i wyznacza
+kierunek** („dobry kierunek"), ale pokrywa tylko wycinek zakresu. Mockup pozostaje próbką
+kierunku wizualnego — dalsze braki adresuje SPECYFIKACJA, nie kolejne iteracje mockupu
+← **decyzja użytkownika**.
+
+**J2. Braki do zaadresowania w `/speckit-specify`** (wszystkie zaznaczone przez użytkownika):
+
+1. **Więcej ekranów** — widok projektu, Today/Upcoming, Assigned, panel Sign-in i Settings
+   w nowym design systemie (kolejność z H1; board = slice 010, buduje się już na tokenach).
+2. **Więcej komponentów** — katalog klocków design systemu: formularze, pickery (data,
+   assignee, label), search, chipy, tabele/listy wariantowe, empty states.
+3. **Więcej stanów i interakcji** — loading/skeleton (tylko genuine network-bound,
+   konstytucja IV), stany błędów, offline/reconnect (konstytucja V), długie treści
+   i overflow, drag&drop, wąskie okno (E3).
+4. **Pełny drawer szczegółów** — komentarze/wzmianki (slice 009), aktywność, edycja
+   wszystkich pól inline; drawer z E2/F2 jako pełnoprawna powierzchnia robocza.
+5. **Inwentaryzacja feature'ów w formie testowalnej** ← **wymaganie użytkownika (kluczowe)**:
+   spec MUSI wylistować KAŻDY istniejący feature aplikacji w formie pozwalającej napisać
+   test UI (dany ekran → zachowanie → oczekiwany efekt), tak by kolejne prace (019 i późniejsze
+   slice'y) nie mogły niezauważenie usunąć istniejących funkcji. `ui-test-plan.md`
+   (UIT-001…UIT-112) jest zalążkiem ograniczonym do mockupu Inbox — inwentaryzacja ma objąć
+   całą istniejącą powierzchnię aplikacji (slice'y 001–009) i stać się siatką regresji
+   utrzymywaną przy każdym kolejnym slice.
+
 ---
 
 **Co się stanie z odpowiedziami:** (1) poprawka konstytucji (`/speckit-constitution` — Zasada I),
 (2) dopisek US/FR do product-vision (jedyny alokator ID), (3) `/speckit-specify` → plan → tasks →
 implementacja tego slice'a PRZED 010, żeby board budował się już na nowym design systemie.
+Wejścia do `/speckit-specify`: ten plik (§A–§J) + `design-brief.md` + `ui-test-plan.md` +
+`mockup-inbox.html`.
