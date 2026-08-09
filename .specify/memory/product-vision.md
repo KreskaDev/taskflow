@@ -13,7 +13,7 @@ TaskFlow MVP — core task management application combining Todoist simplicity w
 
 ---
 
-## 2. User Stories (US-01..US-17 + acceptance scenarios)
+## 2. User Stories (US-01..US-18 + acceptance scenarios)
 
 ### US-01 — Daily Task Capture (Priority: P1)
 
@@ -156,6 +156,14 @@ User can export all their data in JSON (lossless) and CSV (human-readable) forma
 ---
 
 ### US-08 — Keyboard Navigation & Shortcuts Across All Views (Priority: P1)
+
+> **[RETIRED per constitution v5.0.0 (2026-08-09) — see US-18.]** The custom shortcut system
+> (single-key commands, chords, shortcuts overlay) is no longer a product requirement of this
+> iteration; it may return later as an opt-in accelerator slice layered on top of complete UI
+> operability, and must never be the only path to an action. Standard keyboard OPERABILITY
+> (Tab/Enter/Esc/arrows within widgets, focus management) is NOT retired — it lives in the
+> accessibility block (FR-042..047, FR-101). Scenarios below are retained verbatim for the
+> future accelerator slice.
 
 User navigates the entire application using keyboard shortcuts. Global shortcuts work from any view, navigation shortcuts switch between views, and contextual shortcuts operate on the currently selected item.
 
@@ -334,7 +342,41 @@ A signed-in user can export the data they own/can access, and can delete their a
 
 ---
 
-## 3. Functional Requirements (FR-001..FR-101)
+### US-18 — UI-First Operability & Visual Design System (Priority: P1)
+
+The application looks professional (a dark, dense, Linear-inspired visual system) and every
+operation is discoverable and performable through visible UI controls alone — buttons, menus,
+inline inputs, and panels. A first-time user needs no knowledge of keyboard shortcuts.
+
+**Why this priority**: constitution v5.0.0 Principle I (UI-First Operability). The shipped slices
+built a functional baseline operable mainly through memorized shortcuts; this story makes the UI
+self-sufficient and establishes the design system every later surface (board, palette,
+notifications, theming) builds on. Decision record: `specs/019-ui-design-system/visual-requirements.md`.
+
+**Independent Test**: With shortcuts removed, a first-time user performs the complete daily
+workflow (create a task, edit it, set priority/date/labels, move it to a project, complete it,
+comment on a shared task) using only visible controls; a visual audit confirms the design tokens
+(dark theme, accent, typography, iconography) applied on every main view.
+
+**Acceptance Scenarios**:
+
+1. **Given** any view where tasks can exist, **When** the user looks at it, **Then** a visible "add task" affordance is present (global "+ New task" in the app bar AND an inline add within the list) and creates a task in that context.
+2. **Given** a task row, **When** the user points at or focuses it, **Then** quick actions (complete, edit, overflow "⋯") are visible, and the "⋯" menu exposes every operation available on that task (edit, priority, due date, labels, move, assign, comments, delete) — with keyboard-focus equivalents (FR-046).
+3. **Given** a task, **When** the user opens it, **Then** a right-side detail panel (drawer) presents all fields for direct editing plus the comment thread (shared projects).
+4. **Given** the sidebar, **When** the user reads it, **Then** all primary views (Inbox, Today, Upcoming, Assigned, projects) are clickable entries with icons and item counts, and the sidebar is collapsible.
+5. **Given** any empty list, **When** it renders, **Then** it shows a short hint plus the relevant action button (no onboarding wizards — Principle IV).
+6. **Given** any main view, **When** rendered, **Then** the design system applies: dark theme with the indigo accent, consistent typography/spacing tokens, a coherent icon set in the app chrome (emoji only as optional user-chosen project icons), and user avatars (Google photo with initials fallback) — all meeting FR-044 contrast.
+
+---
+
+## 3. Functional Requirements (FR-001..FR-111)
+
+> **UI-first reinterpretation clause (constitution v5.0.0)**: wherever an FR or acceptance
+> scenario in this document names a keyboard shortcut as the TRIGGER of an operation, the
+> shortcut trigger is deferred (future accelerator slice; OOS-20) and the operation MUST instead
+> be reachable through a visible UI control per FR-103. The operation's BEHAVIOR (what it does)
+> is unchanged. Standard editing keys (Enter/Esc/Ctrl+Enter in inputs, arrows within composite
+> widgets) are operability, not shortcuts, and remain in scope.
 
 ### Task Management
 - **FR-001**: System MUST allow creating a task with a mandatory title field.
@@ -347,7 +389,7 @@ A signed-in user can export the data they own/can access, and can delete their a
 - **FR-008**: When a recurring task instance is marked as done (on or after its due date), the system MUST automatically generate the next instance with the appropriate due date according to the recurrence rule. The new instance MUST carry forward all fields from the completed instance (title, description, priority, labels, project, assignees) AND the recurrence rule and its anchor, so the chain continues across successive instances (a second successor MUST be generable from the first), except: status (reset to backlog), timestamps (new created_at, no completed_at), and cycle assignment (new instance is unassigned to any cycle — the user assigns it manually). The new instance keeps the same assignees, but carried-forward assignees MUST be re-validated against current project membership (with no re-notification).
 - **FR-009**: When a recurring task instance is marked as done before its due date, the system MUST NOT generate the next instance immediately. The next instance MUST be generated by a server-side scheduled job (Wolverine) that runs on or after the original due date — not by client startup. The job MUST be idempotent (at most one successor per completed instance), and undoing the completion MUST remove the spawned successor.
 - **FR-010**: When a recurring task is cancelled, the system MUST stop generating further instances.
-- **FR-102**: System MUST allow the user to manually reorder tasks within a list via a persisted `position`. The default order seeds to newest-first (consistent with the Inbox default in FR-021); thereafter the user may reorder freely, and the manual `position` is the persisted order. (Keyboard reorder binding; per Principle I.)
+- **FR-102**: System MUST allow the user to manually reorder tasks within a list via a persisted `position`. The default order seeds to newest-first (consistent with the Inbox default in FR-021); thereafter the user may reorder freely, and the manual `position` is the persisted order. (Reorder affordance is a visible UI control — drag handle and/or move actions in the row menu — per FR-103; the keyboard reorder binding is deferred with the shortcut system, OOS-20.)
 
 ### Project Management
 - **FR-011**: System MUST allow creating projects with a name, color (from preset), and icon (from preset).
@@ -372,16 +414,33 @@ A signed-in user can export the data they own/can access, and can delete their a
 - **FR-026**: The Cycle view MUST display: percentage of tasks completed, days remaining, and breakdown by status.
 
 ### Keyboard Interactions
-- **FR-027**: System MUST support all specified global shortcuts: `C` (create task), `Ctrl+K` (command palette), `/` (search), `?` (shortcuts help).
-- **FR-028**: System MUST support all specified navigation shortcuts: `G I` (Inbox), `G T` (Today), `G U` (Upcoming), `G P` (Projects), `G C` (Current cycle).
-- **FR-029**: System MUST support all specified list shortcuts: arrows (move), `E` (edit), `Space` (toggle done), `1-4` (priority), `T` (date), `L` (label), `M` (move to project), `#` (move to cycle), `Del` (delete).
+
+> **[FR-027..FR-029, FR-031 DEFERRED per constitution v5.0.0 — see US-18/OOS-20.]** The custom
+> shortcut system ships, if at all, as a future accelerator slice; slice 019 removes the existing
+> single-key bindings. FR-030 remains in scope (standard editing keys, operability). FR-031's
+> suppression rule is dormant while no single-key shortcuts exist and re-activates with them.
+
+- **FR-027**: [DEFERRED] System MUST support all specified global shortcuts: `C` (create task), `Ctrl+K` (command palette), `/` (search), `?` (shortcuts help).
+- **FR-028**: [DEFERRED] System MUST support all specified navigation shortcuts: `G I` (Inbox), `G T` (Today), `G U` (Upcoming), `G P` (Projects), `G C` (Current cycle).
+- **FR-029**: [DEFERRED] System MUST support all specified list shortcuts: arrows (move), `E` (edit), `Space` (toggle done), `1-4` (priority), `T` (date), `L` (label), `M` (move to project), `#` (move to cycle), `Del` (delete).
 - **FR-030**: System MUST support task editor shortcuts: `Ctrl+Enter` (save), `Esc` (cancel).
-- **FR-031**: Single-key shortcuts MUST be suppressed when a text input is focused; only modifier-based shortcuts remain active during text input.
+- **FR-031**: [DORMANT while FR-027..029 are deferred] Single-key shortcuts MUST be suppressed when a text input is focused; only modifier-based shortcuts remain active during text input.
 
 ### Command Palette
 - **FR-032**: The command palette MUST provide fuzzy search across tasks (title and description), projects, labels, and actions.
-- **FR-033**: Each action in the command palette MUST display its assigned keyboard shortcut.
+- **FR-033**: [DEFERRED with the shortcut system — see US-18/OOS-20] Each action in the command palette MUST display its assigned keyboard shortcut.
 - **FR-034**: Selecting a result in the command palette MUST navigate to the item or execute the action.
+
+### UI-First Operability & Design System (US-18; constitution v5.0.0 Principle I)
+- **FR-103**: Every operation the product offers MUST have a visible affordance on the surface where it applies — directly, or via an explicit overflow/context menu ("⋯") on the item it targets. No functionality may exist only behind a keyboard shortcut.
+- **FR-104**: The UI MUST be built on a single set of design tokens (color, typography, spacing, radii, elevation) applied consistently across all views. The default theme is DARK with an indigo accent, Linear-inspired density (13px base list typography), and every token combination MUST satisfy FR-044 contrast. (Light theme arrives with the theming story — ASM-07/OOS-10 unchanged.)
+- **FR-105**: Application chrome (navigation, actions, statuses) MUST use a single coherent icon set; emoji MUST NOT serve as system iconography (they remain permitted solely as user-chosen project icons). Users MUST be represented by avatars — Google photo with an initials fallback — wherever authorship, assignment, or mention identity is shown.
+- **FR-106**: Task details (all editable fields plus, for shared-project tasks, the comment thread) MUST open in a right-side detail panel (drawer) without leaving the current view.
+- **FR-107**: A visible "add task" affordance MUST be present on every view where tasks can exist: a persistent global "+ New task" action in the app bar AND an inline add within each task list (Inbox, project, Today), creating the task in that view's context.
+- **FR-108**: Each task row MUST expose quick actions on hover/focus (complete, edit, overflow) and a "⋯" menu containing every operation available on that task; all row actions MUST have keyboard-focus-triggered equivalents (FR-046) and correct hit targets/stacking so pointer clicks always land (Principle I).
+- **FR-109**: The sidebar MUST present all primary views (Inbox, Today, Upcoming, Assigned, projects) as clickable entries with icons and item counts, and MUST be collapsible.
+- **FR-110**: Every empty list state MUST present a short explanatory hint plus the relevant action button; onboarding wizards and first-run modal tours remain prohibited (Principle IV).
+- **FR-111**: The existing single-key shortcut system (global/list/navigation bindings and the shortcuts help overlay) MUST be removed from the application as part of realizing US-18; standard editing keys (FR-030) and WCAG operability (FR-042..047, FR-101) MUST remain intact.
 
 ### Data Management
 - **FR-035**: System MUST support full data export in JSON format (lossless, all entities and fields), scoped to the data the caller owns or can access (not other users' private data).
@@ -499,9 +558,9 @@ A signed-in user can export the data they own/can access, and can delete their a
 
 ---
 
-## 5. Success Criteria (SC-001..SC-017)
+## 5. Success Criteria (SC-001..SC-018)
 
-- **SC-001**: User can perform a complete daily workflow (capture task, review today's tasks, reprioritize, reschedule, mark done) without using the mouse at any point.
+- **SC-001**: [RETIRED per constitution v5.0.0 — superseded by SC-018; returns with the future accelerator slice] User can perform a complete daily workflow (capture task, review today's tasks, reprioritize, reschedule, mark done) without using the mouse at any point.
 - **SC-002**: Application reaches first contentful paint in under 1 second and time-to-interactive in under 2.5 seconds on a broadband connection from a warm backend.
 - **SC-003**: Every user action on a task (create, edit, complete, delete, move, reprioritize) paints its optimistic result within 16ms of the triggering keypress; the server reconciles or rolls back asynchronously.
 - **SC-004**: Application depends on no third-party runtime data services — only its own API and PostgreSQL database; there are no external SaaS data dependencies at runtime.
@@ -518,6 +577,7 @@ A signed-in user can export the data they own/can access, and can delete their a
 - **SC-015**: The system serves ~10 concurrent users performing typical operations without perceptible degradation.
 - **SC-016**: Authorization coverage is mechanically verifiable: every data handler ships with both an allow and a deny test, and a role×operation deny matrix demonstrates that insufficient ownership/membership/role is rejected.
 - **SC-017**: Deleting an account removes or anonymizes all of the user's personal data per the FR-085 cascade (no residual personally attributable data beyond the defined tombstone identity).
+- **SC-018**: A first-time user, given no instruction, completes the full daily workflow (create a task, edit it, set priority/date/labels, move it to a project, complete it, and comment on a shared task) using only visible UI controls — verified end-to-end with the shortcut system absent.
 
 ---
 
@@ -554,7 +614,7 @@ A signed-in user can export the data they own/can access, and can delete their a
 
 ---
 
-## 8. Out of Scope (OOS-01..OOS-19)
+## 8. Out of Scope (OOS-01..OOS-20)
 
 The following are explicitly excluded from this MVP iteration:
 
@@ -577,29 +637,31 @@ The following are explicitly excluded from this MVP iteration:
 - **OOS-17**: Organizations / multi-tenancy beyond the single team, and non-Google SSO / additional identity providers
 - **OOS-18**: Pending / pre-account invitations (invites are by email resolved against existing signed-in Users only)
 - **OOS-19**: Per-user timezones (the instance uses a single reference timezone, ASM-12)
+- **OOS-20**: The custom keyboard shortcut system — single-key commands, chords, and the shortcuts help overlay (US-08, FR-027..029/031/033, SC-001) — deferred per constitution v5.0.0 to a future opt-in accelerator slice layered on top of complete UI operability (US-18). Standard editing keys and WCAG keyboard operability are NOT out of scope.
 
 ---
 
 ## 9. Slicing Strategy
 
-The MVP is delivered through 18 sequential vertical slices, each independently shippable. See `specs/001-accounts-and-auth` through `specs/018-appearance-theming`. Slicing rationale follows constitution Principles I (Keyboard-First), III (Instant Response), and VIII (Test-First) — small slices keep feedback loops tight and constitution-compliance verifiable per increment.
+The MVP is delivered through 19 sequential vertical slices, each independently shippable. See `specs/001-accounts-and-auth` through `specs/019-ui-design-system` (folder numbers are cosmetic; slice 019 executes between 009 and 010 so the board and every later surface build on the design system). Slicing rationale follows constitution Principles I (UI-First Operability), III (Instant Response), and VIII (Test-First) — small slices keep feedback loops tight and constitution-compliance verifiable per increment.
 
-Cross-cutting requirements are realized (not merely referenced) in every slice to which their scope applies: UI accessibility (FR-031, FR-042–FR-047, FR-101) in every slice that renders UI, resilience (FR-049, FR-050, FR-051) in every slice that modifies data, and access control (FR-065–FR-068) on every read/write. The full out-of-scope boundary (OOS-01–OOS-19) is confirmed in every slice.
+Cross-cutting requirements are realized (not merely referenced) in every slice to which their scope applies: UI accessibility (FR-042–FR-047, FR-101) in every slice that renders UI, UI-first operability (FR-103) in every slice that adds an operation, resilience (FR-049, FR-050, FR-051) in every slice that modifies data, and access control (FR-065–FR-068) on every read/write. The full out-of-scope boundary (OOS-01–OOS-20) is confirmed in every slice.
 
 High-level mapping (slice → coverage):
 - 001 accounts-and-auth
 - 002 task-capture — keyboard capture, single task list, core navigation/done/inline-rename/delete, server-side persistence, accessibility & resilience foundation
 - 003 natural-language-dates — Polish natural-language due-date parsing and parser-failure UX
 - 004 project-management — projects with one-level nesting, archive, Inbox definition, move-to-project
-- 005 daily-planning — Today & Upcoming views, priorities, full task editor, the mouse-free daily loop
+- 005 daily-planning — Today & Upcoming views, priorities, full task editor, the daily triage loop
 - 006 labels — reusable many-to-many labels and the label selector
 - 007 project-sharing-membership
 - 008 task-assignment
 - 009 comments-mentions
+- 019 ui-design-system — US-18: the dark Linear-inspired design system + full UI operability (FR-103..111), shortcut-system removal (executes BEFORE 010)
 - 010 project-board-kanban — project Kanban board with status columns, groupable project list
 - 011 cycles — 2-week cycles, assignment, metrics, rollover, deletion guards
 - 012 recurring-tasks — recurrence rules and next-instance generation
-- 013 command-palette-search — Ctrl+K fuzzy search across tasks/projects/labels/actions, view filter
+- 013 command-palette-search — fuzzy search across tasks/projects/labels/actions, view filter
 - 014 undo — 30-second undo window for all destructive actions
 - 015 data-export-import — JSON/CSV export, TaskFlow/Todoist import with mapping preview
 - 016 real-time-collaboration
