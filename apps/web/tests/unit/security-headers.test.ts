@@ -54,4 +54,17 @@ describe("BFF security headers (next.config)", () => {
     const csp = await cspFor("development");
     expect(csp).toContain("'unsafe-eval'");
   });
+
+  it("the /:path* header group covers the slice-009 comment surface (defense-in-depth behind safeMarkdown)", async () => {
+    // Slice 009 (FR-099, R8): comments are the first free-form user-content surface. The render-boundary
+    // sanitizer (safeMarkdown) is the primary control; THIS CSP is the reused defense-in-depth layer
+    // behind it. The `/:path*` source is a catch-all, so the task-detail routes (where the thread renders)
+    // are covered by construction — this pins that the group stays a catch-all and keeps its CSP.
+    const groups = await nextConfig.headers!();
+    const group = groups.find((g) => g.source === "/:path*");
+    expect(group, "the catch-all /:path* header group must survive (it covers the comment surface)").toBeDefined();
+    const headerMap = new Map(group!.headers.map((h) => [h.key, h.value]));
+    expect(headerMap.get("Content-Security-Policy")).toBeDefined();
+    expect(headerMap.get("X-Content-Type-Options")).toBe("nosniff");
+  });
 });

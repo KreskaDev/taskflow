@@ -158,6 +158,8 @@ export function apiAs(taskFlowUserId: string): {
   archiveProject: (projectId: string, version: number, childDisposition?: "cascade" | "orphan_to_top") => Promise<void>;
   shareProject: (projectId: string, version: number) => Promise<{ version: number }>;
   inviteMember: (projectId: string, email: string, role: "editor" | "viewer", version: number) => Promise<{ userId: string }>;
+  /** Raw authed request — for specs asserting DENY status codes (403/404/422) on the real API (slice 009). */
+  request: (method: string, path: string, body?: unknown) => Promise<Response>;
 } {
   const base = process.env.API_INTERNAL_URL as string;
 
@@ -223,7 +225,28 @@ export function apiAs(taskFlowUserId: string): {
       if (!res.ok) throw new Error(`inviteMember failed (${String(res.status)}): ${await res.text()}`);
       return (await res.json()) as { userId: string };
     },
+    request(method, path, body) {
+      return authedFetch(path, body === undefined ? { method } : { method, body });
+    },
   };
+}
+
+/**
+ * Removes a membership row directly (slice 009 former-member deny cases — FR-066: membership loss revokes
+ * ALL, structurally beating the author grant). The DB-direct analogue of {@link insertSession}: the specs
+ * assert the SERVER-side deny (404) that follows, not the remove-member UI (slice 007 covers that).
+ */
+export async function deleteMembershipRow(projectId: string, userId: string): Promise<void> {
+  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  await client.connect();
+  try {
+    await client.query(`DELETE FROM project_memberships WHERE project_id = $1 AND user_id = $2`, [
+      projectId,
+      userId,
+    ]);
+  } finally {
+    await client.end();
+  }
 }
 
 /** Reads a session row's invalidation flag (used to assert server-side sign-out). */

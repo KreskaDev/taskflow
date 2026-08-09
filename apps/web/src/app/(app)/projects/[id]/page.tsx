@@ -3,6 +3,7 @@
 import { use, useState } from "react";
 
 import { ProjectSelector } from "@/components/projects/ProjectSelector";
+import { TaskDetailPanel } from "@/components/tasks/TaskDetailPanel";
 import { useProjects } from "@/hooks/useProjects";
 import { useProjectTasks } from "@/hooks/useProjectTasks";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
@@ -25,8 +26,13 @@ export default function ProjectView({ params }: { params: Promise<{ id: string }
   const { data: tasks, isPending } = useProjectTasks(id);
   const { moveTaskToProject } = useTaskMutations();
   const [movingId, setMovingId] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const rows = tasks ?? [];
+  const detailTask = rows.find((t) => t.id === detailId);
+  // Comments exist ONLY on shared-project tasks (slice 009, FR-072) — a personal project shows no
+  // comment affordance at all (the server would 404 the thread anyway).
+  const isShared = project?.visibility === "shared";
 
   return (
     <section aria-labelledby="project-heading" className="tf-workspace">
@@ -51,6 +57,18 @@ export default function ProjectView({ params }: { params: Promise<{ id: string }
               >
                 Move to another project
               </button>
+              {isShared ? (
+                // The slice-009 thread affordance: opens the task detail panel hosting the comment
+                // thread + composer (lazy fetch — the thread loads only when the panel opens, R14).
+                <button
+                  type="button"
+                  className="tf-task-row__project"
+                  aria-label={`Komentarze: ${task.title}`}
+                  onClick={() => setDetailId(task.id)}
+                >
+                  Komentarze
+                </button>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -65,6 +83,17 @@ export default function ProjectView({ params }: { params: Promise<{ id: string }
           if (movingId !== null) moveTaskToProject(movingId, projectId, id);
         }}
       />
+
+      {isShared && detailTask ? (
+        <TaskDetailPanel
+          open
+          onClose={() => setDetailId(null)}
+          taskId={detailTask.id}
+          taskTitle={detailTask.title}
+          projectId={id}
+          role={project?.role ?? null}
+        />
+      ) : null}
     </section>
   );
 }

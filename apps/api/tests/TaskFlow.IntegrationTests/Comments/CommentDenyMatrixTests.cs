@@ -140,6 +140,16 @@ public sealed class CommentDenyMatrixTests : CommentsTestBase
         }
 
         (await LoadCommentRowAsync(authored.Id))!.DeletedAt.Should().BeNull("no denied cell deleted the row");
+
+        // Re-add restores access (quickstart §E): membership is resolved LIVE per request, so re-inviting
+        // the author immediately re-enables the author grant — the comment row survived the removal.
+        await SeedMembershipAsync(s.Project.Id, s.Editor, TaskFlow.Domain.TaskManagement.MembershipRoles.Editor);
+        using (var r = await SendAsync(HttpMethod.Patch, CommentPath(authored.Id), TokenFor(s.Editor),
+            new { body = "Wróciłem", mentionedUserIds = NoMentions }))
+        {
+            r.StatusCode.Should().Be(HttpStatusCode.OK,
+                "current membership is what authorizes — re-adding the author restores edit access");
+        }
     }
 
     [Fact]
