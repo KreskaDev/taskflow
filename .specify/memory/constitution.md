@@ -1,71 +1,82 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 3.0.0 -> 4.0.0
-  Bump rationale: MAJOR — admission control reverses the v3.0.0 "open
-    sign-up" rule (account creation is now gated to an allowlist / Google
-    Workspace hosted-domain). Bundled with this MAJOR change: three new
-    principles (X Time & Timezone, XI Privacy & Personal Data, XII Security
-    by Default) and material strengthening of II, III, VII, IX and the
-    Performance Standards, resolving the 2026-06-15 design review's
-    cross-cutting blockers.
+  Version change: 4.0.0 -> 5.0.0
+  Bump rationale: MAJOR — Principle I is REDEFINED from "Keyboard-First"
+    to "UI-First": every action MUST be reachable through visible UI
+    controls; the custom application shortcut system (single-key commands
+    C/E/M/L/T/1-4, chords, shortcut-discoverability requirements) is
+    REMOVED as a constitutional requirement and may return later as an
+    opt-in accelerator slice. WCAG keyboard operability (Principle II) is
+    explicitly unaffected. Decision recorded by the product owner in
+    specs/019-ui-design-system/visual-requirements.md (§G1, 2026-08-09).
 
   Modified principles:
-    - I. Keyboard-First                    — unchanged
-    - II. Accessibility (WCAG 2.1 AA)       — strengthened (ARIA-live for
-      server-initiated updates/toasts; dialog focus contract)
-    - III. Instant Response                 — strengthened (measurable
-      budgets; server-mutation budget is a MUST)
-    - IV. Minimalist UI                     — unchanged
-    - V. Connected, Server-Authoritative    — unchanged
-    - VI. Type Safety End-to-End            — unchanged (API/error contract
-      detail referenced via ADR-0009)
-    - VII. Data Integrity & Resilience      — strengthened (restore-tested +
-      offsite backups; deploy rollback; undo-under-LWW; blast radius)
-    - VIII. Test-First                      — unchanged
-    - IX. Authentication & Authorization    — strengthened + backward-
-      incompatible (dispatch authz; authorship grant; live-subscription
-      authz; session policy; ADMISSION GATE replaces open sign-up)
-
-  Added principles:
-    - X. Time & Timezone                    — NEW
-    - XI. Privacy & Personal Data           — NEW
-    - XII. Security by Default              — NEW
+    - I. Keyboard-First -> I. UI-First Operability — REDEFINED (backward
+      incompatible: keyboard-shortcut mandates dropped; visible-affordance
+      mandate added)
+    - II. Accessibility (WCAG 2.1 AA)       — clarified (shortcut-collision
+      rule made conditional on shortcuts existing; dialog contract wording
+      decoupled from the command palette; rationale rewritten for UI-first)
+    - III. Instant Response                 — clarified (optimistic-paint
+      budget anchored to any triggering input, not "the keypress")
+    - IV.–XII.                              — unchanged
 
   Modified sections:
-    - Architecture & Stack — message transport relaxed (Wolverine local
-      queues default; RabbitMQ when justified); SignalR hub proxied by
-      Caddy directly to api; ADR-0009 (API & error contract) referenced
-    - Performance Standards — measurable concurrency/fan-out/search budgets;
-      10k figures anchored to per-user authz-scoped working set
-    - Governance — authorization changes need a non-author reviewer; authz
-      allow+deny test gate in compliance review
+    - Performance Standards — search budget annotated as applying when the
+      command-palette/search feature ships (it remains a planned feature,
+      no longer a constitutionally mandated discoverability surface)
+    - Development Workflow — YAGNI core-promise wording updated
+      ("keyboard-driven" -> "UI-first")
 
   Templates requiring updates:
-    - .specify/templates/plan-template.md  — ⚠ pending: dynamic Constitution
-      Check re-derives at /plan time (new X/XI/XII + admission will surface)
+    - .specify/templates/plan-template.md  — ✅ no change (Constitution
+      Check re-derives dynamically at /plan time)
     - .specify/templates/spec-template.md  — ✅ no change (no constitution refs)
     - .specify/templates/tasks-template.md — ✅ no change (no constitution refs)
+    - README.md                            — ✅ updated ("keyboard-first" ->
+      "UI-first" in the tagline + governance summary)
+    - docs/HANDOFF.md, docs/handoff-prompt.md — ⚠ left as-is intentionally
+      (historical handoff snapshots, not living guidance)
 
-  Follow-up TODOs: none
+  Follow-up TODOs:
+    - product-vision.md must be amended next (slice-019 flow): US-08 and the
+      keyboard-shortcut FRs (incl. FR-031's role) need redistribution under
+      the UI-first model before /speckit-specify for 019 runs.
 -->
 
 # TaskFlow Constitution
 
 ## Core Principles
 
-### I. Keyboard-First
+### I. UI-First Operability
 
-Every interaction MUST be achievable entirely via keyboard.
-Mouse and trackpad support is permitted as a convenience but MUST
-never be required. Keyboard shortcuts MUST be:
+Every action MUST be reachable through visible, self-explanatory UI
+controls — buttons, menus, inline inputs, and panels. A user with no
+prior knowledge of the application MUST be able to discover and perform
+every operation by sight alone.
 
-- Discoverable (help overlay or command palette)
-- Consistent across all views
-- Composable (modifiers follow a predictable grammar)
+- Every operation the product offers MUST have a visible affordance on
+  the surface where it applies — directly, or via an explicit overflow /
+  context menu ("⋯") on the item it targets. No functionality may exist
+  ONLY behind a keyboard shortcut.
+- Pointer input (mouse/trackpad) is a first-class path: everything
+  clickable MUST actually be clickable (correct hit targets, stacking,
+  and pointer affordances such as cursor and hover/focus states).
+- Standard keyboard operability per WCAG — Tab/Shift+Tab order,
+  Enter/Space activation, Esc dismissal, arrow keys within lists and
+  menus, focus management — remains REQUIRED via Principle II. It is not
+  a "shortcut system"; it is operability.
+- A custom application shortcut system (single-key commands, chords, a
+  shortcuts help overlay) is NOT a requirement of this iteration. It MAY
+  return later as an opt-in accelerator layered ON TOP of complete UI
+  operability, and MUST NOT ever become the only path to an action.
 
-Rationale: the core promise is that the user never reaches for the
-mouse during daily task management.
+Rationale: the keyboard-first posture produced surfaces operable only by
+memorized shortcuts, which fails users who have not read the manual.
+Discoverability by sight is the baseline; accelerators are an
+optimization for returning users, never a substitute (product-owner
+decision, specs/019-ui-design-system/visual-requirements.md §G1).
 
 ### II. Accessibility (WCAG 2.1 AA)
 
@@ -76,7 +87,8 @@ Every interactive element MUST meet WCAG 2.1 AA compliance:
   VoiceOver, JAWS).
 - Text contrast ratio MUST be at least 4.5:1 (3:1 for large
   text).
-- Custom keyboard shortcuts MUST NOT collide with native
+- Any custom keyboard shortcut, if introduced (see Principle I — none are
+  required this iteration), MUST NOT collide with native
   assistive-technology bindings.
 - No content accessible only via hover — all tooltips and
   popovers MUST have a keyboard/focus-triggered equivalent.
@@ -88,15 +100,18 @@ Every interactive element MUST meet WCAG 2.1 AA compliance:
   (`aria-live`/`role=status`/`role=log`) WITHOUT stealing focus; polite by
   default (assertive only for genuinely urgent direct-to-user cases),
   coalesced/rate-limited so output stays usable under concurrent fan-out.
-- **Dialog focus contract**: confirmation and command-palette dialogs MUST
-  set initial focus into the dialog, trap focus, dismiss on Esc, and return
-  focus to the invoker on close.
+- **Dialog focus contract**: confirmation dialogs, pickers, and every
+  other modal surface MUST set initial focus into the dialog, trap focus,
+  dismiss on Esc, and return focus to the invoker on close.
 
-Rationale: Keyboard-First without accessibility means "shortcuts
-for power users." True keyboard-first means the app is usable by
-everyone who cannot or chooses not to use a mouse — including
-assistive-technology users. Real-time collaboration adds server-pushed
-DOM changes, which AT only perceives via status regions.
+Rationale: UI-first without accessibility means "buttons for mouse
+users." The app MUST be usable by everyone — including
+assistive-technology users operating entirely by keyboard. WCAG keyboard
+operability is unaffected by the removal of the custom shortcut system
+(Principle I): focus order, activation, dismissal, and composite-widget
+arrow navigation are operability, not shortcuts. Real-time collaboration
+adds server-pushed DOM changes, which AT only perceives via status
+regions.
 
 ### III. Instant Response
 
@@ -105,9 +120,9 @@ backend. This is achieved through optimistic UI, not by blocking on the
 server:
 
 - Optimistic feedback: a user action MUST paint its optimistic result
-  within one animation frame (under 16 ms) of the keypress, before the
-  server confirms. The client reconciles or rolls back when the server
-  responds.
+  within one animation frame (under 16 ms) of the triggering input (click
+  or keypress), before the server confirms. The client reconciles or
+  rolls back when the server responds.
 - Server budget: server-confirmed mutations MUST complete within a p95 of
   200 ms for single-entity writes against a representative dataset; failures
   MUST surface a clear, recoverable message (Principle VII).
@@ -451,7 +466,8 @@ API/error-contract ADRs (0004–0009). It is normative.
   that shape (overlapping shared-project membership), not a flat list.
 - **Rendering**: list views MUST maintain 60 fps while scrolling through
   10 000 items (client-side virtualization required).
-- **Search**: command-palette search MUST return results in under 50 ms
+- **Search**: search (command palette, when that feature ships) MUST
+  return results in under 50 ms
   over the access-scoped set, with authorization filtering INSIDE the
   budget; the caller's accessible-project set is resolved cheaply (cached
   per session). A separate budget covers the initial scoped load.
@@ -476,7 +492,7 @@ API/error-contract ADRs (0004–0009). It is normative.
 - **Release cadence**: ship when ready; no fixed schedule. Each
   release MUST include a changelog entry.
 - **YAGNI discipline**: every feature MUST justify its existence
-  against the core promise — fast, quiet, keyboard-driven collaborative
+  against the core promise — fast, quiet, UI-first collaborative
   task management. When in doubt, leave it out. Three lines of clear
   code are better than a premature abstraction. Configuration
   surface MUST be minimal — sensible defaults over settings
@@ -514,4 +530,4 @@ proposals MUST be evaluated against this document.
 - **Guidance file**: refer to the current plan and spec for
   runtime development guidance.
 
-**Version**: 4.0.0 | **Ratified**: 2026-06-13 | **Last Amended**: 2026-06-15
+**Version**: 5.0.0 | **Ratified**: 2026-06-13 | **Last Amended**: 2026-08-09
