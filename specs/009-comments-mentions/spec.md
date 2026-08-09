@@ -4,7 +4,7 @@
 
 **Created**: 2026-06-13
 
-**Status**: Draft
+**Status**: Implemented (2026-08-09 — all T001–T046 complete; pending non-author authz review before merge)
 
 **Input**: Slice 009 of the TaskFlow MVP. Source of truth: `.specify/memory/product-vision.md`. Goal: a comment thread on tasks in shared projects, where editors and owners can post comments and @mention project members, and authors can edit and delete their own comments. Viewers can read the thread but cannot comment (read-only). An @mention notifies the mentioned member; mechanically it emits a `UserMentioned` domain event consumed by slice 017 (notifications).
 
