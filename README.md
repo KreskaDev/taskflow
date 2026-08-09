@@ -1,6 +1,6 @@
 # TaskFlow
 
-A UI-first, **collaborative multi-user** task manager for a small team (~10) — combining Todoist's simplicity with Linear's speed and aesthetics.
+A UI-first, **collaborative multi-user** task manager for a small team (~10) — combining Todoist's simplicity with Linear's speed and density, in the KreskaDev visual identity (4-palette token system: dark/light × cool blue / warm red).
 
 This monorepo holds both the **spec-driven product definition** for the TaskFlow MVP and the **application code**, organized as sequential, independently shippable vertical slices. Implementation has begun: **slice 001 (Accounts & Auth)** is built and green.
 

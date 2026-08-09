@@ -1,7 +1,34 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 4.0.0 -> 5.0.0
+  Version change: 5.0.0 -> 5.1.0
+  Bump rationale: MINOR — Principle IV's aesthetic-direction guidance is
+    materially replaced (not a redefinition of the principle: minimalism,
+    density and animation rules are untouched). "Inspired by Linear's
+    visual language" becomes the KreskaDev 4-palette semantic token
+    system (2 modes × 2 palettes: dark/light × cool blue / warm red,
+    default dark-cool), with tokens carried 1:1 from the product owner's
+    blog (kreskadev.github.io, its ADR-039 token mapping + ADR-041
+    dual-palette) plus documented app extensions. Tokens live in a single
+    source file and components consume ONLY semantic tokens, keeping the
+    set extractable into a future shared cross-project package.
+    Decision recorded in specs/019-ui-design-system/visual-requirements.md
+    (§A1/§B1/§B2, superseding the earlier Linear-indigo direction) and
+    specs/019-ui-design-system/design-brief.md (token tables, contrast
+    verification per palette).
+
+  Modified principles (5.0.0 -> 5.1.0):
+    - IV. Minimalist UI — aesthetic direction bullet replaced (Linear ->
+      KreskaDev token system); rationale extended with the shared-token
+      motivation. No other principle touched.
+
+  Templates requiring updates (5.1.0):
+    - .specify/templates/plan-template.md  — ✅ no change (Constitution
+      Check re-derives dynamically at /plan time)
+    - .specify/templates/spec-template.md  — ✅ no change
+    - .specify/templates/tasks-template.md — ✅ no change
+
+  Previous amendment (4.0.0 -> 5.0.0), retained for context:
   Bump rationale: MAJOR — Principle I is REDEFINED from "Keyboard-First"
     to "UI-First": every action MUST be reachable through visible UI
     controls; the custom application shortcut system (single-key commands
@@ -153,13 +180,25 @@ The interface MUST be clean, focused, and distraction-free.
 - Loading affordances MUST be purposeful: skeleton screens are permitted
   for genuine network-bound loads, but spinners and progress bars MUST
   NOT stand in for content that optimistic UI can render immediately.
-- Aesthetic direction: muted palette, clear typography, spatial
-  consistency. Inspired by Linear's visual language.
+- Aesthetic direction: the **KreskaDev 4-palette semantic token system**
+  — two modes × two palettes (dark/light × cool blue / warm red), default
+  `dark-cool`. Token names and values are carried 1:1 from the KreskaDev
+  blog (`kreskadev.github.io`; its ADR-039 token mapping and ADR-041
+  dual-palette system), extended only by documented app tokens
+  (`specs/019-ui-design-system/design-brief.md`). All tokens MUST live in
+  a single source file and components MUST consume only semantic tokens —
+  no raw hex values — so the set stays extractable into a future shared
+  cross-project package. Contrast MUST be verified per palette
+  (Principle II). Dense, muted, professional: Geist typography (13px base
+  in dense views), Lucide icons (emoji only as optional project icons),
+  4px spacing rhythm.
 - No onboarding wizards, tooltips-on-first-run, or modal
   interruptions.
 
 Rationale: the tool MUST feel like an extension of the user's
-thought process, not a product demanding attention.
+thought process, not a product demanding attention. Sharing one token
+system across the owner's projects makes the visual identity a single
+maintained asset rather than a per-app fork.
 
 ### V. Connected, Server-Authoritative
 
@@ -530,4 +569,4 @@ proposals MUST be evaluated against this document.
 - **Guidance file**: refer to the current plan and spec for
   runtime development guidance.
 
-**Version**: 5.0.0 | **Ratified**: 2026-06-13 | **Last Amended**: 2026-08-09
+**Version**: 5.1.0 | **Ratified**: 2026-06-13 | **Last Amended**: 2026-08-09
