@@ -1,6 +1,6 @@
 # TaskFlow
 
-A keyboard-first, **collaborative multi-user** task manager for a small team (~10) — combining Todoist's simplicity with Linear's speed and aesthetics.
+A UI-first, **collaborative multi-user** task manager for a small team (~10) — combining Todoist's simplicity with Linear's speed and aesthetics.
 
 This monorepo holds both the **spec-driven product definition** for the TaskFlow MVP and the **application code**, organized as sequential, independently shippable vertical slices. Implementation has begun: **slice 001 (Accounts & Auth)** is built and green.
 
@@ -88,7 +88,7 @@ docs/
 - **Each slice in `specs/`** is an independently shippable increment whose `spec.md` opens with a **Provenance** section — a pure-ID trace anchor back to `product-vision.md` — followed by the full requirement text for the IDs that slice realizes. Reading order equals dependency order (auth is foundational).
 - **Cross-cutting requirements** are realized in every slice to which they apply: accessibility (FR-031, FR-042–047), resilience (FR-049–051), and **access control** — per-user isolation (FR-065) plus, for shared projects, membership + role checks (FR-066–068). The full out-of-scope boundary (OOS-01..17) is confirmed in each slice.
 
-The project is governed by `.specify/memory/constitution.md` (v4.0.0, 12 principles) — keyboard-first, WCAG 2.1 AA accessibility, instant response, minimalist UI, server-authoritative, end-to-end type safety, data integrity & resilience, test-first, authn/authz, time & timezone, privacy, and security-by-default.
+The project is governed by `.specify/memory/constitution.md` (v5.0.0, 12 principles) — UI-first operability, WCAG 2.1 AA accessibility, instant response, minimalist UI, server-authoritative, end-to-end type safety, data integrity & resilience, test-first, authn/authz, time & timezone, privacy, and security-by-default.
 
 ## Prerequisites
 
