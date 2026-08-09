@@ -1,53 +1,80 @@
 # Design Brief: TaskFlow UI Design System (slice 019)
 
-**Źródła**: odpowiedzi z `visual-requirements.md` (decyzje użytkownika mają pierwszeństwo) +
-skill `ui-ux-pro-max` (styl "Modern Dark", palety dark/indygo, pairing "Minimal Swiss",
-wytyczne UX §1–§9). Ten dokument jest wejściem do `/speckit-specify` — spec może doprecyzować,
-ale nie powinien łamać tych tokenów bez powodu.
+**Źródła**: odpowiedzi z `visual-requirements.md` (decyzje użytkownika mają pierwszeństwo),
+**system stylowania bloga kreskadev.github.io** (`app/globals.css`, ADR-039 token mapping +
+ADR-041 dual-palette — wartości przeniesione 1:1) oraz skill `ui-ux-pro-max` (wytyczne UX
+§1–§9, gęstość, stany interakcji). Ten dokument jest wejściem do `/speckit-specify` — spec
+może doprecyzować, ale nie powinien łamać tych tokenów bez powodu.
 
 ## Kierunek
 
-Linear-like: ciemny, gęsty, minimalistyczny, profesjonalny. Trzy przymiotniki: **czysty,
-gęsty, profesjonalny**. Zakazane: emoji jako ikony systemowe, niskokontrastowe szare-na-szarym,
+Gęstość i obsługa jak Linear; **tożsamość wizualna jak blog KreskaDev**: "black and blue" +
+system **2 tryby (dark/light) × 2 palety (cool blue / warm red)**. Trzy przymiotniki: czysty,
+gęsty, profesjonalny. Zakazane: emoji jako ikony systemowe, niskokontrastowe szare-na-szarym,
 spinnery zamiast optimistic UI, dekoracyjne animacje.
 
-## Tokeny kolorów (dark, motyw domyślny)
+**Cel długoterminowy (poza zakresem 019, wpływa na strukturę)**: użytkownik chce w przyszłości
+wyodrębnić ten zestaw tokenów do wspólnej paczki („common") aktualizującej wszystkie jego
+projekty (blog, TaskFlow, kolejne). Dlatego: (1) nazwy i wartości tokenów trzymamy **1:1
+z blogiem** (`--color-bg-primary`, `--color-accent`, …), (2) wszystkie tokeny żyją w JEDNYM
+pliku (`globals.css` / Tailwind `@theme`), (3) komponenty znają wyłącznie tokeny semantyczne —
+ekstrakcja = przeniesienie jednego pliku. Nie budujemy paczki teraz (YAGNI, konstytucja).
 
-Semantyczne tokeny CSS (Tailwind theme), nigdy surowe hexy w komponentach. Wartości bazowe —
-do finalnej walidacji kontrastu WCAG w implementacji:
+## System palet (przeniesiony z bloga)
 
-| Token | Wartość | Uwagi |
-|---|---|---|
-| `--bg-deep` | `#050506` | tło aplikacji (nie czysta czerń — OLED smear) |
-| `--bg-base` | `#0A0A0C` | tło paneli / list |
-| `--bg-elevated` | `#141416` | karty, drawer, popovery, menu |
-| `--bg-hover` | `rgba(255,255,255,0.05)` | hover wiersza/pozycji |
-| `--bg-active` | `rgba(255,255,255,0.08)` | stan pressed / selected |
-| `--fg-primary` | `#EDEDEF` | tekst główny (kontrast ≥ 12:1) |
-| `--fg-secondary` | `#8A8F98` | tekst drugorzędny (≈5.9:1 na `--bg-base` — AA ✓) |
-| `--fg-disabled` | `#5A5F66` | tylko elementy disabled (zwolnione z AA) |
-| `--accent` | `#5E6AD2` | indygo Linear — primary buttons, zaznaczenia |
-| `--accent-hover` | `#6E79D6` | |
-| `--on-accent` | `#FFFFFF` | zweryfikować 4.5:1 na `--accent`; przy zawodzie przyciemnić accent |
-| `--focus-ring` | `#5E6AD2` | ring 2px + offset, na KAŻDYM fokusowalnym elemencie |
-| `--border` | `rgba(255,255,255,0.08)` | separatory, obrysy kart |
-| `--border-strong` | `rgba(255,255,255,0.14)` | inputy, aktywne obrysy |
-| `--danger` | `#F87171` (tekst) / `#DC2626` (przycisk destructive) | + ikona/tekst, nigdy sam kolor |
-| `--success` | `#4ADE80` | potwierdzenia |
-| `--warning` | `#FBBF24` | |
+Klasa composite na `<html>` (`dark-cool` | `dark-warm` | `light-cool` | `light-warm`)
+przełącza komplet tokenów; **default TaskFlow: `dark-cool`** (decyzja „ciemny"). Mechanizm
+przełączania trybu/palety = zakres slice'a 018 (theming) — slice 019 dostarcza architekturę
+tokenów i wszystkie 4 palety, 018 dodaje UI przełącznika + persystencję preferencji.
+(Uwaga: `color-scheme` per tryb; SSR fallback na default przed hydracją, jak na blogu.)
 
-Zasady: stany hover/pressed/disabled rozróżnialne wizualnie; kolor funkcjonalny zawsze z ikoną
-lub tekstem; bordery widoczne na każdym tle; scrim modali/draweru 40–60% czerni.
+Tokeny bazowe (nazwy per blog ADR-039; aliasy TaskFlow w nawiasach tam, gdzie mockup używa
+skrótu):
 
-## Typografia
+| Token | dark-cool | dark-warm | light-cool | light-warm |
+|---|---|---|---|---|
+| `bg-primary` (bg-base) | `#181818` | `#1A1816` | `#FAFAFA` | `#FAF7F2` |
+| `bg-secondary` (bg-elevated) | `#222222` | `#221F1C` | `#F2F2F2`* | `#F2EFE8`* |
+| `text-primary` | `#E8E4DC` | `#E8E4DC` | `#2A2520` | `#2A2520` |
+| `text-secondary` | `#B5B0A6` | `#B5B0A6` | `#5C5A55` | `#5C5A55` |
+| `text-tertiary` (disabled/meta) | `#8A857C` | `#8A857C` | `#807B72` | `#807B72` |
+| `accent` | `#5290BD` | `#C97E87` | `#3A7194` | `#9D4754` |
+| `accent-hover` | `#7AAACF` | `#D9959C` | `#2D5E7E` | `#844050` |
+| `accent-soft` | `#11212D` | `#2F1518` | `#E5EFF6` | `#F1E3E5` |
+| `burgundy` (danger) | `#C97E87` | `#C97E87` | `#9D4754` | `#9D4754` |
+| `green` (success) | `#7BA887` | `#7BA887` | `#4A7C57` | `#4A7C57` |
+| `border` | `#383330` | `#383330` | `#E5E0D8` | `#E5E0D8` |
+| `border-strong` | `#524C47` | `#524C47` | `#C9C0B0` | `#C9C0B0` |
+| `surface-elevated` | `rgba(255,255,255,.06)` | j.w. | `rgba(0,0,0,.04)` | j.w. |
 
-- **Font**: Inter (pairing "Minimal Swiss" — jedna rodzina, hierarchia wagami).
-  **Self-hosted przez `next/font`** — bez importu z Google Fonts CDN (Konstytucja: brak
-  zewnętrznych zależności runtime + CSP).
-- **Skala**: 12px meta/etykiety · **13px UI i wiersze list (baza)** · 14px treść
-  (opisy, komentarze) · 16/18/20px nagłówki. Liczby w kolumnach: tabular-nums.
+\* w aplikacji (gęste panele, drawer) karty w trybie light mogą używać `#FFFFFF` z borderem —
+do rozstrzygnięcia w spec; blog używa `bg-secondary` jako tła kart.
+
+Rozszerzenia TaskFlow (aplikacja potrzebuje więcej niż blog; nazwy w konwencji bloga):
+`--color-bg-hover` `rgba(255,255,255,.05)` / `rgba(0,0,0,.045)`, `--color-bg-active`
+`rgba(255,255,255,.08)` / `rgba(0,0,0,.08)`, `--color-warning` `#C9B850` (dark) / `#A89640`
+(light), `--color-accent-strong` `#356D97` (tło primary button w dark-cool — `#5290BD`
+z białym tekstem nie domyka 4.5:1; w light accent-strong = accent). Kandydaci do „common"
+przy ekstrakcji.
+
+Zasady: kontrast weryfikowany **osobno w każdej z 4 palet**; kolor funkcjonalny zawsze
+z ikoną/tekstem; `::selection` na `accent-soft`; focus ring 2px `accent` + offset; scrim
+modali/draweru 40–60% czerni + blur 4px (jak `::backdrop` bloga).
+
+## Typografia (stack bloga)
+
+- **Fonty jak na blogu**: **Geist** (sans, cały UI) · **Instrument Serif** (display — TYLKO
+  brand „TaskFlow" w sidebarze i ewentualnie sign-in; nie w UI) · **JetBrains Mono** (mono —
+  identyfikatory TSK-…, inline code w komentarzach). Wszystkie **self-hosted przez
+  `next/font`** — bez Google Fonts CDN (Konstytucja: CSP + brak zewnętrznych zależności
+  runtime).
+- **Skala**: 12px meta/etykiety · **13px UI i wiersze list (baza — gęściej niż 16px bloga,
+  bo aplikacja, nie proza)** · 14px treść (opisy, komentarze) · 16/18/20px nagłówki. Liczby
+  w kolumnach: tabular-nums.
 - **Wagi**: 400 body, 500 etykiety/pozycje nav, 600 nagłówki/przyciski. Line-height ~1.5 dla
   treści, ciaśniej (1.3) w gęstych wierszach list.
+- Detal z bloga do przeniesienia: akcentowy pasek `border-left: 2-3px accent` dla opisu
+  taska / cytatów / bloków kodu.
 
 ## Layout i gęstość
 

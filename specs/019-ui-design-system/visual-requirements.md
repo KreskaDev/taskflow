@@ -31,15 +31,21 @@ użytkownika; pozycje oznaczone `(default — do akceptacji)` przyjął agent zg
 
 **B1. Motyw domyślny:**
 - [ ] jasny (light)
-- [x] ciemny (dark) ← **decyzja użytkownika** (light dojdzie w slice 018 — theming)
+- [x] ciemny (dark) ← **decyzja użytkownika, DOPRECYZOWANA**: system stylowania przenosimy
+  z bloga kreskadev.github.io (ADR-041) — **2 tryby (dark/light) × 2 palety (cool blue /
+  warm red)**, default `dark-cool` („black and blue"). Slice 019 dostarcza architekturę
+  tokenów i wszystkie 4 palety; UI przełącznika + persystencja preferencji = slice 018.
 - [ ] jasny + ciemny od razu w tym slice
 
 **B2. Kolor akcentu (przyciski primary, focus, zaznaczenia):**
-- [x] fiolet/indygo (styl Linear) ← **decyzja użytkownika**
-- [ ] niebieski (klasyczny produktowy)
+- [ ] fiolet/indygo (styl Linear) ← ~~pierwotna decyzja~~ ZMIENIONA po obejrzeniu mockupu
+- [x] **niebieski z bloga**: `#5290BD` (dark-cool) / `#3A7194` (light-cool) ← **decyzja
+  użytkownika** („odzwierciedlić styl bloga — black and blue"); paleta warm używa bordowego
+  `#C97E87` / `#9D4754`. Pełna tabela tokenów: `design-brief.md`.
 - [ ] czerwony/pomarańczowy (styl Todoist)
 - [ ] zielony
-- → własny (hex, jeśli masz): — (dokładny odcień dobierze spec/plan z walidacją kontrastu WCAG)
+- → własny (hex, jeśli masz): tokeny 1:1 z `globals.css` bloga (przyszła wspólna paczka
+  design-tokenów dla wszystkich projektów użytkownika)
 
 **B3. Gęstość interfejsu:**
 - [x] gęsto (dużo wierszy na ekranie, mało paddingu — styl Linear) *(default — do akceptacji;
@@ -50,9 +56,10 @@ użytkownika; pozycje oznaczone `(default — do akceptacji)` przyjął agent zg
 ## C. Typografia
 
 **C1. Font:**
-- [x] Inter (standard produktowy, neutralny) *(default — do akceptacji; font Linear-podobny,
-  self-hosted — zero zewnętrznych zależności runtime)*
-- [ ] Geist (nowocześniejszy, "vercelowy")
+- [ ] Inter (standard produktowy, neutralny)
+- [x] **Geist** — stack z bloga: Geist (sans/UI) + Instrument Serif (tylko brand) +
+  JetBrains Mono (identyfikatory/kod); self-hosted przez `next/font` *(zmienione z defaultu
+  Inter po decyzji „styl bloga")*
 - [ ] systemowy stack (zero ładowania fontów)
 - → inny: —
 

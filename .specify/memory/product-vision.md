@@ -365,7 +365,7 @@ comment on a shared task) using only visible controls; a visual audit confirms t
 3. **Given** a task, **When** the user opens it, **Then** a right-side detail panel (drawer) presents all fields for direct editing plus the comment thread (shared projects).
 4. **Given** the sidebar, **When** the user reads it, **Then** all primary views (Inbox, Today, Upcoming, Assigned, projects) are clickable entries with icons and item counts, and the sidebar is collapsible.
 5. **Given** any empty list, **When** it renders, **Then** it shows a short hint plus the relevant action button (no onboarding wizards — Principle IV).
-6. **Given** any main view, **When** rendered, **Then** the design system applies: dark theme with the indigo accent, consistent typography/spacing tokens, a coherent icon set in the app chrome (emoji only as optional user-chosen project icons), and user avatars (Google photo with initials fallback) — all meeting FR-044 contrast.
+6. **Given** any main view, **When** rendered, **Then** the design system applies: the KreskaDev blog-derived token palette (default `dark-cool`), consistent typography/spacing tokens (Geist UI stack), a coherent icon set in the app chrome (emoji only as optional user-chosen project icons), and user avatars (Google photo with initials fallback) — all meeting FR-044 contrast.
 
 ---
 
@@ -433,7 +433,7 @@ comment on a shared task) using only visible controls; a visual audit confirms t
 
 ### UI-First Operability & Design System (US-18; constitution v5.0.0 Principle I)
 - **FR-103**: Every operation the product offers MUST have a visible affordance on the surface where it applies — directly, or via an explicit overflow/context menu ("⋯") on the item it targets. No functionality may exist only behind a keyboard shortcut.
-- **FR-104**: The UI MUST be built on a single set of design tokens (color, typography, spacing, radii, elevation) applied consistently across all views. The default theme is DARK with an indigo accent, Linear-inspired density (13px base list typography), and every token combination MUST satisfy FR-044 contrast. (Light theme arrives with the theming story — ASM-07/OOS-10 unchanged.)
+- **FR-104**: The UI MUST be built on a single set of design tokens (color, typography, spacing, radii, elevation) applied consistently across all views, with token names and values taken 1:1 from the owner's KreskaDev token system (2 modes × 2 palettes; see `specs/019-ui-design-system/design-brief.md`) so the set stays extractable into a future shared package. The default theme is `dark-cool` ("black and blue", accent `#5290BD`) at Linear-inspired density (13px base list typography); components use semantic tokens only (no raw hexes), and every token combination MUST satisfy FR-044 contrast in each palette. (Slice 019 ships the token architecture with all four palettes; the mode/palette switcher and preference persistence arrive with the theming story — ASM-07/OOS-10.)
 - **FR-105**: Application chrome (navigation, actions, statuses) MUST use a single coherent icon set; emoji MUST NOT serve as system iconography (they remain permitted solely as user-chosen project icons). Users MUST be represented by avatars — Google photo with an initials fallback — wherever authorship, assignment, or mention identity is shown.
 - **FR-106**: Task details (all editable fields plus, for shared-project tasks, the comment thread) MUST open in a right-side detail panel (drawer) without leaving the current view.
 - **FR-107**: A visible "add task" affordance MUST be present on every view where tasks can exist: a persistent global "+ New task" action in the app bar AND an inline add within each task list (Inbox, project, Today), creating the task in that view's context.
@@ -604,7 +604,7 @@ comment on a shared task) using only visible controls; a visual audit confirms t
 - **ASM-04 — Preset colors and icons**: Project colors and icons are selected from a predefined set, not custom user values.
 - **ASM-05 — No subtasks**: Tasks are flat entities. Only projects support hierarchy (one level). Task nesting (subtasks) is explicitly out of scope.
 - **ASM-06 — In-app notifications only**: The app provides in-app notifications (assignment, mention, changes); email and push/device notifications and reminders are out of scope.
-- **ASM-07 — Dark/light theme only**: Visual theming is limited to dark and light modes. Custom themes are out of scope.
+- **ASM-07 — Preset theming only**: Visual theming is limited to the preset KreskaDev token system — 2 modes (dark/light) × 2 palettes (cool/warm), default `dark-cool` (FR-104). Custom user-defined themes are out of scope.
 - **ASM-08 — Data format**: The relational schema in PostgreSQL is documented and inspectable; full export/import (Principle VII) keeps user data portable, consistent with the data-sovereignty principle.
 - **ASM-09 — Recurrence based on due date**: Next recurring task instance is calculated from the original due date, not the completion date, ensuring consistent scheduling.
 - **ASM-10 — Small team scale**: Small team (~10 users) on a single shared instance; not organizational multi-tenancy.
