@@ -78,6 +78,10 @@ body {
   justify-content: center;
   background: rgba(28, 28, 34, 0.45);
   padding: 1rem;
+  /* Above every positioned page element (the virtualized task list's transformed rows create
+     stacking contexts that otherwise paint OVER the overlay and swallow pointer clicks on the
+     dialog options — keyboard worked, mouse didn't). */
+  z-index: 1000;
 }
 
 .tf-dialog {
