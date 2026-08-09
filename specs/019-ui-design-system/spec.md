@@ -12,7 +12,7 @@ Goal: the application looks professional in the KreskaDev 4-palette semantic tok
 operation is discoverable and performable through visible UI controls alone; the existing
 single-key shortcut system is removed. Decision record and design inputs:
 `visual-requirements.md` (§A–§J, including the post-mockup verdict §J), `design-brief.md`
-(token tables, component contracts), `ui-test-plan.md` (UIT-001..UIT-112),
+(token tables, component contracts — normative annex), `ui-test-plan.md` (UIT-001..UIT-112),
 `mockup-inbox.html` (approved direction). Executes BEFORE slice 010 so the board and every
 later surface build on the design system.
 
@@ -56,164 +56,212 @@ Entity touchpoints (all referenced, none modified):
 - ENT-08 (Comment) — thread rendered inside the drawer (slice 009 behavior re-skinned, safeMarkdown regression kept)
 
 Depends on:
-- 001–009 (all shipped slices) — this slice redesigns their surfaces and must preserve their behavior; the regression inventory (below) is the mechanism that proves preservation.
+- 001–009 (all shipped slices) — this slice redesigns their surfaces and must preserve their behavior; User Story 2 (regression inventory) is the mechanism that proves preservation.
+
+> **ID purity note**: the user stories below are a spec-local decomposition of US-18 into
+> independently testable increments. They mint no new product-vision IDs; every acceptance
+> scenario keeps its canonical `US-18.AS-xx` anchor where one exists, and scenarios added
+> by this spec are numbered locally per story (`S<n>.<k>`). Slice-local ID namespaces:
+> `INV-###` (feature inventory), `UIT-###` (test plan).
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 18 - UI-First Operability & Visual Design System (Priority: P1)
+### User Story 1 - Token Foundation & Four Palettes (Priority: P1)
 
-The application looks professional (a dark, dense, Linear-inspired visual system) and every
-operation is discoverable and performable through visible UI controls alone — buttons, menus,
-inline inputs, and panels. A first-time user needs no knowledge of keyboard shortcuts.
+Every screen of the application renders on a single set of semantic design tokens carried
+1:1 from the owner's KreskaDev system — two modes × two palettes with `dark-cool` as the
+default — so the product looks professional, dense, and consistent ("black and blue"), and
+the token set stays extractable into a future shared cross-project package.
 
-**Why this priority**: constitution v5.0.0 Principle I (UI-First Operability). The shipped slices
-built a functional baseline operable mainly through memorized shortcuts; this story makes the UI
-self-sufficient and establishes the design system every later surface (board, palette,
-notifications, theming) builds on. Decision record: `specs/019-ui-design-system/visual-requirements.md`.
+**Why this priority**: every other story in this slice, and every later slice (board,
+palette, notifications, theming), builds on the tokens. Without the foundation, restyling
+is per-screen forkery. Constitution v5.1.0 Principle IV makes this system the aesthetic
+direction.
 
-**Independent Test**: With shortcuts removed, a first-time user performs the complete daily
-workflow (create a task, edit it, set priority/date/labels, move it to a project, complete it,
-comment on a shared task) using only visible controls; a visual audit confirms the design tokens
-(dark theme, accent, typography, iconography) applied on every main view.
+**Independent Test**: load the application with no stored preference and verify it renders
+entirely in `dark-cool` tokens; force each of the four palette classes and verify key
+surfaces re-theme without layout change; run the token contrast matrix and the per-palette
+accessibility audit.
 
-> Scope note (aesthetic direction): per constitution v5.1.0 Principle IV, "dark
-> Linear-inspired" is realized concretely as the KreskaDev 4-palette token system
-> (`design-brief.md` is normative for token names, values, and the documented app
-> extensions). Density and operability remain Linear-inspired; visual identity is the
-> owner's blog system, carried 1:1 for future extraction into a shared package.
+**Acceptance Scenarios**:
 
-**Acceptance Scenarios** (owned by this slice):
+1. **(US-18.AS-06) Given** any main view, **When** rendered, **Then** the design system applies: the KreskaDev blog-derived token palette (default `dark-cool`), consistent typography/spacing tokens (Geist UI stack), a coherent icon set in the app chrome (emoji only as optional user-chosen project icons), and user avatars (Google photo with initials fallback) — all meeting FR-044 contrast.
+2. **(S1.2) Given** a first load with no theme preference stored, **When** the page renders (including before hydration), **Then** the `dark-cool` palette applies with no flash of unstyled or mis-themed content, and native controls/scrollbars match the mode.
+3. **(S1.3) Given** any of the four palettes (`dark-cool`, `dark-warm`, `light-cool`, `light-warm`) activated via the composite theme class, **When** any in-scope screen renders, **Then** all surfaces resolve to that palette's tokens — no component keeps hard-coded colors (semantic tokens only, no raw hex values outside the token source file).
+4. **(S1.4) Given** the token contrast matrix, **When** it is evaluated separately in each of the four palettes, **Then** every text pairing is ≥4.5:1 and every non-text/control-boundary pairing is ≥3:1 — including hover, selected, and disabled states (known traps enumerated in Edge Cases are explicit matrix rows).
+5. **(S1.5) Given** the application chrome, **When** audited, **Then** a single coherent icon set is used throughout (no emoji as system iconography; emoji only as optional user-chosen project icons), and identity is shown as avatars with initials fallback (FR-105).
+
+---
+
+### User Story 2 - Regression Feature Inventory (Priority: P1)
+
+Every feature the application already has (slices 001–009) is enumerated in a testable
+form — screen → Given/When/Then → expected outcome — and each entry is covered by an
+automated UI test, so the redesign (and every later slice) cannot silently drop an
+existing capability. **This is the key user requirement of this slice**
+(`visual-requirements.md` §J2.5).
+
+**Why this priority**: the redesign touches every surface at once; without an explicit
+regression grid, feature loss would be detected only by users. The inventory is also the
+acceptance instrument for every other story in this slice, so it must exist BEFORE
+restyling begins.
+
+**Independent Test**: `feature-inventory.md` exists, is derived from an audit of the
+running application (not the specs alone), covers all shipped user-visible features of
+slices 001–009, and CI proves 100% of entries have a passing covering test.
+
+**Acceptance Scenarios**:
+
+1. **(S2.1) Given** the shipped application (slices 001–009), **When** the inventory audit completes, **Then** `specs/019-ui-design-system/feature-inventory.md` lists every user-visible feature as a stable `INV-###` entry in Given/When/Then form, cross-referenced to the product-vision FR/AS it realizes.
+2. **(S2.2) Given** the inventory, **When** coverage is computed, **Then** every `INV-###` entry maps to at least one automated UI test (component, E2E, or a11y level per `ui-test-plan.md` conventions); an uncovered entry fails the slice's exit criterion.
+3. **(S2.3) Given** the redesigned UI, **When** the full inventory suite runs in CI, **Then** all entries pass: no feature present before this slice is absent after it — except the shortcut system, whose REMOVAL is itself an inventory entry asserting the bindings are gone (FR-111).
+4. **(S2.4) Given** a later slice modifying the UI, **When** its CI runs, **Then** the inventory suite still gates the merge (Constitution VIII — the grid is a living artifact extended by subsequent slices).
+
+---
+
+### User Story 3 - UI-Operable Daily Workflow & Shortcut Removal (Priority: P1)
+
+A first-time user — given no instruction and with the shortcut system removed — performs
+the complete daily workflow through visible controls alone: creates a task, edits it, sets
+priority/date/labels, moves it to a project, completes it, and comments on a shared task.
+Navigation, task creation, row actions, and empty states are all discoverable.
+
+**Why this priority**: this is the substance of constitution Principle I (UI-First
+Operability) and the SC-018 gate. It depends on Story 1 for its visual language but is the
+behavioral heart of the slice.
+
+**Independent Test**: the SC-018 end-to-end journey passes with only pointer + standard
+Tab/Enter/Esc interaction; a binding audit confirms no single-key shortcut is registered.
+
+**Acceptance Scenarios**:
 
 1. **(US-18.AS-01) Given** any view where tasks can exist, **When** the user looks at it, **Then** a visible "add task" affordance is present (global "+ New task" in the app bar AND an inline add within the list) and creates a task in that context.
 2. **(US-18.AS-02) Given** a task row, **When** the user points at or focuses it, **Then** quick actions (complete, edit, overflow "⋯") are visible, and the "⋯" menu exposes every operation available on that task (edit, priority, due date, labels, move, assign, comments, delete) — with keyboard-focus equivalents (FR-046).
-3. **(US-18.AS-03) Given** a task, **When** the user opens it, **Then** a right-side detail panel (drawer) presents all fields for direct editing plus the comment thread (shared projects).
-4. **(US-18.AS-04) Given** the sidebar, **When** the user reads it, **Then** all primary views (Inbox, Today, Upcoming, Assigned, projects) are clickable entries with icons and item counts, and the sidebar is collapsible.
-5. **(US-18.AS-05) Given** any empty list, **When** it renders, **Then** it shows a short hint plus the relevant action button (no onboarding wizards — Principle IV).
-6. **(US-18.AS-06) Given** any main view, **When** rendered, **Then** the design system applies: the KreskaDev blog-derived token palette (default `dark-cool`), consistent typography/spacing tokens (Geist UI stack), a coherent icon set in the app chrome (emoji only as optional user-chosen project icons), and user avatars (Google photo with initials fallback) — all meeting FR-044 contrast.
+3. **(US-18.AS-04) Given** the sidebar, **When** the user reads it, **Then** all primary views (Inbox, Today, Upcoming, Assigned, projects) are clickable entries with icons and item counts, and the sidebar is collapsible.
+4. **(US-18.AS-05) Given** any empty list, **When** it renders, **Then** it shows a short hint plus the relevant action button (no onboarding wizards — Principle IV).
+5. **(S3.5) Given** the application after this slice, **When** the user presses any former shortcut key (C/E/M/L/T/1–4, G-chords, `?`) while a list has focus, **Then** nothing happens — no action fires, no dead binding errors — and the shortcuts help overlay no longer exists (FR-111); standard editing keys (Ctrl+Enter save, Esc cancel — FR-030) and WCAG operability (Tab order, arrows within composite widgets) still work.
+6. **(S3.6) Given** a first-time user with no instruction, **When** they attempt the full daily workflow (create → edit → set priority/date/labels → move to project → complete → comment on a shared task), **Then** every step is completable through visible controls alone (SC-018).
+7. **(S3.7) Given** a task list, **When** the user wants to reorder tasks, **Then** a visible reorder affordance exists (drag handle and/or move actions in the row "⋯" menu) persisting the order through the existing reorder capability (FR-102 affordance; non-pointer equivalent required).
 
-### Slice scope details (no new product-vision IDs; binding for plan/tasks)
+---
 
-The post-mockup verdict (`visual-requirements.md` §J) fixes the delivery scope of this
-slice beyond the literal AS list. All items below are realizations of the owned FRs cited
-in parentheses — they mint no new requirement IDs.
+### User Story 4 - Task Detail Drawer (Priority: P2)
 
-**1. Screens in scope** (order per §H1; every screen restyled on tokens AND made fully
-UI-operable):
-- Workspace/Inbox (reference implementation — matches the approved mockup)
-- Project view (list mode; board arrives in slice 010 already on tokens)
-- Today / Upcoming
-- Assigned to me
-- Task detail drawer (on every screen that lists tasks)
-- Sign-in and Settings/Profile (Settings today = profile + sign-out; theme controls arrive in slice 018)
+Opening a task slides in a right-side detail panel — without leaving the current view —
+where every field is directly editable inline and, for shared-project tasks, the full
+comment thread (slice 009) lives: composer, @mention picker, avatars, tombstones.
 
-**2. Component catalog** (FR-104/FR-105; each component ships with hover/active/focus/
-disabled states, per-palette contrast, and its ARIA contract per FR-043/FR-046/FR-101):
-buttons (primary `accent-strong`, secondary, destructive `danger-strong`, icon buttons ≥32px
-hit area), inline quick-add input, text inputs and textareas, date input (with the Polish
-NL parse behavior and FR-006 error presentation unchanged), pickers (priority, project,
-label, assignee), checkbox (32px padded hit area, outline on `fg-disabled`), chips
-(labels, assignees), context/overflow menu, modal dialog (native `<dialog>`, full focus
-contract), non-modal drawer, toasts (persistent live region; undo toast lives the full
-30 s window per Constitution VII), skeletons (genuine network-bound loads only),
-empty states, avatars (AA-safe deterministic palette).
+**Why this priority**: the drawer is the "complete editing surface" leg of FR-103 (the
+"⋯" menu covers completeness of actions; the drawer covers completeness of editing). It
+depends on Stories 1 and 3 surfaces but is independently testable and shippable after them.
 
-**3. Interaction states** (FR-049/FR-108/Principle III/IV): loading (skeleton only where
-optimistic UI cannot paint), error (visible message + recovery per FR-049), optimistic
-pending, hover/focus/active/disabled/selected, long-content overflow (truncation with a
-focus-reachable full-value affordance — FR-046), drag-and-drop reorder (FR-102 affordance)
-with a non-pointer equivalent (move actions in the "⋯" menu), narrow-window behavior
-(≥768px sensible, no horizontal scroll; drawer becomes an overlay ≤1024px).
+**Acceptance Scenarios**:
 
-**4. Full drawer** (FR-106): all task fields editable inline (title, description, status,
-priority, due date, labels, assignees where shared), the slice-009 comment thread
-(composer, @mention picker, tombstones, sanitization regression), monospace task
-identifier, deep-linkable URL, non-modal contract (list stays interactive; Esc closes
-except while a text field is focused; focus returns to the invoker).
+1. **(US-18.AS-03) Given** a task, **When** the user opens it, **Then** a right-side detail panel (drawer) presents all fields for direct editing plus the comment thread (shared projects).
+2. **(S4.2) Given** the drawer is open, **When** the user interacts with the list behind it, **Then** the list remains interactive (non-modal); Esc closes the drawer and returns focus to the invoker — EXCEPT while a text field inside the drawer is focused, where Esc cancels the field edit (FR-030) without closing the drawer.
+3. **(S4.3) Given** a task URL, **When** the user navigates to it directly (deep link) or uses browser back/forward, **Then** the drawer opens on the right task and list state is preserved.
+4. **(S4.4) Given** a shared task's thread in the drawer, **When** comments render, **Then** slice-009 behavior is fully preserved: chronological order, author avatar (Google photo → initials fallback), @mention tokens highlighted, soft-deleted comments as tombstones, markdown sanitized (XSS payloads never execute), and a viewer sees the thread but no composer.
 
-**5. Shortcut-system removal** (FR-111): all single-key global/list/navigation bindings
-and the shortcuts help overlay are deleted from the codebase; pressing former shortcut
-keys (C/E/M/L/T/1–4/G-chords/?) in a list does nothing; FR-030 editor keys and standard
-WCAG operability (Tab order, arrows within composite widgets, Esc, Enter/Space) remain.
+---
 
-### Regression inventory — testable feature list (key user requirement, §J2.5)
+### User Story 5 - Full-Codebase Sweep: Remaining Screens, States & Cleanup (Priority: P2)
 
-The spec's verification backbone. **Deliverable**: `specs/019-ui-design-system/feature-inventory.md`
-— an enumeration of EVERY user-visible feature shipped by slices 001–009, each entry in a
-directly testable form (screen → Given/When/Then → expected outcome) with a stable
-slice-local ID (`INV-###`), cross-referenced to the product-vision FR/AS it realizes and
-to the UIT test that covers it.
+Every remaining UI surface in the codebase — project view, Today/Upcoming, Assigned,
+Sign-in, Settings/Profile, and ANY other place that renders UI — is migrated to the
+design system and made fully UI-operable; the component catalog defines complete
+interaction states (loading, error, optimistic-pending, hover/focus/active/disabled/
+selected, long-content overflow, narrow-window behavior); and the migration leaves no
+dead code behind (user requirement §J3.6–7: the sweep covers the WHOLE codebase, not a
+list of blessed screens).
 
-- The inventory MUST be produced before restyling begins (plan phase task), by auditing the
-  shipped application surface (slices 001–009), not the specs alone.
-- Every inventory entry MUST map to at least one automated UI test (component, E2E, or
-  a11y level per `ui-test-plan.md` conventions); entries with no covering test fail the
-  slice's exit criterion.
-- The redesigned UI MUST pass the full inventory: no feature present before this slice may
-  be absent after it (except the shortcut system, whose removal is itself an inventory
-  entry asserting the bindings are gone — FR-111).
-- The inventory is a living regression grid: subsequent slices extend it and CI keeps it
-  green (Constitution VIII — failing suite blocks merge).
+**Why this priority**: completes the §J2/§J3 gap list across the whole shipped surface.
+Depends on Stories 1–3 patterns; each screen is independently verifiable against the
+inventory and the component contracts.
 
-**Test plan**: `ui-test-plan.md` (UIT-001..UIT-112) enumerates the design-system-specific
-tests across levels [C]/[E]/[A]/[V]/[P]; the seed `tests/mockup.spec.ts` is rewritten
-against the real application during implementation. Exit criterion: all [C]/[E]/[A] green
-in CI; [V] baseline approved per palette; [P] after benchmark baseline.
+**Acceptance Scenarios**:
+
+1. **(S5.1) Given** each in-scope screen (project view, Today, Upcoming, Assigned, Sign-in, Settings/Profile), **When** rendered, **Then** it uses only design-system components and tokens, passes the per-palette accessibility audit, and every operation it offers has a visible affordance (FR-103) — verified against its inventory entries.
+2. **(S5.2) Given** a genuine network-bound load, **When** content is pending, **Then** a skeleton renders (never a spinner standing in for optimistically paintable content); optimistic writes paint immediately (Principle III/IV).
+3. **(S5.3) Given** a failed operation, **When** the error surfaces, **Then** the user sees a clear message with an actionable recovery in place (FR-049) — no silent failure on any in-scope surface.
+4. **(S5.4) Given** long task titles, label names, or project names, **When** they exceed available space, **Then** they truncate with ellipsis and the full value stays reachable without hover-only affordances (FR-046).
+5. **(S5.5) Given** a window between 768px and 1024px, **When** the layout renders, **Then** nothing scrolls horizontally and the drawer overlays the list instead of docking beside it; the collapsible sidebar remains operable.
+6. **(S5.6) Given** the codebase after the migration, **When** it is audited, **Then** NO UI surface remains on legacy styling (no component bypasses the design system; no raw hex values outside the token source file), and no dead UI code remains: unused components, styles, and hooks — including all shortcut-system remnants (FR-111) — are deleted, not orphaned.
+
+---
+
+### Delivery constraints (user requirements §J3; binding for plan/tasks, no new IDs)
+
+- **Complete sweep (§J3.6)**: the migration covers EVERY place in the codebase that
+  renders UI — screens, shared components, one-off widgets, error/empty/loading surfaces.
+  "In-scope screens" in Story 5 is a checklist, not a boundary; anything discovered during
+  the sweep joins the inventory and is migrated too.
+- **Dead code removal (§J3.7)**: code made unreachable by the redesign (legacy styles,
+  superseded components, unused hooks, the entire shortcut system) is deleted in the same
+  slice — the codebase after 019 contains no unreferenced UI-layer artifacts.
+- **Styling architecture (§J3.8)**: UI elements are built as SEPARATE reusable components,
+  each with its styling grouped/co-located at the component — there is NO single monolithic
+  stylesheet holding all component styles. Deliberate exception (unchanged from FR-104):
+  design TOKENS stay in one source file (the extraction-to-shared-package prerequisite),
+  and the only global styles beyond it are a minimal base/reset. Components consume
+  semantic tokens only.
+
+### Component catalog (binding for plan/tasks; realizes FR-104/FR-105 across stories)
+
+Each component ships with hover/active/focus/disabled states, per-palette contrast, and
+its ARIA contract (FR-043/FR-046/FR-101): buttons (primary on `accent-strong`, secondary,
+destructive on `danger-strong`, icon buttons ≥32px hit area), inline quick-add input, text
+inputs/textareas, date input (Polish NL parse behavior and FR-006 error presentation
+unchanged), pickers (priority, project, label, assignee), checkbox (32px padded hit area,
+outline on `fg-disabled`), chips (labels, assignees), context/overflow menu (full keyboard
+navigation), modal dialog (full focus contract), non-modal drawer, toasts (persistent live
+region; undo toast lives the full 30 s window per Constitution VII), skeletons, empty
+states, avatars (AA-safe deterministic palette). `design-brief.md` is the normative annex
+for tokens, dimensions, and the menu/modal/toast contracts.
 
 ### Edge Cases
 
-- **Per-palette contrast**: every token pair is verified separately in each of the 4
-  palettes, INCLUDING hover and selected states. Known traps (design-brief, normative):
-  dark `accent-hover` is a lightened TEXT tint — primary-button hover backgrounds go
-  darker via `accent-strong-hover`, never `accent-hover` (white label would fall to
-  2.4–4.0:1); light-mode warning uses `#8F7F36` (blog `#A89640` is 2.8:1); selection in
-  dark uses translucent accent (blog `accent-soft` is invisible at 1.05–1.08:1 on dark);
+- **Per-palette contrast traps** (normative rows of the S1.4 matrix, from `design-brief.md`):
+  dark `accent-hover` is a lightened TEXT tint — primary-button hover backgrounds go darker
+  via `accent-strong-hover`, never `accent-hover` (white label would fall to 2.4–4.0:1);
+  light-mode warning uses `#8F7F36` (blog `#A89640` is 2.8:1); selection in dark uses
+  translucent accent (blog `accent-soft` is invisible at 1.05–1.08:1 on dark backgrounds);
   checkbox outlines use `fg-disabled` (~4.2:1), not `border-strong` (~2:1, breaks
   WCAG 1.4.11); accent/danger text on hovered elevated surfaces switches to its hover
-  variant in parallel or dark-cool drops below 4.5:1.
-- **SSR before hydration**: no palette class on `<html>` renders the `dark-cool` default
-  without a flash of unstyled tokens; `color-scheme` is set per mode so native controls
-  and scrollbars match.
-- **Hover-revealed actions**: the row action bar must also appear on keyboard focus and be
-  Tab/Shift+Tab traversable in both directions (not `display:none` while unfocused) —
-  FR-046/FR-108.
+  variant in parallel, or dark-cool drops below 4.5:1.
+- **SSR before hydration**: no palette class present renders the `dark-cool` default
+  without a flash of unstyled tokens; `color-scheme` per mode keeps native controls and
+  scrollbars consistent.
+- **Hover-revealed actions**: the row action bar also appears on keyboard focus and is
+  Tab/Shift+Tab traversable in both directions (not `display:none` while unfocused).
 - **Menu at viewport edge**: the "⋯" menu on bottom rows repositions to stay inside the
   viewport (dimensions measured after showing).
-- **Toast semantics**: toast text is injected into a PERSISTENT `role="status"` live region
-  (toggling `display` with pre-filled content is unreliable for screen readers); closing a
-  toast never lands focus on a `display:none` element; informational toasts auto-dismiss
+- **Toast semantics**: toast text is injected into a PERSISTENT `role="status"` live
+  region (toggling visibility of pre-filled content is unreliable for screen readers);
+  closing a toast never lands focus on a hidden element; informational toasts auto-dismiss
   in 3–5 s; the undo toast persists the full 30 s window with an explicit close.
-- **Drawer non-modality**: Esc in a drawer text field does NOT close the drawer (it cancels
-  the field edit per FR-030); Esc elsewhere closes and returns focus to the invoker; the
-  underlying list stays interactive throughout.
 - **Empty vs. loading**: an empty state (hint + action button) renders only when the view
-  is confirmed empty; a genuine network-bound load shows a skeleton, never a spinner in
-  place of optimistically paintable content.
-- **Former shortcuts are inert**: typing C/E/1–4 etc. while a list has focus inserts
-  nothing and triggers nothing (no hidden dead bindings, no console errors); typing them
-  inside inputs types the character (trivially, since no bindings exist).
+  is confirmed empty — never as a flash while data is still loading.
 - **Viewer role**: a viewer on a shared task sees the comment thread but no composer, and
-  sees no assignment/edit affordances they cannot use — disabled-with-reason or absent per
-  the slice-007/009 authorization surface, restyled but behaviorally unchanged.
+  no assignment/edit affordances they cannot use — the slice-007/009 authorization surface
+  is restyled but behaviorally unchanged.
 - **Reduced motion**: `prefers-reduced-motion: reduce` makes all transitions instant or
   <100ms (FR-047), including drawer and menu open/close.
-- **Long content**: long task titles, label names, and project names truncate with
-  ellipsis; the full value stays reachable without hover-only affordances (FR-046).
-- **Narrow window**: down to 768px nothing scrolls horizontally; ≤1024px the drawer
-  overlays the list instead of docking beside it.
+- **Typing former shortcut characters in inputs**: characters type normally (trivially
+  true once no bindings exist — asserted as an inventory regression entry).
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements (slice-specific, verbatim from product-vision.md)
 
-- **FR-103**: Every operation the product offers MUST have a visible affordance on the surface where it applies — directly, or via an explicit overflow/context menu ("⋯") on the item it targets. No functionality may exist only behind a keyboard shortcut.
-- **FR-104**: The UI MUST be built on a single set of design tokens (color, typography, spacing, radii, elevation) applied consistently across all views, with token names and values taken 1:1 from the owner's KreskaDev token system (2 modes × 2 palettes; see `specs/019-ui-design-system/design-brief.md`) so the set stays extractable into a future shared package. The default theme is `dark-cool` ("black and blue", accent `#5290BD`) at Linear-inspired density (13px base list typography); components use semantic tokens only (no raw hexes), and every token combination MUST satisfy FR-044 contrast in each palette. (Slice 019 ships the token architecture with all four palettes; the mode/palette switcher and preference persistence arrive with the theming story — ASM-07/OOS-10.)
-- **FR-105**: Application chrome (navigation, actions, statuses) MUST use a single coherent icon set; emoji MUST NOT serve as system iconography (they remain permitted solely as user-chosen project icons). Users MUST be represented by avatars — Google photo with an initials fallback — wherever authorship, assignment, or mention identity is shown.
-- **FR-106**: Task details (all editable fields plus, for shared-project tasks, the comment thread) MUST open in a right-side detail panel (drawer) without leaving the current view.
-- **FR-107**: A visible "add task" affordance MUST be present on every view where tasks can exist: a persistent global "+ New task" action in the app bar AND an inline add within each task list (Inbox, project, Today), creating the task in that view's context.
-- **FR-108**: Each task row MUST expose quick actions on hover/focus (complete, edit, overflow) and a "⋯" menu containing every operation available on that task; all row actions MUST have keyboard-focus-triggered equivalents (FR-046) and correct hit targets/stacking so pointer clicks always land (Principle I).
-- **FR-109**: The sidebar MUST present all primary views (Inbox, Today, Upcoming, Assigned, projects) as clickable entries with icons and item counts, and MUST be collapsible.
-- **FR-110**: Every empty list state MUST present a short explanatory hint plus the relevant action button; onboarding wizards and first-run modal tours remain prohibited (Principle IV).
-- **FR-111**: The existing single-key shortcut system (global/list/navigation bindings and the shortcuts help overlay) MUST be removed from the application as part of realizing US-18; standard editing keys (FR-030) and WCAG operability (FR-042..047, FR-101) MUST remain intact.
+- **FR-103**: Every operation the product offers MUST have a visible affordance on the surface where it applies — directly, or via an explicit overflow/context menu ("⋯") on the item it targets. No functionality may exist only behind a keyboard shortcut. *(Stories 3, 4, 5)*
+- **FR-104**: The UI MUST be built on a single set of design tokens (color, typography, spacing, radii, elevation) applied consistently across all views, with token names and values taken 1:1 from the owner's KreskaDev token system (2 modes × 2 palettes; see `specs/019-ui-design-system/design-brief.md`) so the set stays extractable into a future shared package. The default theme is `dark-cool` ("black and blue", accent `#5290BD`) at Linear-inspired density (13px base list typography); components use semantic tokens only (no raw hexes), and every token combination MUST satisfy FR-044 contrast in each palette. (Slice 019 ships the token architecture with all four palettes; the mode/palette switcher and preference persistence arrive with the theming story — ASM-07/OOS-10.) *(Story 1)*
+- **FR-105**: Application chrome (navigation, actions, statuses) MUST use a single coherent icon set; emoji MUST NOT serve as system iconography (they remain permitted solely as user-chosen project icons). Users MUST be represented by avatars — Google photo with an initials fallback — wherever authorship, assignment, or mention identity is shown. *(Story 1)*
+- **FR-106**: Task details (all editable fields plus, for shared-project tasks, the comment thread) MUST open in a right-side detail panel (drawer) without leaving the current view. *(Story 4)*
+- **FR-107**: A visible "add task" affordance MUST be present on every view where tasks can exist: a persistent global "+ New task" action in the app bar AND an inline add within each task list (Inbox, project, Today), creating the task in that view's context. *(Story 3)*
+- **FR-108**: Each task row MUST expose quick actions on hover/focus (complete, edit, overflow) and a "⋯" menu containing every operation available on that task; all row actions MUST have keyboard-focus-triggered equivalents (FR-046) and correct hit targets/stacking so pointer clicks always land (Principle I). *(Story 3)*
+- **FR-109**: The sidebar MUST present all primary views (Inbox, Today, Upcoming, Assigned, projects) as clickable entries with icons and item counts, and MUST be collapsible. *(Story 3)*
+- **FR-110**: Every empty list state MUST present a short explanatory hint plus the relevant action button; onboarding wizards and first-run modal tours remain prohibited (Principle IV). *(Stories 3, 5)*
+- **FR-111**: The existing single-key shortcut system (global/list/navigation bindings and the shortcuts help overlay) MUST be removed from the application as part of realizing US-18; standard editing keys (FR-030) and WCAG operability (FR-042..047, FR-101) MUST remain intact. *(Stories 2, 3)*
 
 ### Cross-cutting Requirements (realized in this slice)
 
@@ -246,11 +294,17 @@ the redesigned surfaces with behavior unchanged (see Entity touchpoints in Prove
 
 ### Measurable Outcomes
 
-- **SC-018** (owned): A first-time user, given no instruction, completes the full daily workflow (create a task, edit it, set priority/date/labels, move it to a project, complete it, and comment on a shared task) using only visible UI controls — verified end-to-end with the shortcut system absent.
-- **Regression gate** (this slice's exit bar, per §J2.5): 100% of `feature-inventory.md` entries have a covering automated test, and the full inventory passes against the redesigned UI in CI.
-- **SC-008** (referenced): Every main view passes automated accessibility audit at WCAG 2.1 AA level — extended here to run per palette (×4).
+- **SC-018** (owned): A first-time user, given no instruction, completes the full daily workflow (create a task, edit it, set priority/date/labels, move it to a project, complete it, and comment on a shared task) using only visible UI controls — verified end-to-end with the shortcut system absent. *(Story 3)*
+- **Regression gate** (this slice's exit bar, §J2.5): 100% of `feature-inventory.md` entries have a covering automated test, and the full inventory passes against the redesigned UI in CI. *(Story 2)*
+- **SC-008** (referenced): Every main view passes automated accessibility audit at WCAG 2.1 AA level — extended here to run per palette (×4). *(Stories 1, 5)*
 - **SC-002 / SC-003** (referenced): FCP <1 s, TTI <2.5 s; optimistic paint within 16 ms — the redesign MUST NOT regress these budgets (UIT-110/111 guard them).
 - **SC-014** (referenced): live fan-out within ~1 s remains intact on redesigned surfaces (UIT-045/082/112).
+- **Sweep & cleanup gate** (§J3): an automated post-migration audit finds zero raw hex values outside the token source file, zero surfaces styled outside the design system, and zero unreferenced UI-layer modules (dead code, including shortcut-system remnants). *(Story 5)*
+
+**Test plan**: `ui-test-plan.md` (UIT-001..UIT-112) enumerates the design-system tests
+across levels [C]/[E]/[A]/[V]/[P]; the seed `tests/mockup.spec.ts` is rewritten against
+the real application during implementation. Exit criterion: all [C]/[E]/[A] green in CI;
+[V] screenshot baseline approved per palette; [P] after benchmark baseline.
 
 ## Assumptions
 

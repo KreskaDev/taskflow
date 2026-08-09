@@ -182,12 +182,27 @@ kierunku wizualnego — dalsze braki adresuje SPECYFIKACJA, nie kolejne iteracje
 4. **Pełny drawer szczegółów** — komentarze/wzmianki (slice 009), aktywność, edycja
    wszystkich pól inline; drawer z E2/F2 jako pełnoprawna powierzchnia robocza.
 5. **Inwentaryzacja feature'ów w formie testowalnej** ← **wymaganie użytkownika (kluczowe)**:
+   (numeracja ciąg dalszy w §J3)
    spec MUSI wylistować KAŻDY istniejący feature aplikacji w formie pozwalającej napisać
    test UI (dany ekran → zachowanie → oczekiwany efekt), tak by kolejne prace (019 i późniejsze
    slice'y) nie mogły niezauważenie usunąć istniejących funkcji. `ui-test-plan.md`
    (UIT-001…UIT-112) jest zalążkiem ograniczonym do mockupu Inbox — inwentaryzacja ma objąć
    całą istniejącą powierzchnię aplikacji (slice'y 001–009) i stać się siatką regresji
    utrzymywaną przy każdym kolejnym slice.
+
+**J3. Wymagania dostarczeniowe** (doprecyzowanie użytkownika, 2026-08-09, przy `/speckit-specify`):
+
+6. **Pełny przegląd codebase'u** ← **wymaganie użytkownika**: migracja obejmuje KAŻDE
+   miejsce w kodzie, gdzie jest UI/UX — nie tylko główne ekrany. Po slice 019 żadna
+   powierzchnia nie zostaje na starym stylowaniu.
+7. **Usunięcie dead code'u** ← **wymaganie użytkownika**: w ramach przejścia usuwamy
+   martwy kod — nieużywane komponenty, style, hooki (w tym pozostałości systemu hotkeys
+   po FR-111); po migracji nie zostają niereferencjonowane elementy warstwy UI.
+8. **Architektura stylowania** ← **wymaganie użytkownika**: elementy UI jako OSOBNE
+   komponenty, stylowanie POGRUPOWANE per komponent (co-located) — NIE jeden plik ze
+   wszystkimi stylami. Wyjątek (świadomy, bez zmiany): TOKENY zostają w jednym pliku
+   źródłowym (warunek ekstrakcji do wspólnej paczki — patrz design-brief); monolit
+   globalny ogranicza się do tokenów + minimalnego base/reset.
 
 ---
 
