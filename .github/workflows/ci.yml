@@ -38,15 +38,42 @@ jobs:
       - run: dotnet restore apps/api/TaskFlow.sln
       # Analyzers-as-errors enforced via Directory.Build.props (Constitution VI).
       - run: dotnet build apps/api/TaskFlow.sln -c Release --no-restore
-      # Testcontainers uses the Docker daemon available on GitHub runners. The two test projects run
-      # as SEPARATE sequential steps (not `dotnet test` on the solution): the solution form runs both
-      # assemblies in parallel MSBuild nodes, and the integration assembly alone boots a Postgres
-      # container + a full API host per test — concurrent with the unit run this exhausted the 7 GB
-      # runner and killed the test host (MSB4166 "child node exited prematurely"). The integration
-      # assembly's xunit.runner.json additionally caps collection parallelism at 2 for the same reason.
       - run: dotnet test apps/api/tests/TaskFlow.UnitTests -c Release --no-build
-      - run: dotnet test apps/api/tests/TaskFlow.IntegrationTests -c Release --no-build
-        timeout-minutes: 45
+
+  # The integration suite boots a THROWAWAY Postgres container + a full API host PER TEST
+  # (IAsyncLifetime per fact). The whole 004–009 suite is ~200+ container create/start/stop cycles —
+  # one GitHub runner's Docker daemon degrades under that churn until a container START times out
+  # (Docker.DotNet TaskCanceledException ~11 min in) and the test host dies (MSB4166). Sharding
+  # across FRESH runners keeps each daemon under ~60 cycles. The shard filters are COMPLEMENTS
+  # (contains vs the same list negated), so a future test class always lands in exactly one shard —
+  # nothing can silently drop out of CI. The integration assembly's xunit.runner.json additionally
+  # caps in-process parallelism at 2 (7 GB runner memory).
+  api-integration:
+    name: api integration (${{ matrix.shard.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          - name: comments
+            filter: "FullyQualifiedName~IntegrationTests.Comments"
+          - name: identity-labels-infra
+            filter: "FullyQualifiedName!~IntegrationTests.Comments&FullyQualifiedName!~IntegrationTests.TaskManagement"
+          - name: tasks-core
+            filter: "FullyQualifiedName~IntegrationTests.TaskManagement&FullyQualifiedName!~ChangeMemberRole&FullyQualifiedName!~GetProjectMembers&FullyQualifiedName!~InviteMember&FullyQualifiedName!~LeaveProject&FullyQualifiedName!~RemoveMember&FullyQualifiedName!~RoleOperationDenyMatrix&FullyQualifiedName!~SharedProjectReadAccess&FullyQualifiedName!~ShareUnshareProject&FullyQualifiedName!~TransferOwnership&FullyQualifiedName!~SetTaskAssignees&FullyQualifiedName!~GetAssignedToMe&FullyQualifiedName!~TaskAssigneesEagerLoad&FullyQualifiedName!~AssignmentCleanup&FullyQualifiedName!~SetTaskDoneSharedAuthz&FullyQualifiedName!~MoveTaskToProject&FullyQualifiedName!~InboxAndProjectTasks&FullyQualifiedName!~SetPriority&FullyQualifiedName!~RescheduleDueDate&FullyQualifiedName!~EditTask&FullyQualifiedName!~GetUpcoming&FullyQualifiedName!~DailyViewsDst&FullyQualifiedName!~GetTodayTasks&FullyQualifiedName!~GetMyTasks&FullyQualifiedName!~SetTaskDoneTests"
+          - name: tasks-daily-triage
+            filter: "FullyQualifiedName~IntegrationTests.TaskManagement&(FullyQualifiedName~SetPriority|FullyQualifiedName~RescheduleDueDate|FullyQualifiedName~EditTask|FullyQualifiedName~GetUpcoming|FullyQualifiedName~DailyViewsDst|FullyQualifiedName~GetTodayTasks|FullyQualifiedName~GetMyTasks|FullyQualifiedName~SetTaskDoneTests)"
+          - name: sharing-assignment
+            filter: "FullyQualifiedName~IntegrationTests.TaskManagement&(FullyQualifiedName~ChangeMemberRole|FullyQualifiedName~GetProjectMembers|FullyQualifiedName~InviteMember|FullyQualifiedName~LeaveProject|FullyQualifiedName~RemoveMember|FullyQualifiedName~RoleOperationDenyMatrix|FullyQualifiedName~SharedProjectReadAccess|FullyQualifiedName~ShareUnshareProject|FullyQualifiedName~TransferOwnership|FullyQualifiedName~SetTaskAssignees|FullyQualifiedName~GetAssignedToMe|FullyQualifiedName~TaskAssigneesEagerLoad|FullyQualifiedName~AssignmentCleanup|FullyQualifiedName~SetTaskDoneSharedAuthz|FullyQualifiedName~MoveTaskToProject|FullyQualifiedName~InboxAndProjectTasks)"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet restore apps/api/TaskFlow.sln
+      - run: dotnet build apps/api/TaskFlow.sln -c Release --no-restore
+      - run: dotnet test apps/api/tests/TaskFlow.IntegrationTests -c Release --no-build --filter "${{ matrix.shard.filter }}"
+        timeout-minutes: 30
 
   openapi-sync:
     name: openapi client in sync
@@ -102,7 +129,7 @@ jobs:
   build-push:
     name: build + push images
     runs-on: ubuntu-latest
-    needs: [web-quality, api-quality, openapi-sync]
+    needs: [web-quality, api-quality, api-integration, openapi-sync]
     if: github.ref == 'refs/heads/main'
     permissions:
       contents: read
