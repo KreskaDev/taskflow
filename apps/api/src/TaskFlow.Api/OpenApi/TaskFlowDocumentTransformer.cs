@@ -125,6 +125,17 @@ internal sealed class TaskFlowDocumentTransformer : IOpenApiDocumentTransformer
         SetOperation(document, "/api/projects/{id}/members/{userId}", OperationType.Delete, "removeProjectMember", 403, 404, 409);
         SetOperation(document, "/api/projects/{id}/membership", OperationType.Delete, "leaveProject", 404, 409);
 
+        // Comment surface (slice 009, contracts/openapi.yaml). listTaskComments is a member-only read
+        // (non-member/personal task → 404). postTaskComment dispatches by visibility (viewer → 403,
+        // non-member/personal/foreign → 404, bad body / non-member mention → 422). editComment/deleteComment
+        // run the strict two-step gate (role floor then author-equality → 403; membership boundary → 404);
+        // comments are VERSIONLESS (LWW) so NO op carries a 409, and deleteComment has no body (no 422).
+        // NO new errorCode — the ErrorCodes enum is UNCHANGED (R9).
+        SetOperation(document, "/api/tasks/{taskId}/comments", OperationType.Get, "listTaskComments", 404);
+        SetOperation(document, "/api/tasks/{taskId}/comments", OperationType.Post, "postTaskComment", 403, 404, 422);
+        SetOperation(document, "/api/comments/{commentId}", OperationType.Patch, "editComment", 403, 404, 422);
+        SetOperation(document, "/api/comments/{commentId}", OperationType.Delete, "deleteComment", 403, 404);
+
         return Task.CompletedTask;
     }
 

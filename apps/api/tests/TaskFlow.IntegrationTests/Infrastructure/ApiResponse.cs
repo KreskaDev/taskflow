@@ -78,6 +78,21 @@ public sealed record MemberBody(Guid UserId, string DisplayName, string Role, bo
 /// <summary>The <c>MembersResponse</c> roster body (slice 007): the composed roster + the project <c>version</c>.</summary>
 public sealed record MembersBody(Guid ProjectId, int Version, IReadOnlyList<MemberBody> Members);
 
+/// <summary>A resolved @mention token in a <c>CommentResponse</c> (slice 009); <c>userId</c> null = erased tombstone (R11).</summary>
+public sealed record CommentMentionBody(Guid? UserId, string DisplayName);
+
+/// <summary>
+/// The <c>CommentResponse</c> read model (slice 009, contracts/openapi.yaml). <c>authorId</c> null =
+/// tombstoned author (renders "Deleted user"); <c>canEdit</c> is the caller-is-author UI convenience.
+/// NEVER carries an email (Constitution XI).
+/// </summary>
+public sealed record CommentBody(
+    Guid Id, Guid TaskId, Guid? AuthorId, string AuthorDisplayName, string Body,
+    IReadOnlyList<CommentMentionBody> Mentions, DateTime CreatedAt, DateTime? EditedAt, bool CanEdit);
+
+/// <summary>The <c>CommentListResponse</c> envelope (slice 009): a task's chronological live thread.</summary>
+public sealed record CommentListBody(Guid TaskId, IReadOnlyList<CommentBody> Comments);
+
 /// <summary>
 /// Helpers for the allow/deny integration tests: read the typed bodies the API emits using the same
 /// camelCase (<see cref="JsonSerializerDefaults.Web"/>) conventions the host serializes with.
@@ -175,6 +190,20 @@ public static class ApiResponse
         ArgumentNullException.ThrowIfNull(response);
         return (await response.Content.ReadFromJsonAsync<IReadOnlyList<LabelBody>>(Web))
             ?? throw new InvalidOperationException("Expected a LabelResponse array but the response was empty.");
+    }
+
+    public static async Task<CommentBody> ReadCommentAsync(this HttpResponseMessage response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        return (await response.Content.ReadFromJsonAsync<CommentBody>(Web))
+            ?? throw new InvalidOperationException("Expected a CommentResponse body but the response was empty.");
+    }
+
+    public static async Task<CommentListBody> ReadCommentListAsync(this HttpResponseMessage response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        return (await response.Content.ReadFromJsonAsync<CommentListBody>(Web))
+            ?? throw new InvalidOperationException("Expected a CommentListResponse body but the response was empty.");
     }
 
     public static async Task<ProblemBody> ReadProblemAsync(this HttpResponseMessage response)

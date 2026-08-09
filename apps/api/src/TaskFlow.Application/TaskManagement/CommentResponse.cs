@@ -1,3 +1,6 @@
+using TaskFlow.Domain.IdentityAccess;
+using TaskFlow.Domain.TaskManagement;
+
 namespace TaskFlow.Application.TaskManagement;
 
 /// <summary>
@@ -35,6 +38,44 @@ public sealed record CommentResponse
 
     /// <summary>UI convenience: true iff the caller is the author (drives the edit/delete affordances only).</summary>
     public required bool CanEdit { get; init; }
+
+    /// <summary>The neutral tombstone rendered for an erased author/mention (R11/R15) — never their email.</summary>
+    public const string DeletedUserDisplayName = "Deleted user";
+
+    /// <summary>
+    /// Projects a <see cref="Comment"/> for <paramref name="caller"/>, resolving author/mention ids to
+    /// display names via <paramref name="displayNames"/>. Tombstone-safe: a null id (erased account) — or an
+    /// id whose user row is gone — renders <see cref="DeletedUserDisplayName"/>. <c>CanEdit</c> is the
+    /// caller-is-author UI convenience only; the author-only server gate (R4) stays authoritative (FR-068).
+    /// </summary>
+    public static CommentResponse From(
+        Comment comment, UserId caller, IReadOnlyDictionary<UserId, string> displayNames)
+    {
+        ArgumentNullException.ThrowIfNull(comment);
+        ArgumentNullException.ThrowIfNull(displayNames);
+
+        return new CommentResponse
+        {
+            Id = comment.Id.Value,
+            TaskId = comment.TaskId.Value,
+            AuthorId = comment.AuthorId?.Value,
+            AuthorDisplayName = Resolve(comment.AuthorId, displayNames),
+            Body = comment.Body,
+            Mentions = comment.Mentions
+                .Select(m => new CommentMentionResponse
+                {
+                    UserId = m.UserId?.Value,
+                    DisplayName = Resolve(m.UserId, displayNames),
+                })
+                .ToList(),
+            CreatedAt = comment.CreatedAt,
+            EditedAt = comment.EditedAt,
+            CanEdit = comment.AuthorId is { } author && author == caller,
+        };
+    }
+
+    private static string Resolve(UserId? id, IReadOnlyDictionary<UserId, string> displayNames) =>
+        id is { } userId && displayNames.TryGetValue(userId, out var name) ? name : DeletedUserDisplayName;
 }
 
 /// <summary>
@@ -48,4 +89,17 @@ public sealed record CommentMentionResponse
 
     /// <summary>The mentioned member's display name (output-encoded on render); "Deleted user" when erased.</summary>
     public required string DisplayName { get; init; }
+}
+
+/// <summary>
+/// A task's chronological live thread (contracts/openapi.yaml <c>CommentListResponse</c>): the parent task
+/// id + the comments ordered by <c>createdAt</c> (soft-deleted rows excluded — R5).
+/// </summary>
+public sealed record CommentListResponse
+{
+    /// <summary>The parent task the thread hangs on.</summary>
+    public required Guid TaskId { get; init; }
+
+    /// <summary>The live thread, ordered chronologically by <c>createdAt</c>.</summary>
+    public required IReadOnlyList<CommentResponse> Comments { get; init; }
 }

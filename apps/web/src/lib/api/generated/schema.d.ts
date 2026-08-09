@@ -4,6 +4,54 @@
  */
 
 export interface paths {
+    "/api/tasks/{taskId}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GET_api_tasks_taskId_comments
+         * @description GET_api_tasks_taskId_comments
+         */
+        get: operations["listTaskComments"];
+        put?: never;
+        /**
+         * POST_api_tasks_taskId_comments
+         * @description POST_api_tasks_taskId_comments
+         */
+        post: operations["postTaskComment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/comments/{commentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * DELETE_api_comments_commentId
+         * @description DELETE_api_comments_commentId
+         */
+        delete: operations["deleteComment"];
+        options?: never;
+        head?: never;
+        /**
+         * PATCH_api_comments_commentId
+         * @description PATCH_api_comments_commentId
+         */
+        patch: operations["editComment"];
+        trace?: never;
+    };
     "/api/internal/auth-check": {
         parameters: {
             query?: never;
@@ -686,6 +734,32 @@ export interface components {
             /** Format: int32 */
             version: number;
         };
+        CommentListResponse: {
+            /** Format: uuid */
+            taskId: string;
+            comments: components["schemas"]["CommentResponse"][];
+        };
+        CommentMentionResponse: {
+            /** Format: uuid */
+            userId?: string | null;
+            displayName: string;
+        };
+        CommentResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            taskId: string;
+            /** Format: uuid */
+            authorId?: string | null;
+            authorDisplayName: string;
+            body: string;
+            mentions: components["schemas"]["CommentMentionResponse"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            editedAt?: string | null;
+            canEdit: boolean;
+        };
         CreateLabelRequest: {
             name: string;
             color?: string | null;
@@ -703,6 +777,10 @@ export interface components {
             /** Format: date-time */
             dueDate?: string | null;
             dueHasTime?: boolean | null;
+        };
+        EditCommentRequest: {
+            body: string;
+            mentionedUserIds?: string[] | null;
         };
         EditProjectRequest: {
             name: string;
@@ -763,6 +841,10 @@ export interface components {
             projectId?: string | null;
             /** Format: int32 */
             version: number;
+        };
+        PostCommentRequest: {
+            body: string;
+            mentionedUserIds?: string[] | null;
         };
         ProjectResponse: {
             /** Format: uuid */
@@ -914,6 +996,219 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    listTaskComments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentListResponse"];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The resource does not exist, is soft-deleted, or the caller is not permitted to observe it (errorCode = not_found). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    postTaskComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostCommentRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentResponse"];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The caller is a member but lacks the required role for this operation (errorCode = forbidden). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The resource does not exist, is soft-deleted, or the caller is not permitted to observe it (errorCode = not_found). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Request validation failed (errorCode = validation_failed). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    deleteComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                commentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The caller is a member but lacks the required role for this operation (errorCode = forbidden). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The resource does not exist, is soft-deleted, or the caller is not permitted to observe it (errorCode = not_found). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    editComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                commentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditCommentRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentResponse"];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The caller is a member but lacks the required role for this operation (errorCode = forbidden). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The resource does not exist, is soft-deleted, or the caller is not permitted to observe it (errorCode = not_found). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Request validation failed (errorCode = validation_failed). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     GET_api_internal_auth_check: {
         parameters: {
             query?: never;

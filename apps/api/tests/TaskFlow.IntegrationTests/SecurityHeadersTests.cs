@@ -43,4 +43,25 @@ public sealed class SecurityHeadersTests : IntegrationTestBase
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         AssertSecurityHeaders(response);
     }
+
+    [Fact]
+    public async Task Security_headers_cover_the_comment_endpoints_error_paths()
+    {
+        // Slice 009 (FR-099, R8): the comment surface is the first free-form-content surface, so lock the
+        // reused SecurityHeadersMiddleware onto its routes too — the unauthenticated 401 error path exercises
+        // the same OnStarting emission every comment response rides.
+        var commentsPath = new Uri($"/api/tasks/{Guid.CreateVersion7()}/comments", UriKind.Relative);
+        using (var response = await Client.GetAsync(commentsPath))
+        {
+            response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+            AssertSecurityHeaders(response);
+        }
+
+        var commentPath = new Uri($"/api/comments/{Guid.CreateVersion7()}", UriKind.Relative);
+        using (var response = await Client.DeleteAsync(commentPath))
+        {
+            response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+            AssertSecurityHeaders(response);
+        }
+    }
 }
