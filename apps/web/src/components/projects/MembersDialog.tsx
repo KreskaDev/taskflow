@@ -67,7 +67,7 @@ export function MembersDialog({ open, onClose, project }: MembersDialogProps) {
                 {isOwner && !member.isOwner ? (
                   <span className="tf-members__actions">
                     <label className="tf-members__role-select">
-                      <span className="tf-visually-hidden">Role for {member.displayName}</span>
+                      <span className="sr-only">Role for {member.displayName}</span>
                       <select
                         aria-label={`Role for ${member.displayName}`}
                         value={member.role}
