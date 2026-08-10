@@ -1,0 +1,60 @@
+/* Move-to-project selector (T056) — full-width destination buttons; the current
+   placement carries aria-current + the active tint. */
+
+.list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--hit-target);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-control);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  text-align: left;
+}
+
+.option:hover {
+  background: var(--color-bg-hover);
+}
+
+.option[aria-current="true"] {
+  background: var(--color-bg-active);
+  font-weight: var(--weight-label);
+}
+
+.icon {
+  flex: none;
+  display: inline-flex;
+  width: 16px;
+  justify-content: center;
+}
+
+/* Preset-token tint mapping mirrors Chip's dot (decorative only — FR-044). */
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--color-text-tertiary);
+}
+
+.swatch[data-color="red"],
+.swatch[data-color="rose"] { background: var(--color-danger); }
+.swatch[data-color="orange"],
+.swatch[data-color="amber"] { background: var(--color-warning); }
+.swatch[data-color="green"],
+.swatch[data-color="teal"] { background: var(--color-green); }
+.swatch[data-color="blue"],
+.swatch[data-color="indigo"] { background: var(--color-accent); }
+.swatch[data-color="violet"],
+.swatch[data-color="pink"] { background: var(--color-accent-hover); }

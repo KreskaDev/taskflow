@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { Dialog } from "@/components/ui/Dialog";
+import { Dialog, DialogActions, DialogTitle } from "@/components/ui/Dialog";
 
 /**
  * Account-deletion control (T053, FR-049). The trigger opens a modal that states the full blast
@@ -18,7 +18,7 @@ export function DeleteAccountDialog() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="tf-delete-account">
+    <div>
       <Button variant="danger" onClick={() => setOpen(true)}>
         Delete account
       </Button>
@@ -29,21 +29,21 @@ export function DeleteAccountDialog() {
         titleId="delete-account-title"
         descriptionId="delete-account-desc"
       >
-        <h2 id="delete-account-title">Delete account</h2>
+        <DialogTitle id="delete-account-title">Delete account</DialogTitle>
         <p id="delete-account-desc">
           This permanently and irreversibly deletes your account and ALL of its data. This cannot
           be undone.
         </p>
-        <div className="tf-dialog__actions">
+        <DialogActions>
           <Button variant="secondary" onClick={() => setOpen(false)}>
             Cancel
           </Button>
           <form method="post" action="/api/auth/delete">
-            <button type="submit" className="tf-button tf-button--danger">
+            <Button type="submit" variant="danger">
               Permanently delete account
-            </button>
+            </Button>
           </form>
-        </div>
+        </DialogActions>
       </Dialog>
     </div>
   );

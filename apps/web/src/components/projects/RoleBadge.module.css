@@ -1,0 +1,17 @@
+/* Role badge (T056) — text + glyph carry the meaning (FR-044), border-boxed pill. */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 1px var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.badge[data-role="owner"] {
+  color: var(--color-text-primary);
+}

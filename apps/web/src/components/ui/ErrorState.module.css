@@ -1,0 +1,20 @@
+/* ErrorState (S5.3) — centered failure message + recovery action. */
+
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+}
+
+.message {
+  color: var(--color-text-primary);
+  font-size: var(--text-md);
+}
+
+.action {
+  display: flex;
+  gap: var(--space-2);
+}

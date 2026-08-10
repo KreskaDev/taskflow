@@ -3,11 +3,14 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/Button";
-import { Dialog } from "@/components/ui/Dialog";
+import { Dialog, DialogActions, DialogTitle } from "@/components/ui/Dialog";
+import dialogStyles from "@/components/ui/Dialog.module.css";
+import { Input } from "@/components/ui/Input";
 import { useProjects, type ProjectResponse } from "@/hooks/useProjects";
 import { nestingPreventionMessage, useProjectMutations } from "@/hooks/useProjectMutations";
 import { PROJECT_COLORS, PROJECT_ICONS } from "@/lib/projectPresets";
 import { createProjectSchema, editProjectSchema } from "@/lib/validation/project";
+import styles from "./ProjectForm.module.css";
 
 const TITLE_ID = "project-form-title";
 const NAME_ID = "project-form-name";
@@ -86,23 +89,24 @@ function ProjectFormBody({ onClose, mode, project }: Omit<ProjectFormProps, "ope
 
   return (
     <Dialog open onClose={onClose} titleId={TITLE_ID}>
-      <h2 id={TITLE_ID}>{mode === "edit" ? "Edit project" : "New project"}</h2>
+      <DialogTitle id={TITLE_ID}>{mode === "edit" ? "Edit project" : "New project"}</DialogTitle>
 
-      <label htmlFor={NAME_ID}>Name</label>
-      <input
-        id={NAME_ID}
-        type="text"
-        className="tf-project-form__name"
-        aria-label="Project name"
-        maxLength={200}
-        value={name}
-        onChange={(event) => setName(event.target.value)}
-      />
+      <label className={dialogStyles.fieldRow} htmlFor={NAME_ID}>
+        <span>Name</span>
+        <Input
+          id={NAME_ID}
+          type="text"
+          aria-label="Project name"
+          maxLength={200}
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
+      </label>
 
-      <fieldset className="tf-project-form__colors">
+      <fieldset className={styles.colors}>
         <legend>Color</legend>
         {PROJECT_COLORS.map((c) => (
-          <label key={c} className="tf-project-form__color-option">
+          <label key={c} className={styles.option}>
             <input
               type="radio"
               name="project-color"
@@ -110,16 +114,16 @@ function ProjectFormBody({ onClose, mode, project }: Omit<ProjectFormProps, "ope
               checked={color === c}
               onChange={() => setColor(c)}
             />
-            <span className="tf-sidebar__swatch" aria-hidden="true" data-color={c} />
-            <span className="tf-project-form__color-name">{c}</span>
+            <span className={styles.swatch} aria-hidden="true" data-color={c} />
+            <span>{c}</span>
           </label>
         ))}
       </fieldset>
 
-      <fieldset className="tf-project-form__icons">
+      <fieldset className={styles.icons}>
         <legend>Icon</legend>
         {PROJECT_ICONS.map((i) => (
-          <label key={i} className="tf-project-form__icon-option">
+          <label key={i} className={styles.option}>
             <input
               type="radio"
               name="project-icon"
@@ -127,38 +131,39 @@ function ProjectFormBody({ onClose, mode, project }: Omit<ProjectFormProps, "ope
               checked={icon === i}
               onChange={() => setIcon(i)}
             />
-            <span className="tf-project-form__icon-name">{i}</span>
+            <span>{i}</span>
           </label>
         ))}
       </fieldset>
 
-      <label htmlFor="project-form-parent">Parent project</label>
-      <select
-        id="project-form-parent"
-        className="tf-project-form__parent"
-        value={parentId ?? ""}
-        onChange={(event) => setParentId(event.target.value === "" ? null : event.target.value)}
-      >
-        <option value="">No parent (top-level)</option>
-        {parentChoices.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
+      <label className={dialogStyles.fieldRow} htmlFor="project-form-parent">
+        <span>Parent project</span>
+        <select
+          id="project-form-parent"
+          value={parentId ?? ""}
+          onChange={(event) => setParentId(event.target.value === "" ? null : event.target.value)}
+        >
+          <option value="">No parent (top-level)</option>
+          {parentChoices.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      </label>
 
-      <p id={NESTING_ERROR_ID} className="tf-project-form__error" role="status" aria-live="polite">
+      <p id={NESTING_ERROR_ID} className={styles.status} role="status" aria-live="polite">
         {nestingError ?? ""}
       </p>
 
-      <div className="tf-dialog__actions">
+      <DialogActions>
         <Button variant="secondary" onClick={onClose}>
           Cancel
         </Button>
         <Button onClick={submit} disabled={nestingError !== null}>
           {mode === "edit" ? "Save" : "Create"}
         </Button>
-      </div>
+      </DialogActions>
     </Dialog>
   );
 }

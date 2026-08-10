@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/Button";
-import { Dialog } from "@/components/ui/Dialog";
+import { Dialog, DialogActions, DialogChoices, DialogTitle } from "@/components/ui/Dialog";
 import { useProjectMutations } from "@/hooks/useProjectMutations";
 import type { ProjectResponse } from "@/hooks/useProjects";
 import type { ChildDisposition, TaskDisposition } from "@/lib/validation/project";
@@ -56,7 +56,7 @@ export function DeleteProjectDialog({ open, onClose, project, taskCount, childCo
 
   return (
     <Dialog open={open} onClose={onClose} titleId={TITLE_ID} descriptionId={DESC_ID}>
-      <h2 id={TITLE_ID}>Delete project</h2>
+      <DialogTitle id={TITLE_ID}>Delete project</DialogTitle>
       <p id={DESC_ID}>
         Deleting <strong>{project.name}</strong> affects {taskCount}{" "}
         {taskCount === 1 ? "task" : "tasks"} and {childCount}{" "}
@@ -64,8 +64,7 @@ export function DeleteProjectDialog({ open, onClose, project, taskCount, childCo
       </p>
 
       {taskCount > 0 ? (
-        <fieldset className="tf-delete-project__tasks">
-          <legend>Its {taskCount} {taskCount === 1 ? "task" : "tasks"}</legend>
+        <DialogChoices legend={`Its ${taskCount} ${taskCount === 1 ? "task" : "tasks"}`}>
           <label>
             <input
               type="radio"
@@ -96,12 +95,11 @@ export function DeleteProjectDialog({ open, onClose, project, taskCount, childCo
             />
             Delete them too
           </label>
-        </fieldset>
+        </DialogChoices>
       ) : null}
 
       {childCount > 0 ? (
-        <fieldset className="tf-delete-project__children">
-          <legend>Its {childCount} {childCount === 1 ? "sub-project" : "sub-projects"}</legend>
+        <DialogChoices legend={`Its ${childCount} ${childCount === 1 ? "sub-project" : "sub-projects"}`}>
           <label>
             <input
               type="radio"
@@ -122,17 +120,17 @@ export function DeleteProjectDialog({ open, onClose, project, taskCount, childCo
             />
             Delete them too
           </label>
-        </fieldset>
+        </DialogChoices>
       ) : null}
 
-      <div className="tf-dialog__actions">
+      <DialogActions>
         <Button variant="secondary" onClick={onClose}>
           Cancel
         </Button>
         <Button variant="danger" onClick={confirm} disabled={busy}>
           Delete project
         </Button>
-      </div>
+      </DialogActions>
     </Dialog>
   );
 }

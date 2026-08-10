@@ -1,8 +1,9 @@
 "use client";
 
 import { Inbox } from "lucide-react";
-import { Dialog } from "@/components/ui/Dialog";
+import { Dialog, DialogTitle } from "@/components/ui/Dialog";
 import { useProjects, type ProjectResponse } from "@/hooks/useProjects";
+import styles from "./ProjectSelector.module.css";
 
 const TITLE_ID = "project-selector-title";
 
@@ -52,17 +53,17 @@ export function ProjectSelector({ open, onClose, task, onSelect }: ProjectSelect
 
   return (
     <Dialog open onClose={onClose} titleId={TITLE_ID}>
-      <h2 id={TITLE_ID}>{task ? `Move "${task.title}" to…` : "Move to…"}</h2>
+      <DialogTitle id={TITLE_ID}>{task ? `Move "${task.title}" to…` : "Move to…"}</DialogTitle>
 
-      <ul className="tf-project-selector__list" role="list">
+      <ul className={styles.list} role="list">
         <li>
           <button
             type="button"
-            className="tf-project-selector__option"
+            className={styles.option}
             aria-current={currentProjectId === null ? "true" : undefined}
             onClick={() => choose(null)}
           >
-            <span className="tf-project-selector__icon" aria-hidden="true">
+            <span className={styles.icon} aria-hidden="true">
               <Inbox size={16} strokeWidth={1.75} />
             </span>
             Inbox
@@ -72,12 +73,12 @@ export function ProjectSelector({ open, onClose, task, onSelect }: ProjectSelect
           <li key={p.id}>
             <button
               type="button"
-              className="tf-project-selector__option"
+              className={styles.option}
               aria-current={currentProjectId === p.id ? "true" : undefined}
               onClick={() => choose(p.id)}
             >
-              <span className="tf-sidebar__swatch" aria-hidden="true" data-color={p.color} />
-              <span className="tf-project-selector__icon" aria-hidden="true">
+              <span className={styles.swatch} aria-hidden="true" data-color={p.color} />
+              <span className={styles.icon} aria-hidden="true">
                 {p.icon}
               </span>
               {p.name}

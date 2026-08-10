@@ -3,7 +3,8 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/Button";
-import { Dialog } from "@/components/ui/Dialog";
+import { Dialog, DialogActions, DialogTitle } from "@/components/ui/Dialog";
+import dialogStyles from "@/components/ui/Dialog.module.css";
 import { useMembershipMutations } from "@/hooks/useMembershipMutations";
 import type { MemberResponse } from "@/hooks/useProjectMembers";
 
@@ -37,16 +38,16 @@ export function TransferOwnershipDialog({ open, onClose, projectId, version, mem
 
   return (
     <Dialog open={open} onClose={onClose} titleId={TITLE_ID} descriptionId={DESC_ID}>
-      <h2 id={TITLE_ID}>Transfer ownership</h2>
+      <DialogTitle id={TITLE_ID}>Transfer ownership</DialogTitle>
       <p id={DESC_ID}>
         Choose a member to become the new owner. You become an <strong>editor</strong> — this cannot be undone
         from here (the new owner would have to transfer it back).
       </p>
 
       {members.length === 0 ? (
-        <p className="tf-transfer__empty">Invite a member first — ownership can only move to a current member.</p>
+        <p className={dialogStyles.muted}>Invite a member first — ownership can only move to a current member.</p>
       ) : (
-        <label className="tf-transfer__select">
+        <label className={dialogStyles.fieldRow}>
           <span>New owner</span>
           <select value={userId} onChange={(e) => setUserId(e.target.value)}>
             {members.map((m) => (
@@ -58,14 +59,14 @@ export function TransferOwnershipDialog({ open, onClose, projectId, version, mem
         </label>
       )}
 
-      <div className="tf-dialog__actions">
+      <DialogActions>
         <Button variant="secondary" onClick={onClose}>
           Cancel
         </Button>
         <Button variant="danger" onClick={confirm} disabled={members.length === 0 || !userId}>
           Transfer ownership
         </Button>
-      </div>
+      </DialogActions>
     </Dialog>
   );
 }

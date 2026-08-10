@@ -40,7 +40,7 @@ test.describe("US1 sign-in via OAuth (AS-01)", () => {
 
     // And the profile reflects the Google identity (proves the session carries the TaskFlow id).
     await page.goto("/settings");
-    await expect(page.locator(".tf-profile__name")).toHaveText("Alan Turing");
+    await expect(page.getByRole("main")).toContainText("Alan Turing");
 
     await context.close();
   });

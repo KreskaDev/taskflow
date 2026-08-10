@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/Button";
-import { Dialog } from "@/components/ui/Dialog";
+import { Dialog, DialogActions, DialogTitle } from "@/components/ui/Dialog";
 import { useMembershipMutations } from "@/hooks/useMembershipMutations";
 import type { MemberResponse } from "@/hooks/useProjectMembers";
 
@@ -32,20 +32,20 @@ export function RemoveMemberDialog({ open, onClose, projectId, version, member }
 
   return (
     <Dialog open={open} onClose={onClose} titleId={TITLE_ID} descriptionId={DESC_ID}>
-      <h2 id={TITLE_ID}>Remove member</h2>
+      <DialogTitle id={TITLE_ID}>Remove member</DialogTitle>
       <p id={DESC_ID}>
         Removing <strong>{member.displayName}</strong> revokes all their access to this project immediately and
         unassigns them from its tasks. This can&apos;t be undone — you&apos;d have to invite them again.
       </p>
 
-      <div className="tf-dialog__actions">
+      <DialogActions>
         <Button variant="secondary" onClick={onClose}>
           Cancel
         </Button>
         <Button variant="danger" onClick={confirm}>
           Remove member
         </Button>
-      </div>
+      </DialogActions>
     </Dialog>
   );
 }

@@ -3,6 +3,8 @@
 import { useMemo } from "react";
 
 import { DailyView, type DailyGroup } from "@/components/tasks/DailyView";
+import { Button } from "@/components/ui/Button";
+import { ErrorState } from "@/components/ui/ErrorState";
 import { useProjects } from "@/hooks/useProjects";
 import { useUpcomingTasks } from "@/hooks/useUpcomingTasks";
 
@@ -32,12 +34,14 @@ export function UpcomingView() {
 
   if (isError) {
     return (
-      <div className="tf-daily-view" role="alert">
-        <p>Nie udało się wczytać widoku Nadchodzące.</p>
-        <button type="button" className="tf-button" onClick={() => void refetch()}>
-          Spróbuj ponownie
-        </button>
-      </div>
+      <ErrorState
+        message="Nie udało się wczytać widoku Nadchodzące."
+        action={
+          <Button variant="secondary" onClick={() => void refetch()}>
+            Spróbuj ponownie
+          </Button>
+        }
+      />
     );
   }
 

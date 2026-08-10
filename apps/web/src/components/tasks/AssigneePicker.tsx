@@ -3,7 +3,9 @@
 import { Avatar } from "@/components/ui/Avatar";
 import { useState } from "react";
 
-import { Dialog } from "@/components/ui/Dialog";
+import { Button } from "@/components/ui/Button";
+import { Dialog, DialogActions, DialogTitle } from "@/components/ui/Dialog";
+import dialogStyles from "@/components/ui/Dialog.module.css";
 import { useProjectMembers } from "@/hooks/useProjectMembers";
 
 const TITLE_ID = "assignee-picker-title";
@@ -54,21 +56,19 @@ export function AssigneePicker({ open, projectId, current, onClose, onSubmit }: 
           }
         }}
       >
-        <h2 id={TITLE_ID} className="tf-dialog__title">
-          Przypisz osoby
-        </h2>
+        <DialogTitle id={TITLE_ID}>Przypisz osoby</DialogTitle>
 
         {isError ? (
-          <p role="alert" className="tf-reschedule-input__error">
+          <p role="alert" className={dialogStyles.dialogError}>
             Nie udało się wczytać listy członków.
           </p>
         ) : isPending ? (
-          <p className="tf-daily-view__empty">Wczytywanie…</p>
+          <p className={dialogStyles.muted}>Wczytywanie…</p>
         ) : (
-          <ul className="tf-assignee-picker__list">
+          <ul className={dialogStyles.optionList}>
             {(data?.members ?? []).map((m) => (
-              <li key={m.userId} className="tf-assignee-picker__item">
-                <label className="tf-field tf-field--inline">
+              <li key={m.userId}>
+                <label className={dialogStyles.inlineRow}>
                   <input
                     type="checkbox"
                     checked={selected.has(m.userId)}
@@ -77,7 +77,7 @@ export function AssigneePicker({ open, projectId, current, onClose, onSubmit }: 
                   <Avatar userId={m.userId} displayName={m.displayName} size="sm" />
                   <span>
                     {m.displayName}
-                    {m.isOwner ? <span className="tf-sr-only"> (właściciel)</span> : null}
+                    {m.isOwner ? <span className="sr-only"> (właściciel)</span> : null}
                   </span>
                 </label>
               </li>
@@ -85,14 +85,12 @@ export function AssigneePicker({ open, projectId, current, onClose, onSubmit }: 
           </ul>
         )}
 
-        <div className="tf-dialog__actions">
-          <button type="button" className="tf-button" onClick={save}>
-            Zapisz (Ctrl+Enter)
-          </button>
-          <button type="button" className="tf-button tf-button--secondary" onClick={onClose}>
+        <DialogActions>
+          <Button onClick={save}>Zapisz (Ctrl+Enter)</Button>
+          <Button variant="secondary" onClick={onClose}>
             Anuluj (Esc)
-          </button>
-        </div>
+          </Button>
+        </DialogActions>
       </div>
     </Dialog>
   );

@@ -7,6 +7,7 @@ import { CommentItem } from "@/components/tasks/CommentItem";
 import { DeleteCommentDialog } from "@/components/tasks/DeleteCommentDialog";
 import type { CommentMention, CommentResponse } from "@/hooks/useComments";
 import type { MemberResponse } from "@/hooks/useProjectMembers";
+import styles from "./CommentThread.module.css";
 
 interface CommentThreadProps {
   taskId: string;
@@ -45,13 +46,13 @@ export function CommentThread({
   return (
     // No own aria-label: the drawer's comment SECTION (DrawerCommentSection) is the single
     // "Komentarze" landmark — a second nested one would duplicate the region name (T053).
-    <section className="tf-comment-thread">
+    <section className={styles.thread}>
       {comments.length === 0 ? (
-        <p className="tf-comment-thread__empty">Brak komentarzy.</p>
+        <p className={styles.empty}>Brak komentarzy.</p>
       ) : (
-        <ol className="tf-comment-thread__list">
+        <ol className={styles.list}>
           {comments.map((comment) => (
-            <li key={comment.id} className="tf-comment-thread__item">
+            <li key={comment.id}>
               {editingId === comment.id ? (
                 <CommentComposer
                   members={members}

@@ -2,30 +2,35 @@
 
 import { useRef, useState } from "react";
 
-import { Dialog } from "@/components/ui/Dialog";
+import { Button } from "@/components/ui/Button";
+import { Dialog, DialogActions, DialogTitle } from "@/components/ui/Dialog";
+import dialogStyles from "@/components/ui/Dialog.module.css";
+import { Input } from "@/components/ui/Input";
 import { useLabelMutations, useLabelRoster } from "@/hooks/useLabels";
 import { labelNameSchema } from "@/lib/validation/label";
+import styles from "./LabelSelector.module.css";
 
 const TITLE_ID = "label-selector-title";
 
 interface LabelSelectorProps {
-  /** Whether the selector is open (the `L` key opened it for the selected task). */
+  /** Whether the selector is open (the row menu's "Etykiety…" opened it). */
   open: boolean;
   /** The task's current CALLER-scoped label ids (seeds the checked set). */
   current: string[];
-  /** Dismiss without saving (Esc / overlay click) — returns focus to the originating row. */
+  /** Dismiss without saving (Esc / overlay click) — returns focus to the invoker. */
   onClose: () => void;
   /** Commit the chosen label set (the parent calls `setTaskLabels`). */
   onSubmit: (labelIds: string[]) => void;
 }
 
 /**
- * The `L` label selector (slice 006, US-08.AS-04). A modal {@link Dialog} (FR-101 focus contract: initial
- * focus, trap, Esc, return focus) listing the caller's labels (the per-user roster) as keyboard-operable
- * checkboxes, plus a type-to-create input. Toggling builds the desired set locally; typing a new name + Enter
- * creates the label (client-id idempotent PUT) and adds it to the set; Ctrl+Enter (or Save) commits the whole
- * set via `setTaskLabels`. Label NAMES are React-escaped text (FR-099); the preset color is decorative
- * (`data-color`), never the sole carrier (FR-044). A per-label Delete removes it from the caller's roster
+ * The label selector (slice 006, US-08.AS-04; migrated to the catalog in slice 019 — T061).
+ * A modal {@link Dialog} (FR-101 focus contract) listing the caller's labels (the per-user
+ * roster) as keyboard-operable checkboxes, plus a type-to-create input. Toggling builds the
+ * desired set locally; typing a new name + Enter creates the label (client-id idempotent PUT)
+ * and adds it to the set; Ctrl+Enter (or Save) commits the whole set via `setTaskLabels`.
+ * Label NAMES are React-escaped text (FR-099); the preset color is decorative (`data-color`),
+ * never the sole carrier (FR-044). A per-label Delete removes it from the caller's roster
  * (full CRUD; the server cascade clears its applications).
  */
 export function LabelSelector({ open, current, onClose, onSubmit }: LabelSelectorProps) {
@@ -72,33 +77,30 @@ export function LabelSelector({ open, current, onClose, onSubmit }: LabelSelecto
           }
         }}
       >
-        <h2 id={TITLE_ID} className="tf-dialog__title">
-          Etykiety
-        </h2>
+        <DialogTitle id={TITLE_ID}>Etykiety</DialogTitle>
 
         {isError ? (
-          <p role="alert" className="tf-reschedule-input__error">
+          <p role="alert" className={dialogStyles.dialogError}>
             Nie udało się wczytać etykiet.
           </p>
         ) : isPending ? (
-          <p className="tf-daily-view__empty">Wczytywanie…</p>
+          <p className={dialogStyles.muted}>Wczytywanie…</p>
         ) : (
-          <ul className="tf-label-selector__list">
+          <ul className={dialogStyles.optionList}>
             {(data ?? []).map((label) => (
-              <li key={label.id} className="tf-label-selector__item">
-                <label className="tf-field tf-field--inline">
+              <li key={label.id} className={styles.item}>
+                <label className={dialogStyles.inlineRow}>
                   <input
                     type="checkbox"
                     checked={selected.has(label.id)}
                     onChange={() => toggle(label.id)}
                   />
-                  <span className="tf-label-chip" data-color={label.color ?? undefined}>
+                  <span className={styles.chip} data-color={label.color ?? undefined}>
                     {label.name}
                   </span>
                 </label>
-                <button
-                  type="button"
-                  className="tf-button tf-button--secondary"
+                <Button
+                  variant="secondary"
                   aria-label={`Usuń etykietę ${label.name}`}
                   onClick={() => {
                     // Prune the id from the pending set so Save can't commit a just-deleted label (→ 422),
@@ -110,21 +112,18 @@ export function LabelSelector({ open, current, onClose, onSubmit }: LabelSelecto
                   }}
                 >
                   Usuń
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
         )}
 
-        <div className="tf-field">
-          <label htmlFor="label-create" className="tf-sr-only">
-            Nowa etykieta
-          </label>
-          <input
+        <label className={dialogStyles.fieldRow} htmlFor="label-create">
+          <span className="sr-only">Nowa etykieta</span>
+          <Input
             ref={createInputRef}
             id="label-create"
             type="text"
-            className="tf-input"
             placeholder="Nowa etykieta…"
             maxLength={50}
             value={draft}
@@ -139,16 +138,14 @@ export function LabelSelector({ open, current, onClose, onSubmit }: LabelSelecto
               }
             }}
           />
-        </div>
+        </label>
 
-        <div className="tf-dialog__actions">
-          <button type="button" className="tf-button" onClick={save}>
-            Zapisz (Ctrl+Enter)
-          </button>
-          <button type="button" className="tf-button tf-button--secondary" onClick={onClose}>
+        <DialogActions>
+          <Button onClick={save}>Zapisz (Ctrl+Enter)</Button>
+          <Button variant="secondary" onClick={onClose}>
             Anuluj (Esc)
-          </button>
-        </div>
+          </Button>
+        </DialogActions>
       </div>
     </Dialog>
   );

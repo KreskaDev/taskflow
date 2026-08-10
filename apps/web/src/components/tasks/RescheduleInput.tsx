@@ -1,6 +1,6 @@
 "use client";
 
-import { Dialog } from "@/components/ui/Dialog";
+import { Dialog, DialogTitle } from "@/components/ui/Dialog";
 import { DateInput } from "@/components/ui/DateInput";
 
 const TITLE_ID = "reschedule-input-title";
@@ -27,9 +27,7 @@ export function RescheduleInput({ open, onClose, onSubmit }: RescheduleInputProp
   if (!open) return null;
   return (
     <Dialog open={open} onClose={onClose} titleId={TITLE_ID}>
-      <h2 id={TITLE_ID} className="tf-dialog__title">
-        Zmień termin
-      </h2>
+      <DialogTitle id={TITLE_ID}>Zmień termin</DialogTitle>
       <DateInput
         id="reschedule-input"
         label="Nowy termin (np. jutro, piątek, 30.06)"

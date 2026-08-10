@@ -1,6 +1,7 @@
 "use client";
 
-import { Dialog } from "@/components/ui/Dialog";
+import { Button } from "@/components/ui/Button";
+import { Dialog, DialogActions, DialogTitle } from "@/components/ui/Dialog";
 
 const TITLE_ID = "delete-comment-title";
 const DESCRIPTION_ID = "delete-comment-description";
@@ -24,25 +25,22 @@ export function DeleteCommentDialog({ open, onClose, onConfirm }: DeleteCommentD
 
   return (
     <Dialog open={open} onClose={onClose} titleId={TITLE_ID} descriptionId={DESCRIPTION_ID}>
-      <h2 id={TITLE_ID} className="tf-dialog__title">
-        Usunąć komentarz?
-      </h2>
+      <DialogTitle id={TITLE_ID}>Usunąć komentarz?</DialogTitle>
       <p id={DESCRIPTION_ID}>Komentarz zniknie z wątku.</p>
-      <div className="tf-dialog__actions">
-        <button
-          type="button"
-          className="tf-button"
+      <DialogActions>
+        <Button
+          variant="danger"
           onClick={() => {
             onConfirm();
             onClose();
           }}
         >
           Usuń
-        </button>
-        <button type="button" className="tf-button tf-button--secondary" onClick={onClose}>
+        </Button>
+        <Button variant="secondary" onClick={onClose}>
           Anuluj (Esc)
-        </button>
-      </div>
+        </Button>
+      </DialogActions>
     </Dialog>
   );
 }

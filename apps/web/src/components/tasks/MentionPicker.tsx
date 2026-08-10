@@ -1,7 +1,9 @@
 "use client";
 
 import { Avatar } from "@/components/ui/Avatar";
-import { Dialog } from "@/components/ui/Dialog";
+import { Button } from "@/components/ui/Button";
+import { Dialog, DialogActions, DialogTitle } from "@/components/ui/Dialog";
+import dialogStyles from "@/components/ui/Dialog.module.css";
 import type { MemberResponse } from "@/hooks/useProjectMembers";
 
 const TITLE_ID = "mention-picker-title";
@@ -31,21 +33,18 @@ export function MentionPicker({ open, members, chosen, onClose, onPick }: Mentio
 
   return (
     <Dialog open={open} onClose={onClose} titleId={TITLE_ID}>
-      <h2 id={TITLE_ID} className="tf-dialog__title">
-        Wspomnij osobę
-      </h2>
+      <DialogTitle id={TITLE_ID}>Wspomnij osobę</DialogTitle>
 
       {members.length === 0 ? (
-        <p className="tf-daily-view__empty">Brak członków do wspomnienia.</p>
+        <p className={dialogStyles.muted}>Brak członków do wspomnienia.</p>
       ) : (
-        <ul className="tf-mention-picker__list">
+        <ul className={dialogStyles.optionList}>
           {members.map((m) => {
             const alreadyChosen = chosen.includes(m.userId);
             return (
-              <li key={m.userId} className="tf-mention-picker__item">
-                <button
-                  type="button"
-                  className="tf-button tf-button--secondary"
+              <li key={m.userId}>
+                <Button
+                  variant="secondary"
                   disabled={alreadyChosen}
                   onClick={() => {
                     onPick(m);
@@ -55,20 +54,20 @@ export function MentionPicker({ open, members, chosen, onClose, onPick }: Mentio
                   <Avatar userId={m.userId} displayName={m.displayName} size="sm" />
                   {" @"}
                   {m.displayName}
-                  {m.isOwner ? <span className="tf-sr-only"> (właściciel)</span> : null}
-                  {alreadyChosen ? <span className="tf-sr-only"> (już wspomniano)</span> : null}
-                </button>
+                  {m.isOwner ? <span className="sr-only"> (właściciel)</span> : null}
+                  {alreadyChosen ? <span className="sr-only"> (już wspomniano)</span> : null}
+                </Button>
               </li>
             );
           })}
         </ul>
       )}
 
-      <div className="tf-dialog__actions">
-        <button type="button" className="tf-button tf-button--secondary" onClick={onClose}>
+      <DialogActions>
+        <Button variant="secondary" onClick={onClose}>
           Anuluj (Esc)
-        </button>
-      </div>
+        </Button>
+      </DialogActions>
     </Dialog>
   );
 }

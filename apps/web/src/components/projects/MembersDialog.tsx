@@ -10,11 +10,13 @@ import { RoleBadge } from "@/components/projects/RoleBadge";
 import { ShareProjectDialog } from "@/components/projects/ShareProjectDialog";
 import { TransferOwnershipDialog } from "@/components/projects/TransferOwnershipDialog";
 import { Button } from "@/components/ui/Button";
-import { Dialog } from "@/components/ui/Dialog";
+import { Dialog, DialogActions, DialogTitle } from "@/components/ui/Dialog";
+import dialogStyles from "@/components/ui/Dialog.module.css";
 import { useMembershipMutations } from "@/hooks/useMembershipMutations";
 import { useProjectMembers, type MemberResponse } from "@/hooks/useProjectMembers";
 import type { ProjectResponse } from "@/hooks/useProjects";
 import type { MembershipRole } from "@/lib/validation/membership";
+import styles from "./MembersDialog.module.css";
 
 const TITLE_ID = "members-dialog-title";
 
@@ -50,43 +52,39 @@ export function MembersDialog({ open, onClose, project }: MembersDialogProps) {
   return (
     <>
       <Dialog open={open} onClose={onClose} titleId={TITLE_ID}>
-        <h2 id={TITLE_ID}>Members of {project.name}</h2>
+        <DialogTitle id={TITLE_ID}>Members of {project.name}</DialogTitle>
 
-        {isPending ? <p className="tf-members__status">Loading members…</p> : null}
+        {isPending ? <p className={dialogStyles.muted}>Loading members…</p> : null}
         {error ? (
-          <p className="tf-members__status" role="alert">
+          <p className={dialogStyles.dialogError} role="alert">
             {error.message}
           </p>
         ) : null}
 
         {roster ? (
-          <ul className="tf-members__list" aria-label="Project members">
+          <ul className={styles.list} aria-label="Project members">
             {members.map((member) => (
-              <li key={member.userId} className="tf-members__row">
+              <li key={member.userId} className={styles.row}>
                 <Avatar userId={member.userId} displayName={member.displayName} size="md" />
-                <span className="tf-members__name">{member.displayName}</span>
+                <span className={styles.name}>{member.displayName}</span>
                 <RoleBadge role={member.role} />
                 {isOwner && !member.isOwner ? (
-                  <span className="tf-members__actions">
-                    <label className="tf-members__role-select">
-                      <span className="sr-only">Role for {member.displayName}</span>
-                      <select
-                        aria-label={`Role for ${member.displayName}`}
-                        value={member.role}
-                        onChange={(e) => changeMemberRole(project.id, member.userId, e.target.value as MembershipRole, version)}
-                      >
-                        <option value="editor">Editor</option>
-                        <option value="viewer">Viewer</option>
-                      </select>
-                    </label>
-                    <button
-                      type="button"
-                      className="tf-icon-button"
+                  <span className={styles.rowActions}>
+                    <select
+                      aria-label={`Role for ${member.displayName}`}
+                      value={member.role}
+                      onChange={(e) => changeMemberRole(project.id, member.userId, e.target.value as MembershipRole, version)}
+                    >
+                      <option value="editor">Editor</option>
+                      <option value="viewer">Viewer</option>
+                    </select>
+                    <Button
+                      variant="secondary"
                       aria-label={`Remove ${member.displayName}`}
                       onClick={() => setRemoving(member)}
                     >
                       Remove
-                    </button>
+                    </Button>
                   </span>
                 ) : null}
               </li>
@@ -97,7 +95,7 @@ export function MembersDialog({ open, onClose, project }: MembersDialogProps) {
         {isOwner ? (
           <>
             <InviteMemberForm projectId={project.id} version={version} />
-            <div className="tf-members__owner-actions">
+            <div className={styles.ownerActions}>
               <Button variant="secondary" onClick={() => setTransferring(true)} disabled={nonOwnerMembers.length === 0}>
                 Transfer ownership
               </Button>
@@ -107,18 +105,18 @@ export function MembersDialog({ open, onClose, project }: MembersDialogProps) {
             </div>
           </>
         ) : (
-          <div className="tf-members__member-actions">
+          <div className={styles.ownerActions}>
             <Button variant="danger" onClick={() => setLeaving(true)}>
               Leave project
             </Button>
           </div>
         )}
 
-        <div className="tf-dialog__actions">
+        <DialogActions>
           <Button variant="secondary" onClick={onClose}>
             Close
           </Button>
-        </div>
+        </DialogActions>
       </Dialog>
 
       <TransferOwnershipDialog

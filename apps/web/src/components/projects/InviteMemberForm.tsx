@@ -3,8 +3,10 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { useMembershipMutations } from "@/hooks/useMembershipMutations";
 import { inviteSchema, type MembershipRole } from "@/lib/validation/membership";
+import styles from "./InviteMemberForm.module.css";
 
 interface InviteMemberFormProps {
   projectId: string;
@@ -39,10 +41,10 @@ export function InviteMemberForm({ projectId, version }: InviteMemberFormProps) 
   const error = localError ?? inviteError;
 
   return (
-    <form className="tf-invite-form" onSubmit={submit} aria-label="Invite a member">
-      <label className="tf-invite-form__email">
+    <form className={styles.form} onSubmit={submit} aria-label="Invite a member">
+      <label className={styles.field}>
         <span>Invite by email</span>
-        <input
+        <Input
           type="email"
           name="invite-email"
           autoComplete="off"
@@ -51,7 +53,7 @@ export function InviteMemberForm({ projectId, version }: InviteMemberFormProps) 
           onChange={(e) => setEmail(e.target.value)}
         />
       </label>
-      <label className="tf-invite-form__role">
+      <label className={styles.field}>
         <span>Role</span>
         <select value={role} onChange={(e) => setRole(e.target.value as MembershipRole)}>
           <option value="editor">Editor</option>
@@ -62,7 +64,7 @@ export function InviteMemberForm({ projectId, version }: InviteMemberFormProps) 
         Invite
       </Button>
       {error ? (
-        <p className="tf-invite-form__error" role="alert">
+        <p className={styles.error} role="alert">
           {error}
         </p>
       ) : null}
