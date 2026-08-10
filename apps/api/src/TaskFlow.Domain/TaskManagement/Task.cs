@@ -153,21 +153,25 @@ public sealed class Task : AggregateRoot<TaskId>
         Touch(utcNow);
     }
 
-    /// <summary>Marks the task done (FR-003): sets <see cref="Status"/> and stamps <see cref="CompletedAt"/>.</summary>
+    /// <summary>
+    /// Moves the task to <paramref name="target"/> (FR-003, slice 010 D2 — replaces the former
+    /// <c>MarkDone</c>/<c>MarkBacklog</c> pair). The five statuses form a flat set, not a state
+    /// machine: no transition is forbidden here (the Done-boundary rule of US-03.AS-05 is a UI
+    /// mapping rule). The single invariant is <see cref="CompletedAt"/> set iff
+    /// <see cref="TaskStatus.Done"/>: entering done stamps it, leaving done clears it. A
+    /// same-status call is an idempotent no-op — no <see cref="Touch"/>, no version bump.
+    /// </summary>
+    /// <param name="target">The desired status.</param>
     /// <param name="utcNow">The current UTC time (injected for testability).</param>
-    public void MarkDone(DateTime utcNow)
+    public void SetStatus(TaskStatus target, DateTime utcNow)
     {
-        Status = TaskStatus.Done;
-        CompletedAt = utcNow;
-        Touch(utcNow);
-    }
+        if (Status == target)
+        {
+            return;
+        }
 
-    /// <summary>Un-completes the task (FR-003): sets <see cref="Status"/> to backlog and clears <see cref="CompletedAt"/>.</summary>
-    /// <param name="utcNow">The current UTC time (injected for testability).</param>
-    public void MarkBacklog(DateTime utcNow)
-    {
-        Status = TaskStatus.Backlog;
-        CompletedAt = null;
+        CompletedAt = target == TaskStatus.Done ? utcNow : null;
+        Status = target;
         Touch(utcNow);
     }
 

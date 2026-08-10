@@ -30,13 +30,12 @@ namespace TaskFlow.IntegrationTests.TaskManagement;
 /// <c>done</c> seed is unreachable through the createTask endpoint, which only ever inserts a fresh
 /// backlog row), so the seed is the only way to stand up a completed row to un-complete.
 /// <para>
-/// The sharpest assertion is the idempotent replay (research.md R3): <see cref="MarkDone"/> is
-/// unconditional, so a SECOND <c>done</c> (carrying the REFRESHED version) re-stamps
-/// <c>completedAt</c> and bumps <c>version</c> again — it does NOT no-op. Idempotency here means the
-/// observable DESIRED state is stable: status stays <c>done</c> and <c>completedAt</c> stays
-/// non-null across repeated done requests; it must NOT toggle back to backlog. We therefore assert
-/// status-stays-done + completedAt-non-null, and deliberately do NOT assert version-unchanged or
-/// completedAt-equal (either would force a no-op-if-already-done handler that contradicts R3).
+/// The sharpest assertion is the idempotent replay (research.md R3): the observable DESIRED
+/// state is stable — status stays <c>done</c> and <c>completedAt</c> stays non-null across
+/// repeated done requests; it must NOT toggle back to backlog. We assert status-stays-done +
+/// completedAt-non-null and deliberately do NOT pin version/completedAt equality, so the suite
+/// stayed green when slice 010 replaced the unconditional <c>MarkDone</c> with the
+/// <c>SetStatus</c> transition whose same-status arm is a true no-op (D2).
 /// </para>
 /// </remarks>
 public sealed class SetTaskDoneTests : IntegrationTestBase
@@ -72,7 +71,7 @@ public sealed class SetTaskDoneTests : IntegrationTestBase
         var task = TaskEntity.Create(TaskId.From(id), owner, title, ValidRank, DateTime.UtcNow);
         if (done)
         {
-            task.MarkDone(DateTime.UtcNow);
+            task.SetStatus(DomainTaskStatus.Done, DateTime.UtcNow);
         }
 
         db.Tasks.Add(task);
@@ -138,9 +137,9 @@ public sealed class SetTaskDoneTests : IntegrationTestBase
     public async Task Allow_repeated_done_is_idempotent_under_desired_state_and_does_not_toggle_back()
     {
         // research.md R3: the command carries the DESIRED state, not a blind flip — so two done
-        // requests (each with the REFRESHED version) both succeed and the task stays done. MarkDone
-        // is unconditional, so we assert the STABLE desired state (status=done, completedAt non-null),
-        // NOT version-unchanged or completedAt-equal (that would force a no-op-if-already-done handler).
+        // requests (each with the REFRESHED version) both succeed and the task stays done. We assert
+        // the STABLE desired state (status=done, completedAt non-null) and deliberately not the
+        // version/completedAt values, so the slice-010 no-op-on-same-status transition stays covered.
         var owner = await CreateOwnerAsync("google-sub-status-idem", "statusidem@example.com");
         var token = TestJwtHelper.Valid(owner.Value.ToString());
         var (id, version) = await SeedTaskAsync(owner, "Idempotent done");

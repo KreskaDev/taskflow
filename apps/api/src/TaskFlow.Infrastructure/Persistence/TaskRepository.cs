@@ -97,16 +97,21 @@ public sealed class TaskRepository(AppDbContext db) : ITaskRepository
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-    public async Task<IReadOnlyList<TaskEntity>> ListByProjectAsync(ProjectId projectId, UserId owner, CancellationToken cancellationToken) =>
+    public async Task<IReadOnlyList<TaskEntity>> ListByProjectAsync(ProjectId projectId, CancellationToken cancellationToken) =>
+        // PROJECT-scoped (slice 010 D4): no created_by filter — a shared project's tasks belong to
+        // the PROJECT regardless of which member authored them (FR-066); authorization stays in the
+        // handlers (404-first readable dispatch). Keeps ORDER BY position, id (COLLATE "C").
         await db.Tasks
-            .Where(t => t.ProjectId == projectId && t.CreatedBy == owner && t.DeletedAt == null)
+            .Where(t => t.ProjectId == projectId && t.DeletedAt == null)
             .OrderBy(t => t.Position)
             .ThenBy(t => t.Id)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-    public Task<int> CountByProjectAsync(ProjectId projectId, UserId owner, CancellationToken cancellationToken) =>
-        db.Tasks.CountAsync(t => t.ProjectId == projectId && t.CreatedBy == owner && t.DeletedAt == null, cancellationToken);
+    public Task<int> CountByProjectAsync(ProjectId projectId, CancellationToken cancellationToken) =>
+        // PROJECT-scoped like the listing (D4) — the delete-disposition guard must see member-authored
+        // tasks, else a project holding only member tasks would tombstone without any disposition.
+        db.Tasks.CountAsync(t => t.ProjectId == projectId && t.DeletedAt == null, cancellationToken);
 
     public async Task<IReadOnlyList<TaskEntity>> ListAssignedToAsync(UserId assignee, CancellationToken cancellationToken) =>
         // The caller's assigned, active, non-deleted tasks across all projects. EF translates the owned

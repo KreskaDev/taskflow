@@ -105,7 +105,8 @@ public static class GetViewCountsHandler
         var assigned = assignedRows.Count(t => IsIncomplete(t) && t.ProjectId is { } pid && readable.Contains(pid));
 
         // Projects: the GetMyProjects listing (owned ∪ member-of, archived excluded), counted with
-        // the project view's own listing (scoped by the PROJECT owner, as GetProjectTasks does).
+        // the project view's own listing (PROJECT-scoped after the slice-010 D4 repair, exactly as
+        // GetProjectTasks lists — member-authored tasks count too, so the badge matches the view).
         var owned = await projects.ListOwnedAsync(caller, includeArchived: false, cancellationToken).ConfigureAwait(false);
         var memberProjects = await projects.ListByIdsAsync(memberOf, includeArchived: false, cancellationToken).ConfigureAwait(false);
         var accessible = owned.Concat(memberProjects)
@@ -117,7 +118,7 @@ public static class GetViewCountsHandler
         foreach (var project in accessible)
         {
             var projectRows = await tasks
-                .ListByProjectAsync(project.Id, project.OwnerId, cancellationToken)
+                .ListByProjectAsync(project.Id, cancellationToken)
                 .ConfigureAwait(false);
             projectCounts.Add(new ProjectCountResponse
             {

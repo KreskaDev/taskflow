@@ -96,7 +96,7 @@ public abstract class SharingTestBase : IntegrationTestBase
             TaskFlow.Domain.TaskManagement.TaskId.From(id), createdBy, title, position, DateTime.UtcNow, dueDate, dueHasTime);
         if (done)
         {
-            task.MarkDone(DateTime.UtcNow);
+            task.SetStatus(TaskFlow.Domain.TaskManagement.TaskStatus.Done, DateTime.UtcNow);
         }
 
         var entry = db.Entry(task);
