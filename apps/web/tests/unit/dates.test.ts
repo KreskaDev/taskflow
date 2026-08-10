@@ -18,7 +18,7 @@ import { formatInReferenceZone } from "@/lib/timezone";
 // 2026-06-21 12:00 Warsaw (Sunday, CEST +02:00) == 10:00:00Z.
 const NOW = new Date("2026-06-21T10:00:00Z");
 
-describe("parseTaskInput — R2 phrase classes (now = 2026-06-21 Sun CEST)", () => {
+describe("parseTaskInput — R2 phrase classes (now = 2026-06-21 Sun CEST) [INV-024]", () => {
   it("dzis → today date-only (midnight Warsaw)", () => {
     const r = parseTaskInput("Sprzatanie dzis", NOW);
     expect(r.title).toBe("Sprzatanie");

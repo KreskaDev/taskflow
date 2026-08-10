@@ -51,7 +51,7 @@ async function createTask(page: Page, title: string): Promise<void> {
 }
 
 test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
-  test("EC-01: a fresh user sees the accessible empty-Inbox hint and zero options", async ({
+  test("EC-01: a fresh user sees the accessible empty-Inbox hint and zero options [INV-030]", async ({
     browser,
   }) => {
     const { page, context } = await signedInPage(browser, "tasks-empty");
@@ -69,7 +69,7 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
     await context.close();
   });
 
-  test("AS-01: pressing C opens the capture dialog with the title input focused", async ({
+  test("AS-01: pressing C opens the capture dialog with the title input focused [INV-020]", async ({
     browser,
   }) => {
     const { page, context } = await signedInPage(browser, "tasks-focus");
@@ -86,7 +86,7 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
     await context.close();
   });
 
-  test("AS-06: Enter creates, the row paints at the top newest-first, and persists across reload", async ({
+  test("AS-06: Enter creates, the row paints at the top newest-first, and persists across reload [INV-021]", async ({
     browser,
   }) => {
     const { page, context } = await signedInPage(browser, "tasks-create");
@@ -114,7 +114,7 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
     await context.close();
   });
 
-  test("AS-07: Esc cancels — no task is created and focus returns to the invoker", async ({
+  test("AS-07: Esc cancels — no task is created and focus returns to the invoker [INV-022]", async ({
     browser,
   }) => {
     const { page, context } = await signedInPage(browser, "tasks-cancel");
@@ -143,7 +143,7 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
     await context.close();
   });
 
-  test("AS-09 precursor: typing C inside the capture input inserts the character (no nested capture)", async ({
+  test("AS-09 precursor: typing C inside the capture input inserts the character (no nested capture) [INV-023]", async ({
     browser,
   }) => {
     const { page, context } = await signedInPage(browser, "tasks-suppress");
@@ -201,7 +201,7 @@ test.describe("US1 Natural-Language Dates (AS-02..05 capture-with-date, EC-02, v
   ];
 
   for (const { scenario, input, title } of captureCases) {
-    test(`${scenario}: "${input}" → title "${title}" stripped + due-date label visible`, async ({
+    test(`${scenario}: "${input}" → title "${title}" stripped + due-date label visible [INV-024]`, async ({
       browser,
     }) => {
       const { page, context } = await signedInPage(
@@ -226,7 +226,7 @@ test.describe("US1 Natural-Language Dates (AS-02..05 capture-with-date, EC-02, v
     });
   }
 
-  test('EC-02: "Spotkanie 30.02" creates NO task and announces "nie rozpoznano"; field retains value', async ({
+  test('EC-02: "Spotkanie 30.02" creates NO task and announces "nie rozpoznano"; field retains value [INV-025]', async ({
     browser,
   }) => {
     const { page, context } = await signedInPage(browser, "dates-ec02-impossible");
@@ -259,7 +259,7 @@ test.describe("US1 Natural-Language Dates (AS-02..05 capture-with-date, EC-02, v
     await context.close();
   });
 
-  test('guard: "Wersja 2.0" is created as-is with NO due-date label and NO error', async ({
+  test('guard: "Wersja 2.0" is created as-is with NO due-date label and NO error [INV-026]', async ({
     browser,
   }) => {
     const { page, context } = await signedInPage(browser, "dates-guard-version");
@@ -315,7 +315,7 @@ test.describe("US8 Keyboard Nav & Operate (AS-03/07/09, Space/E/Del/Alt+↑↓, 
     );
   }
 
-  test("AS-03: ↑/↓ move the selection (aria-selected + listbox aria-activedescendant track it)", async ({
+  test("AS-03: ↑/↓ move the selection (aria-selected + listbox aria-activedescendant track it) [INV-032]", async ({
     browser,
   }) => {
     const { page, context } = await signedInPage(browser, "us8-nav");
@@ -377,7 +377,7 @@ test.describe("US8 Keyboard Nav & Operate (AS-03/07/09, Space/E/Del/Alt+↑↓, 
     await context.close();
   });
 
-  test("AS-09: single-key shortcuts are suppressed while a text input is focused", async ({
+  test("AS-09: single-key shortcuts are suppressed while a text input is focused [INV-124]", async ({
     browser,
   }) => {
     const { page, context } = await signedInPage(browser, "us8-suppress");
@@ -399,7 +399,7 @@ test.describe("US8 Keyboard Nav & Operate (AS-03/07/09, Space/E/Del/Alt+↑↓, 
     await context.close();
   });
 
-  test("Space toggles the selected task done↔backlog and the done state persists across reload", async ({
+  test("Space toggles the selected task done↔backlog and the done state persists across reload [INV-033]", async ({
     browser,
   }) => {
     const { page, context } = await signedInPage(browser, "us8-toggle");
@@ -438,7 +438,7 @@ test.describe("US8 Keyboard Nav & Operate (AS-03/07/09, Space/E/Del/Alt+↑↓, 
     await context.close();
   });
 
-  test("E renames the selected task inline (Enter commits + persists); Esc keeps the original", async ({
+  test("E renames the selected task inline (Enter commits + persists); Esc keeps the original [INV-034]", async ({
     browser,
   }) => {
     const { page, context } = await signedInPage(browser, "us8-rename");
@@ -479,7 +479,7 @@ test.describe("US8 Keyboard Nav & Operate (AS-03/07/09, Space/E/Del/Alt+↑↓, 
     await context.close();
   });
 
-  test("Del soft-deletes the selected task and it stays gone across reload", async ({
+  test("Del soft-deletes the selected task and it stays gone across reload [INV-036]", async ({
     browser,
   }) => {
     const { page, context } = await signedInPage(browser, "us8-delete");
@@ -508,7 +508,7 @@ test.describe("US8 Keyboard Nav & Operate (AS-03/07/09, Space/E/Del/Alt+↑↓, 
     await context.close();
   });
 
-  test("Del rollback-in-place: a server 500 reappears the row in position + announces the failure (FR-049)", async ({
+  test("Del rollback-in-place: a server 500 reappears the row in position + announces the failure (FR-049) [INV-037]", async ({
     browser,
   }) => {
     const { page, context } = await signedInPage(browser, "us8-delete-rollback");
@@ -568,7 +568,7 @@ test.describe("US8 Keyboard Nav & Operate (AS-03/07/09, Space/E/Del/Alt+↑↓, 
     await context.close();
   });
 
-  test("Alt+↓ reorders the selected task down; the new order persists and the URL is unchanged", async ({
+  test("Alt+↓ reorders the selected task down; the new order persists and the URL is unchanged [INV-038]", async ({
     browser,
   }) => {
     const { page, context } = await signedInPage(browser, "us8-reorder");
@@ -600,7 +600,7 @@ test.describe("US8 Keyboard Nav & Operate (AS-03/07/09, Space/E/Del/Alt+↑↓, 
     await context.close();
   });
 
-  test("virtualization-focus: the selected row stays mounted + addressable after a wheel scroll, and ↑/↓ still move", async ({
+  test("virtualization-focus: the selected row stays mounted + addressable after a wheel scroll, and ↑/↓ still move [INV-041] [INV-136]", async ({
     browser,
   }) => {
     const { page, context } = await signedInPage(browser, "us8-virtualize");

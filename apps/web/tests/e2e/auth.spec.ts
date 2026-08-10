@@ -10,7 +10,7 @@ import { ensureUser, insertSession, isSessionInvalidated } from "./helpers/seed"
  */
 
 test.describe("US1 seeded-session (AS-02/03/04)", () => {
-  test("AS-04: settings shows the Google display name + avatar", async ({ browser }) => {
+  test("AS-04: settings shows the Google display name + avatar [INV-133]", async ({ browser }) => {
     // A distinct email/sub keeps this seeded user independent of the OAuth specs (the API enforces
     // UNIQUE(email)); a seeded session is honoured regardless of the admission allowlist.
     const profileEmail = "as04@taskflow.test";
@@ -40,7 +40,7 @@ test.describe("US1 seeded-session (AS-02/03/04)", () => {
     await context.close();
   });
 
-  test("AS-03: unauthenticated access to a protected route redirects to sign-in", async ({
+  test("AS-03: unauthenticated access to a protected route redirects to sign-in [INV-001]", async ({
     browser,
   }) => {
     const context = await browser.newContext();
@@ -54,7 +54,7 @@ test.describe("US1 seeded-session (AS-02/03/04)", () => {
     await context.close();
   });
 
-  test("AS-03: the proxy denies an unauthenticated API call (401)", async ({ request }) => {
+  test("AS-03: the proxy denies an unauthenticated API call (401) [INV-006]", async ({ request }) => {
     // No session cookie → deny-by-default through the real proxy.
     const res = await request.get("http://localhost:3000/api/proxy/api/users/me");
     expect(res.status()).toBe(401);
@@ -62,7 +62,7 @@ test.describe("US1 seeded-session (AS-02/03/04)", () => {
     expect(body.errorCode).toBe("unauthenticated");
   });
 
-  test("AS-02: sign-out ends the session and protected views become inaccessible", async ({
+  test("AS-02: sign-out ends the session and protected views become inaccessible [INV-005]", async ({
     browser,
   }) => {
     const profile = await ensureUser({

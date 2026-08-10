@@ -22,7 +22,7 @@ async function signedInPage(browser: Browser, key: string): Promise<{ page: Page
 }
 
 test.describe("US-08.AS-04 Labels (the L selector)", () => {
-  test("press L → create + apply a label by keyboard → the chip appears → remove it", async ({ browser }) => {
+  test("press L → create + apply a label by keyboard → the chip appears → remove it [INV-100] [INV-101] [INV-102] [INV-103]", async ({ browser }) => {
     const { page, context, userId } = await signedInPage(browser, "lbl-owner");
     await apiAs(userId).createTask({ title: "Buy milk", position: "a0" });
 

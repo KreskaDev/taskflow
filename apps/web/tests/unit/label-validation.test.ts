@@ -8,7 +8,7 @@ import {
   MAX_LABELS_PER_TASK,
 } from "@/lib/validation/label";
 
-describe("labelNameSchema", () => {
+describe("labelNameSchema [INV-105]", () => {
   it("trims and accepts a non-empty name", () => {
     expect(labelNameSchema.parse("  Urgent  ")).toBe("Urgent");
   });

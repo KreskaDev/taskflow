@@ -45,7 +45,7 @@ function dueInDays(days: number): string {
 }
 
 test.describe("US-02 Daily Planning Session (AS-01..AS-08)", () => {
-  test("AS-01/AS-02: G T opens Today showing the due-today task in a labelled listbox", async ({ browser }) => {
+  test("AS-01/AS-02: G T opens Today showing the due-today task in a labelled listbox [INV-012] [INV-050]", async ({ browser }) => {
     const { page, context, userId } = await signedInPage(browser, "dp-today");
     await apiAs(userId).createTask({ title: "Review the day", position: "a0", dueDate: dueToday() });
 
@@ -62,7 +62,7 @@ test.describe("US-02 Daily Planning Session (AS-01..AS-08)", () => {
     await context.close();
   });
 
-  test("AS-04: pressing 1 sets the selected task to P0 with a visible badge", async ({ browser }) => {
+  test("AS-04: pressing 1 sets the selected task to P0 with a visible badge [INV-054]", async ({ browser }) => {
     const { page, context, userId } = await signedInPage(browser, "dp-prio");
     await apiAs(userId).createTask({ title: "Prioritize me", position: "a0", dueDate: dueToday() });
 
@@ -77,7 +77,7 @@ test.describe("US-02 Daily Planning Session (AS-01..AS-08)", () => {
     await context.close();
   });
 
-  test("AS-03: Space toggles done and the row leaves Today", async ({ browser }) => {
+  test("AS-03: Space toggles done and the row leaves Today [INV-050]", async ({ browser }) => {
     const { page, context, userId } = await signedInPage(browser, "dp-done");
     await apiAs(userId).createTask({ title: "Finish me", position: "a0", dueDate: dueToday() });
 
@@ -92,7 +92,7 @@ test.describe("US-02 Daily Planning Session (AS-01..AS-08)", () => {
     await context.close();
   });
 
-  test("AS-05: T then 'jutro' reschedules to tomorrow and the task leaves Today", async ({ browser }) => {
+  test("AS-05: T then 'jutro' reschedules to tomorrow and the task leaves Today [INV-055]", async ({ browser }) => {
     const { page, context, userId } = await signedInPage(browser, "dp-resched");
     await apiAs(userId).createTask({ title: "Move me to tomorrow", position: "a0", dueDate: dueToday() });
 
@@ -111,7 +111,7 @@ test.describe("US-02 Daily Planning Session (AS-01..AS-08)", () => {
     await context.close();
   });
 
-  test("AS-06/AS-07: E opens the editor (title focused); Ctrl+Enter saves", async ({ browser }) => {
+  test("AS-06/AS-07: E opens the editor (title focused); Ctrl+Enter saves [INV-057]", async ({ browser }) => {
     const { page, context, userId } = await signedInPage(browser, "dp-edit-save");
     await apiAs(userId).createTask({ title: "Edit me", position: "a0", dueDate: dueToday() });
 
@@ -134,7 +134,7 @@ test.describe("US-02 Daily Planning Session (AS-01..AS-08)", () => {
     await context.close();
   });
 
-  test("AS-08: Esc discards the editor changes (no save)", async ({ browser }) => {
+  test("AS-08: Esc discards the editor changes (no save) [INV-057]", async ({ browser }) => {
     const { page, context, userId } = await signedInPage(browser, "dp-edit-discard");
     await apiAs(userId).createTask({ title: "Keep my title", position: "a0", dueDate: dueToday() });
 
@@ -154,7 +154,7 @@ test.describe("US-02 Daily Planning Session (AS-01..AS-08)", () => {
 });
 
 test.describe("US-08 Keyboard Navigation (AS-01/AS-02)", () => {
-  test("AS-02: G U opens Upcoming showing the next-7-days task grouped by day", async ({ browser }) => {
+  test("AS-02: G U opens Upcoming showing the next-7-days task grouped by day [INV-053]", async ({ browser }) => {
     const { page, context, userId } = await signedInPage(browser, "dp-upcoming");
     await apiAs(userId).createTask({ title: "Upcoming task", position: "a0", dueDate: dueInDays(2) });
 
@@ -171,7 +171,7 @@ test.describe("US-08 Keyboard Navigation (AS-01/AS-02)", () => {
     await context.close();
   });
 
-  test("AS-01: G I returns to the Inbox", async ({ browser }) => {
+  test("AS-01: G I returns to the Inbox [INV-012]", async ({ browser }) => {
     const { page, context } = await signedInPage(browser, "dp-inbox");
 
     await page.goto("/today");

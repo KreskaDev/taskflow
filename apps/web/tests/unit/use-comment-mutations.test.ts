@@ -96,7 +96,7 @@ beforeEach(() => {
 
 /* ─────────────────────────────── POST ─────────────────────────────── */
 
-describe("postCommentMutationOptions", () => {
+describe("postCommentMutationOptions [INV-118]", () => {
   const variables: PostCommentVariables = {
     taskId: TASK_ID,
     optimisticId: "99999999-9999-7999-8999-999999999999",

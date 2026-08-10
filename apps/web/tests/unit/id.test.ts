@@ -9,7 +9,7 @@ import { newTaskId } from "@/lib/id";
  * 8-4-4-4-12 string (first character of the third group). This guards against a
  * regression to crypto.randomUUID(), which emits a v4 (version nibble 4).
  */
-describe("newTaskId", () => {
+describe("newTaskId [INV-021]", () => {
   // 8-4-4-4-12 canonical UUID, with the version nibble pinned to 7.
   const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 

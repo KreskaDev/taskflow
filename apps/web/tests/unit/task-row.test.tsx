@@ -60,7 +60,7 @@ function renderRow(task: TaskResponse) {
 
 afterEach(cleanup);
 
-describe("TaskRow due-date label", () => {
+describe("TaskRow due-date label [INV-027]", () => {
   it("a dateless row's accessible name is exactly the title (no qualifier, no glyph)", () => {
     renderRow(makeTask({ dueDate: null, dueHasTime: null }));
     expect(screen.getByRole("option", { name: "Kupic mleko" })).toBeTruthy();

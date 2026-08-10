@@ -59,7 +59,7 @@ function todayCache(tasks: TaskResponse[]): TodayResponse {
   return { groups: [{ projectId: null, tasks: tasks.map((t) => ({ ...t, isOverdue: false })) }] };
 }
 
-describe("set-priority optimistic surface", () => {
+describe("set-priority optimistic surface [INV-063] [INV-130]", () => {
   it("re-sorts the Today group in place (priority does not change membership)", async () => {
     freezeNow();
     const qc = new QueryClient();

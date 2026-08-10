@@ -27,6 +27,40 @@ jobs:
       - run: pnpm --filter @taskflow/web typecheck
       - run: pnpm --filter @taskflow/web test
 
+  # Playwright E2E in CI (slice 019, D14): without this job the inventory/S2.4 gate and
+  # every [E]/[A]/[V] exit criterion would be advisory-only. The harness self-boots its
+  # whole stack exactly as locally: disposable Postgres :55432 (docker), the BUILT Debug
+  # API on :4311, the fake IdP :4321, and the Next BFF :3000 (tests/e2e/global-setup.ts).
+  web-e2e:
+    name: web e2e (Playwright, self-booted stack)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: pnpm install --frozen-lockfile
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+      # globalSetup runs the built bin/Debug/net9.0/TaskFlow.Api.dll directly.
+      - run: dotnet build apps/api/src/TaskFlow.Api -c Debug
+      - run: pnpm --filter @taskflow/web e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 7
+
   api-quality:
     name: api build + test (xUnit + Testcontainers)
     runs-on: ubuntu-latest
@@ -129,7 +163,7 @@ jobs:
   build-push:
     name: build + push images
     runs-on: ubuntu-latest
-    needs: [web-quality, api-quality, api-integration, openapi-sync]
+    needs: [web-quality, web-e2e, api-quality, api-integration, openapi-sync]
     if: github.ref == 'refs/heads/main'
     permissions:
       contents: read

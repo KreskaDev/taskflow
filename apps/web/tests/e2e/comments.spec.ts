@@ -50,7 +50,7 @@ async function openThread(page: Page, projectId: string, taskTitle: string): Pro
 }
 
 test.describe("US-14 Comments & @Mentions (AS-01..AS-04)", () => {
-  test("AS-01/AS-02/AS-04: an editor posts + @mentions; the author edits and deletes their own comment", async ({ browser }) => {
+  test("AS-01/AS-02/AS-04: an editor posts + @mentions; the author edits and deletes their own comment [INV-110] [INV-111] [INV-112] [INV-113] [INV-114]", async ({ browser }) => {
     const owner = await ensureUser({ sub: "google-sub-cm-owner1", email: "cm-owner1@taskflow.test", name: "Olga Owner", picture: "https://avatars.test/o.png" });
     const { page, context } = await signedInPage(browser, "cm-editor1", "Edith Editor");
     const { projectId, taskTitle } = await seedSharedTask(owner.id, "cm-editor1@taskflow.test", "editor", "A");
@@ -98,7 +98,7 @@ test.describe("US-14 Comments & @Mentions (AS-01..AS-04)", () => {
     await context.close();
   });
 
-  test("AS-03: a viewer reads the full thread but gets NO composer; a direct post is 403", async ({ browser }) => {
+  test("AS-03: a viewer reads the full thread but gets NO composer; a direct post is 403 [INV-116]", async ({ browser }) => {
     const owner = await ensureUser({ sub: "google-sub-cm-owner2", email: "cm-owner2@taskflow.test", name: "Olga Owner", picture: "https://avatars.test/o.png" });
     const { page, context, userId: viewerId } = await signedInPage(browser, "cm-viewer2", "Vera Viewer");
     const { projectId, taskId, taskTitle } = await seedSharedTask(owner.id, "cm-viewer2@taskflow.test", "viewer", "B");
@@ -128,7 +128,7 @@ test.describe("US-14 Comments & @Mentions (AS-01..AS-04)", () => {
     await context.close();
   });
 
-  test("a non-author (incl. the OWNER) sees no edit/delete affordance and is denied 403; a former member loses ALL access (404)", async ({ browser }) => {
+  test("a non-author (incl. the OWNER) sees no edit/delete affordance and is denied 403; a former member loses ALL access (404) [INV-115]", async ({ browser }) => {
     const { page, context, userId: ownerId } = await signedInPage(browser, "cm-owner3", "Olga Owner");
     const editor = await ensureUser({ sub: "google-sub-cm-editor3", email: "cm-editor3@taskflow.test", name: "Edith Editor", picture: "https://avatars.test/e.png" });
     const { projectId, taskId, taskTitle } = await seedSharedTask(ownerId, "cm-editor3@taskflow.test", "editor", "C");
@@ -172,7 +172,7 @@ test.describe("US-14 Comments & @Mentions (AS-01..AS-04)", () => {
     await context.close();
   });
 
-  test("content safety: empty/over-length rejected (422 + FR-049 message); a hostile payload renders INERT", async ({ browser }) => {
+  test("content safety: empty/over-length rejected (422 + FR-049 message); a hostile payload renders INERT [INV-117]", async ({ browser }) => {
     const owner = await ensureUser({ sub: "google-sub-cm-owner4", email: "cm-owner4@taskflow.test", name: "Olga Owner", picture: "https://avatars.test/o.png" });
     const { page, context, userId: editorId } = await signedInPage(browser, "cm-editor4", "Edith Editor");
     const { projectId, taskId, taskTitle } = await seedSharedTask(owner.id, "cm-editor4@taskflow.test", "editor", "D");

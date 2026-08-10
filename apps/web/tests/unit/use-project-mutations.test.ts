@@ -92,7 +92,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("createProjectMutationOptions — optimistic create", () => {
+describe("createProjectMutationOptions — optimistic create [INV-074] [INV-130]", () => {
   it("onMutate cancels in-flight ['projects'] queries before touching the cache", async () => {
     const seed = seedActive();
     const queryClient = primedClient(seed);

@@ -61,7 +61,7 @@ function sidebarTree(page: Page) {
 /* ───────────────────────────────── GREEN: wired UI ───────────────────────────────── */
 
 test.describe("US-10 Project Management — wired UI (GREEN)", () => {
-  test("AS-01: the New project control opens a create form with name, color, icon, and parent fields", async ({
+  test("AS-01: the New project control opens a create form with name, color, icon, and parent fields [INV-070]", async ({
     browser,
   }) => {
     const { page, context } = await signedInPage(browser, "as01-form");
@@ -84,7 +84,7 @@ test.describe("US-10 Project Management — wired UI (GREEN)", () => {
     await context.close();
   });
 
-  test("AS-02: creating a child under a parent nests it one level under the parent in the sidebar", async ({
+  test("AS-02: creating a child under a parent nests it one level under the parent in the sidebar [INV-072]", async ({
     browser,
   }) => {
     const seeded = await signedInPage(browser, "as02-nest");
@@ -114,7 +114,7 @@ test.describe("US-10 Project Management — wired UI (GREEN)", () => {
     await seeded.context.close();
   });
 
-  test("AS-03: the create form prevents grandchildren — its parent picker offers only top-level projects, never a child", async ({
+  test("AS-03: the create form prevents grandchildren — its parent picker offers only top-level projects, never a child [INV-072]", async ({
     browser,
   }) => {
     const seeded = await signedInPage(browser, "as03-no-grandchild");
@@ -140,7 +140,7 @@ test.describe("US-10 Project Management — wired UI (GREEN)", () => {
     await seeded.context.close();
   });
 
-  test("AS-05: an archived project is NOT visible in the sidebar's default tree", async ({
+  test("AS-05: an archived project is NOT visible in the sidebar's default tree [INV-014]", async ({
     browser,
   }) => {
     const { page, context, api } = await signedInPage(browser, "as05-hidden");
@@ -160,7 +160,7 @@ test.describe("US-10 Project Management — wired UI (GREEN)", () => {
     await context.close();
   });
 
-  test("AS-11: an archived project is reachable via the Archived disclosure and can be unarchived back to the tree", async ({
+  test("AS-11: an archived project is reachable via the Archived disclosure and can be unarchived back to the tree [INV-015]", async ({
     browser,
   }) => {
     const { page, context, api } = await signedInPage(browser, "as11-unarchive");
@@ -189,7 +189,7 @@ test.describe("US-10 Project Management — wired UI (GREEN)", () => {
     await context.close();
   });
 
-  test("Inbox narrowing (FR-021): a task moved into a project leaves the Inbox list", async ({
+  test("Inbox narrowing (FR-021): a task moved into a project leaves the Inbox list [INV-040]", async ({
     browser,
   }) => {
     const { page, context, api } = await signedInPage(browser, "inbox-narrow");
@@ -223,7 +223,7 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
   // The `M` move (real trigger) plus the edit/archive/delete affordances and the project-tasks view
   // are now wired into the app shell (T049–T052), so every scenario below is a live test.
 
-  test("US-08.AS-05: pressing M on the selected task opens the move-to-project selector", async ({
+  test("US-08.AS-05: pressing M on the selected task opens the move-to-project selector [INV-040]", async ({
     browser,
   }) => {
     const seeded = await signedInPage(browser, "as05-move");
@@ -251,7 +251,7 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
   // absent from the Inbox (FR-021), so its row + move affordance live on the project view, where
   // choosing "Inbox" in the selector returns it to the Inbox.
   test(
-    "US-08.AS-05 (move-to-Inbox round-trip): a projected task is moved back to the Inbox via the selector",
+    "US-08.AS-05 (move-to-Inbox round-trip): a projected task is moved back to the Inbox via the selector [INV-040] [INV-079]",
     async ({ browser }) => {
       const { page, context, api } = await signedInPage(browser, "as05-to-inbox");
 
@@ -279,7 +279,7 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
 
   // EDIT / RE-PARENT (AS-07/08/09): the sidebar's per-project Edit affordance opens the edit
   // ProjectForm (T049); these drive it through rename + the allowed/rejected re-parent paths.
-  test("AS-07: editing a project's name/color/icon/parent persists and reflects in the sidebar", async ({
+  test("AS-07: editing a project's name/color/icon/parent persists and reflects in the sidebar [INV-073]", async ({
     browser,
   }) => {
     const { page, context, api } = await signedInPage(browser, "as07-edit");
@@ -300,7 +300,7 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
     await context.close();
   });
 
-  test("AS-08: re-parenting a top-level project under another top-level project is allowed", async ({
+  test("AS-08: re-parenting a top-level project under another top-level project is allowed [INV-073]", async ({
     browser,
   }) => {
     const { page, context, api } = await signedInPage(browser, "as08-reparent-ok");
@@ -322,7 +322,7 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
     await context.close();
   });
 
-  test("AS-09: re-parenting that would create a grandchild is rejected with the one-level message (FR-049)", async ({
+  test("AS-09: re-parenting that would create a grandchild is rejected with the one-level message (FR-049) [INV-074]", async ({
     browser,
   }) => {
     const { page, context, api } = await signedInPage(browser, "as09-reparent-reject");
@@ -349,7 +349,7 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
 
   // DELETE (AS-04/EC-03, AS-10): the sidebar's per-project Delete affordance opens the
   // DeleteProjectDialog (T050) with the task/child disposition prompts.
-  test("AS-04 / EC-03: deleting a project with tasks prompts the three-way task disposition", async ({
+  test("AS-04 / EC-03: deleting a project with tasks prompts the three-way task disposition [INV-077]", async ({
     browser,
   }) => {
     const { page, context, api } = await signedInPage(browser, "ec03-delete-tasks");
@@ -372,7 +372,7 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
     await context.close();
   });
 
-  test("AS-10: deleting a parent with children prompts the child disposition (cascade vs orphan-to-top)", async ({
+  test("AS-10: deleting a parent with children prompts the child disposition (cascade vs orphan-to-top) [INV-078]", async ({
     browser,
   }) => {
     const { page, context, api } = await signedInPage(browser, "as10-delete-children");
@@ -393,7 +393,7 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
     await context.close();
   });
 
-  test("AS-10 (archive): archiving a parent with children prompts the child disposition", async ({
+  test("AS-10 (archive): archiving a parent with children prompts the child disposition [INV-076]", async ({
     browser,
   }) => {
     const { page, context, api } = await signedInPage(browser, "as10-archive-children");

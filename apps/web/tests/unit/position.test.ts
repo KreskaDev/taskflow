@@ -14,7 +14,7 @@ import { between } from "@/lib/position";
  */
 const RANK = /^[0-9A-Za-z]+$/;
 
-describe("position.between", () => {
+describe("position.between [INV-038]", () => {
   it("between(null, null) returns a valid rank for the empty-list first task", () => {
     const seed = between(null, null);
     expect(seed).toMatch(RANK);

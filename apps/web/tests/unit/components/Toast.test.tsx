@@ -17,7 +17,7 @@ function Trigger({ message, persistent }: { message: string; persistent?: boolea
   );
 }
 
-describe("Toast (catalog)", () => {
+describe("Toast (catalog) [INV-131]", () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });

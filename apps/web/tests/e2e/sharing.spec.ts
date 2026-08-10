@@ -39,7 +39,7 @@ function sidebarTree(page: Page) {
 }
 
 test.describe("US-12 Project Sharing — wired UI", () => {
-  test("AS-01/AS-02: owner shares + invites by email; the member sees a role-gated read-only roster", async ({
+  test("AS-01/AS-02: owner shares + invites by email; the member sees a role-gated read-only roster [INV-085] [INV-086] [INV-087] [INV-088] [INV-016]", async ({
     browser,
   }) => {
     const owner = await signedInPage(browser, "a1-owner", "Olivia Owner");
@@ -88,7 +88,7 @@ test.describe("US-12 Project Sharing — wired UI", () => {
     await member.context.close();
   });
 
-  test("AS-04/AS-06: removing a member revokes all access; unshare round-trips to personal", async ({
+  test("AS-04/AS-06: removing a member revokes all access; unshare round-trips to personal [INV-089] [INV-090]", async ({
     browser,
   }) => {
     const owner = await signedInPage(browser, "a2-owner", "Olivia Owner");

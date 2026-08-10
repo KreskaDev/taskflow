@@ -21,7 +21,7 @@ function Host() {
   );
 }
 
-describe("Dialog (catalog)", () => {
+describe("Dialog (catalog) [INV-132]", () => {
   it("sets initial focus into the dialog on open", () => {
     render(<Host />);
     const invoker = screen.getByRole("button", { name: "Otwórz" });

@@ -22,7 +22,7 @@ import {
 
 const VALID_PARENT = "11111111-1111-7111-8111-111111111111";
 
-describe("createProjectSchema — name bounds", () => {
+describe("createProjectSchema — name bounds [INV-071]", () => {
   it("rejects a name that is empty after trimming", () => {
     const result = createProjectSchema.safeParse({ name: "   ", color: "blue", icon: "folder" });
     expect(result.success).toBe(false);

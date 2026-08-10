@@ -59,7 +59,7 @@ function renderThread(
 
 afterEach(cleanup);
 
-describe("CommentThread — AS-03 viewer read-only gating", () => {
+describe("CommentThread — AS-03 viewer read-only gating [INV-113] [INV-115] [INV-116]", () => {
   it("a viewer sees the full thread but NO composer", () => {
     renderThread([makeComment({ id: "11111111-1111-7111-8111-111111111111" })], "viewer");
 

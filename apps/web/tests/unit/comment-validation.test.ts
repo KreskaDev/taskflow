@@ -15,7 +15,7 @@ import {
  * scraped from prose) defaulting to empty. The mention-candidacy (current-members-only) check is a
  * server-side cross-row rule — the client picker only offers members, so the schema stays shape-only.
  */
-describe("commentSchema", () => {
+describe("commentSchema [INV-112]", () => {
   const viewer = "33333333-3333-7333-8333-333333333333";
 
   it("freezes the T002 content-safety surface at 4000", () => {
