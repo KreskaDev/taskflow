@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "@/hooks/useSession";
 import { Avatar } from "@/components/ui/Avatar";
+import { Button } from "@/components/ui/Button";
 import { DeleteAccountDialog } from "@/components/ui/DeleteAccountDialog";
 
 /**
@@ -50,6 +51,14 @@ export default function SettingsPage() {
             <dt>Email</dt>
             <dd className="tf-profile__email">{data.user.email}</dd>
           </dl>
+          {/* Sign-out (INV-005; re-homed here from the pre-019 header during the shell
+              rebuild): a plain form POST to the BFF route — works without client JS
+              (Constitution I, FR-054). */}
+          <form method="post" action="/api/auth/signout">
+            <Button type="submit" variant="secondary">
+              Wyloguj
+            </Button>
+          </form>
           <DeleteAccountDialog />
         </div>
       ) : (

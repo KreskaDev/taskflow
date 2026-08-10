@@ -1,9 +1,10 @@
 import { SignInButton } from "@/components/auth/SignInButton";
+import styles from "../auth.module.css";
 
 /**
- * Sign-in page (T043, US-11). Shows the Google sign-in entry point and any recoverable error from a
- * failed/non-admitted attempt (FR-049): a non-admitted account or a verification/OAuth failure is
- * surfaced as a clear, announced message with no account created.
+ * Sign-in page (migrated in slice 019, T059 — S5.1): the Instrument Serif brand wordmark
+ * (its sole sanctioned use, design-brief) + the Google entry point; a recoverable error
+ * from a failed/non-admitted attempt is surfaced as a clear, announced message (FR-049).
  */
 const ERROR_MESSAGES: Record<string, string> = {
   not_admitted: "Your account is not authorized to access TaskFlow.",
@@ -19,12 +20,14 @@ export default async function SignInPage({
   const message = error ? (ERROR_MESSAGES[error] ?? ERROR_MESSAGES["oauth_failed"]) : undefined;
 
   return (
-    <section className="tf-signin" aria-labelledby="signin-heading">
-      <h1 id="signin-heading">TaskFlow</h1>
-      <p className="tf-signin__subtitle">Sign in to your workspace.</p>
+    <section className={styles.card} aria-labelledby="signin-heading">
+      <h1 id="signin-heading" className={styles.wordmark}>
+        TaskFlow
+      </h1>
+      <p className={styles.subtitle}>Sign in to your workspace.</p>
 
       {message ? (
-        <p className="tf-signin__error" role="alert">
+        <p className={styles.error} role="alert">
           {message}
         </p>
       ) : null}
