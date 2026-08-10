@@ -221,7 +221,7 @@ proves zero feature loss
 
 **Purpose**: Final validation against quickstart.md and the spec's exit criteria
 
-- [ ] T068 Run all five quickstart.md scenarios end-to-end locally: full Vitest suite (contrast matrix, hex audit, inventory coverage), Playwright suite (E2E + axe ×4 + visual — stop any dev API on :4311 first), `dotnet test` (allow+deny for both endpoints), `pnpm --dir apps/web audit:dead`
+- [X] T068 Run all five quickstart.md scenarios end-to-end locally: full Vitest suite (contrast matrix, hex audit, inventory coverage), Playwright suite (E2E + axe ×4 + visual — stop any dev API on :4311 first), `dotnet test` (allow+deny for both endpoints), `pnpm --dir apps/web audit:dead`
 - [ ] T069 [P] Verify performance budgets are not regressed per UIT-110/111 against a production build (`next build` + `next start` over the self-booted stack per quickstart.md): FCP/TTI via the browser Performance API in a Playwright probe (median of 5 runs), optimistic paint via a requestAnimationFrame-delta probe asserting the DOM reflects the action within one frame (<16 ms) of the triggering click, on the redesigned Inbox (SC-002/003; results recorded in the PR — the [P] benchmark suite proper stays post-baseline per spec assumption)
 - [ ] T070 Final gate review: CI green on web-quality (vitest + knip), NEW web-e2e, openapi-sync, and API jobs; re-verify integration-shard capacity/complement filters in .github/workflows/ci.yml after T029/T030 add ~16 container-per-fact tests to `tasks-core` (Docker start timeouts there = capacity, not flakiness); [V] baselines human-approved per palette; feature-inventory.md transfer notes (D11) accurate; spec Success Criteria checklist walked (SC-018, regression gate, SC-008 ×4, sweep gate)
 
