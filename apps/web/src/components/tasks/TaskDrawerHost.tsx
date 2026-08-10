@@ -44,7 +44,7 @@ export function TaskDrawerHost() {
           <h2 id={TASK_DRAWER_TITLE_ID}>Nie znaleziono zadania</h2>
           <p>To zadanie nie istnieje albo nie masz do niego dostępu.</p>
           <Button variant="secondary" onClick={close}>
-            Zamknij panel
+            Wróć do listy
           </Button>
         </div>
       )}

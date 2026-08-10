@@ -267,7 +267,6 @@ function ProjectRow({
 }) {
   const isShared = project.visibility === "shared";
   const href = `/projects/${project.id}`;
-  const shareLabel = isShared ? `Manage members of ${project.name}` : `Share ${project.name}`;
 
   return (
     <div className={styles.projectRow}>
@@ -309,23 +308,6 @@ function ProjectRow({
             { id: "delete", label: "Delete", onSelect: onDelete, destructive: true },
           ]}
         />
-        {/* Direct, name-labelled buttons kept for the click-driven regression specs
-            (projects.spec/sharing.spec address actions by accessible name). Visually part
-            of the hover-revealed action cluster; removed copy-wise in T063 if superseded. */}
-        <span className={styles.legacyActions}>
-          <button type="button" aria-label={shareLabel} onClick={onShareOrManage}>
-            Members
-          </button>
-          <button type="button" aria-label={`Edit ${project.name}`} onClick={onEdit}>
-            Edit
-          </button>
-          <button type="button" aria-label={`Archive ${project.name}`} onClick={onArchive}>
-            Archive
-          </button>
-          <button type="button" aria-label={`Delete ${project.name}`} onClick={onDelete}>
-            Delete
-          </button>
-        </span>
       </span>
     </div>
   );

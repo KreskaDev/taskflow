@@ -174,6 +174,9 @@ export default function WorkspaceHome() {
           onToggleSelected={
             selectedTask ? () => setTaskDone(selectedTask.id, selectedTask.status !== "done") : undefined
           }
+          onActivateSelected={
+            selectedTask ? () => router.push(`/?task=${selectedTask.id}`) : undefined
+          }
           rowActions={rowActions}
           // Pointer drag-drop (T043): the dragged row lands at the target index; the
           // fractional rank is recomputed from the FRESH neighbours inside reorderTask.

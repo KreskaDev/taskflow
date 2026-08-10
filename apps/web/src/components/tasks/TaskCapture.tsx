@@ -146,10 +146,13 @@ export function GlobalCaptureDialog({ open, onClose }: { open: boolean; onClose:
       <h2 id={GLOBAL_TITLE_ID} className="sr-only">
         Nowy task
       </h2>
+      {/* NO autoFocus here: the input's own autofocus fires during commit, BEFORE the
+          Dialog's effect snapshots document.activeElement — the Dialog would remember the
+          INPUT as the "invoker" and Esc could never return focus to the topbar button
+          (FR-101). The Dialog's initial-focus step focuses the input instead. */}
       <TaskCapture
         contextProjectId={contextProjectId}
         defaultDueToday={defaultDueToday}
-        autoFocus
         onCreated={onClose}
         onCancel={onClose}
         errorId="global-capture-error"
