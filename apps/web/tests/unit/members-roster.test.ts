@@ -72,7 +72,7 @@ afterEach(() => {
 describe("RoleBadge — text + icon, never color alone (FR-044) [INV-087] [INV-088]", () => {
   it("renders the role word for each role", () => {
     render(createElement(RoleBadge, { role: "owner" }));
-    expect(screen.getByText("Owner")).toBeTruthy();
+    expect(screen.getByText("Właściciel")).toBeTruthy();
   });
 });
 
@@ -81,14 +81,14 @@ describe("MembersDialog — owner view", () => {
     membersMock.mockReturnValue({ data: roster, isPending: false, error: null });
     render(createElement(MembersDialog, { open: true, onClose: () => {}, project: project("owner") }));
 
-    expect(screen.getByLabelText("Invite a member")).toBeTruthy();
-    expect(screen.getByLabelText("Role for Eddie Editor")).toBeTruthy();
-    expect(screen.getByLabelText("Remove Vera Viewer")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Transfer ownership" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Unshare project" })).toBeTruthy();
+    expect(screen.getByLabelText("Zaproś członka")).toBeTruthy();
+    expect(screen.getByLabelText("Rola: Eddie Editor")).toBeTruthy();
+    expect(screen.getByLabelText("Usuń Vera Viewer")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Przekaż własność" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Cofnij udostępnianie" })).toBeTruthy();
     // The owner entry renders with the owner badge.
-    const list = screen.getByLabelText("Project members");
-    expect(within(list).getByText("Owner")).toBeTruthy();
+    const list = screen.getByLabelText("Członkowie projektu");
+    expect(within(list).getByText("Właściciel")).toBeTruthy();
   });
 });
 
@@ -97,9 +97,9 @@ describe("MembersDialog — viewer (non-owner) view is read-only", () => {
     membersMock.mockReturnValue({ data: roster, isPending: false, error: null });
     render(createElement(MembersDialog, { open: true, onClose: () => {}, project: project("viewer") }));
 
-    expect(screen.queryByLabelText("Invite a member")).toBeNull();
-    expect(screen.queryByLabelText("Role for Eddie Editor")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Unshare project" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Leave project" })).toBeTruthy();
+    expect(screen.queryByLabelText("Zaproś członka")).toBeNull();
+    expect(screen.queryByLabelText("Rola: Eddie Editor")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Cofnij udostępnianie" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Opuść projekt" })).toBeTruthy();
   });
 });

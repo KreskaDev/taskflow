@@ -38,17 +38,17 @@ export function TransferOwnershipDialog({ open, onClose, projectId, version, mem
 
   return (
     <Dialog open={open} onClose={onClose} titleId={TITLE_ID} descriptionId={DESC_ID}>
-      <DialogTitle id={TITLE_ID}>Transfer ownership</DialogTitle>
+      <DialogTitle id={TITLE_ID}>Przekaż własność</DialogTitle>
       <p id={DESC_ID}>
-        Choose a member to become the new owner. You become an <strong>editor</strong> — this cannot be undone
-        from here (the new owner would have to transfer it back).
+        Wybierz członka, który zostanie nowym właścicielem. Ty stajesz się <strong>edytorem</strong> — nie
+        można tego cofnąć stąd (nowy właściciel musiałby przekazać własność z powrotem).
       </p>
 
       {members.length === 0 ? (
-        <p className={dialogStyles.muted}>Invite a member first — ownership can only move to a current member.</p>
+        <p className={dialogStyles.muted}>Najpierw zaproś członka — własność można przekazać tylko obecnemu członkowi.</p>
       ) : (
         <label className={dialogStyles.fieldRow}>
-          <span>New owner</span>
+          <span>Nowy właściciel</span>
           <select value={userId} onChange={(e) => setUserId(e.target.value)}>
             {members.map((m) => (
               <option key={m.userId} value={m.userId}>
@@ -61,10 +61,10 @@ export function TransferOwnershipDialog({ open, onClose, projectId, version, mem
 
       <DialogActions>
         <Button variant="secondary" onClick={onClose}>
-          Cancel
+          Anuluj
         </Button>
         <Button variant="danger" onClick={confirm} disabled={members.length === 0 || !userId}>
-          Transfer ownership
+          Przekaż własność
         </Button>
       </DialogActions>
     </Dialog>

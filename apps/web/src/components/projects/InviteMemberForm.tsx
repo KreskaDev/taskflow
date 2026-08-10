@@ -30,7 +30,7 @@ export function InviteMemberForm({ projectId, version }: InviteMemberFormProps) 
     event.preventDefault();
     const parsed = inviteSchema.safeParse({ email, role, version });
     if (!parsed.success) {
-      setLocalError("Enter a valid email address.");
+      setLocalError("Podaj poprawny adres e-mail.");
       return;
     }
     setLocalError(null);
@@ -41,9 +41,9 @@ export function InviteMemberForm({ projectId, version }: InviteMemberFormProps) 
   const error = localError ?? inviteError;
 
   return (
-    <form className={styles.form} onSubmit={submit} aria-label="Invite a member">
+    <form className={styles.form} onSubmit={submit} aria-label="Zaproś członka">
       <label className={styles.field}>
-        <span>Invite by email</span>
+        <span>Zaproś przez e-mail</span>
         <Input
           type="email"
           name="invite-email"
@@ -54,14 +54,14 @@ export function InviteMemberForm({ projectId, version }: InviteMemberFormProps) 
         />
       </label>
       <label className={styles.field}>
-        <span>Role</span>
+        <span>Rola</span>
         <select value={role} onChange={(e) => setRole(e.target.value as MembershipRole)}>
-          <option value="editor">Editor</option>
-          <option value="viewer">Viewer</option>
+          <option value="editor">Edytor</option>
+          <option value="viewer">Podgląd</option>
         </select>
       </label>
       <Button type="submit" disabled={isInvitePending || email.trim().length === 0}>
-        Invite
+        Zaproś
       </Button>
       {error ? (
         <p className={styles.error} role="alert">

@@ -20,7 +20,7 @@ export function DeleteAccountDialog() {
   return (
     <div>
       <Button variant="danger" onClick={() => setOpen(true)}>
-        Delete account
+        Usuń konto
       </Button>
 
       <Dialog
@@ -29,18 +29,18 @@ export function DeleteAccountDialog() {
         titleId="delete-account-title"
         descriptionId="delete-account-desc"
       >
-        <DialogTitle id="delete-account-title">Delete account</DialogTitle>
+        <DialogTitle id="delete-account-title">Usuń konto</DialogTitle>
         <p id="delete-account-desc">
-          This permanently and irreversibly deletes your account and ALL of its data. This cannot
-          be undone.
+          To trwale i nieodwracalnie usuwa Twoje konto i WSZYSTKIE jego dane. Tej operacji nie
+          można cofnąć.
         </p>
         <DialogActions>
           <Button variant="secondary" onClick={() => setOpen(false)}>
-            Cancel
+            Anuluj
           </Button>
           <form method="post" action="/api/auth/delete">
             <Button type="submit" variant="danger">
-              Permanently delete account
+              Trwale usuń konto
             </Button>
           </form>
         </DialogActions>

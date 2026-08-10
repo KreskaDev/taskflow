@@ -337,7 +337,7 @@ function RenameInput({
       // refocuses the listbox on commit/cancel so arrow-nav resumes.
       autoFocus
       className={styles.renameInput}
-      aria-label="Rename task"
+      aria-label="Zmień nazwę zadania"
       maxLength={500}
       value={value}
       onClick={(event) => event.stopPropagation()}

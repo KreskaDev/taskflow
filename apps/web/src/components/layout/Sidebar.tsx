@@ -122,7 +122,7 @@ export function Sidebar() {
   };
 
   return (
-    <nav className={styles.sidebar} aria-label="Projects">
+    <nav className={styles.sidebar} aria-label="Projekty">
       <ul className={styles.viewList}>
         {PRIMARY_VIEWS.map(({ href, label, icon: Icon, countKey }) => {
           const count = counts?.[countKey];
@@ -153,11 +153,11 @@ export function Sidebar() {
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
           <h2 className={styles.heading} id="tf-sidebar-projects-heading">
-            Projects
+            Projekty
           </h2>
           <button type="button" className={styles.newProject} onClick={() => setFormOpen(true)}>
             <Plus size={14} strokeWidth={1.75} aria-hidden="true" />
-            New project
+            Nowy projekt
           </button>
         </div>
 
@@ -209,7 +209,7 @@ export function Sidebar() {
               <ChevronRight size={14} strokeWidth={1.75} />
             )}
           </span>{" "}
-          Archived
+          Zarchiwizowane
         </button>
         {showArchived ? <ArchivedList /> : null}
       </div>
@@ -285,7 +285,7 @@ function ProjectRow({
             <span aria-hidden="true">
               <UserCheck size={12} strokeWidth={1.75} />
             </span>
-            <span className="sr-only">Shared project</span>
+            <span className="sr-only">Projekt współdzielony</span>
           </span>
         ) : null}
         {count !== undefined && count > 0 ? (
@@ -302,10 +302,10 @@ function ProjectRow({
           triggerContent={<span aria-hidden="true">⋯</span>}
           triggerClassName={styles.projectMenuTrigger}
           items={[
-            { id: "members", label: isShared ? "Members" : "Share", onSelect: onShareOrManage },
-            { id: "edit", label: "Edit", onSelect: onEdit },
-            { id: "archive", label: "Archive", onSelect: onArchive },
-            { id: "delete", label: "Delete", onSelect: onDelete, destructive: true },
+            { id: "members", label: isShared ? "Członkowie" : "Udostępnij", onSelect: onShareOrManage },
+            { id: "edit", label: "Edytuj", onSelect: onEdit },
+            { id: "archive", label: "Archiwizuj", onSelect: onArchive },
+            { id: "delete", label: "Usuń", onSelect: onDelete, destructive: true },
           ]}
         />
       </span>
@@ -347,10 +347,10 @@ function ArchivedList() {
   const { unarchiveProject } = useProjectMutations();
 
   if (isPending) {
-    return <p className={styles.archivedEmpty}>Loading…</p>;
+    return <p className={styles.archivedEmpty}>Wczytywanie…</p>;
   }
   if (!archived || archived.length === 0) {
-    return <p className={styles.archivedEmpty}>No archived projects.</p>;
+    return <p className={styles.archivedEmpty}>Brak zarchiwizowanych projektów.</p>;
   }
 
   return (
@@ -366,7 +366,7 @@ function ArchivedList() {
             className={styles.unarchive}
             onClick={() => unarchiveProject(project.id, project.version)}
           >
-            Unarchive
+            Przywróć
           </button>
         </li>
       ))}

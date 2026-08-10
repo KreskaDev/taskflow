@@ -138,7 +138,7 @@ function TaskListView({
       ref={scrollRef}
       role="listbox"
       tabIndex={0}
-      aria-label="Tasks"
+      aria-label="Zadania"
       aria-activedescendant={hasSelection ? taskOptionId(tasks[selectedIndex]!.id) : undefined}
       className={styles.list}
       onKeyDown={listboxKeyDown({

@@ -56,15 +56,15 @@ export function DeleteProjectDialog({ open, onClose, project, taskCount, childCo
 
   return (
     <Dialog open={open} onClose={onClose} titleId={TITLE_ID} descriptionId={DESC_ID}>
-      <DialogTitle id={TITLE_ID}>Delete project</DialogTitle>
+      <DialogTitle id={TITLE_ID}>Usuń projekt</DialogTitle>
       <p id={DESC_ID}>
-        Deleting <strong>{project.name}</strong> affects {taskCount}{" "}
-        {taskCount === 1 ? "task" : "tasks"} and {childCount}{" "}
-        {childCount === 1 ? "sub-project" : "sub-projects"}. Choose what happens to them.
+        Usunięcie projektu <strong>{project.name}</strong> dotyczy {taskCount}{" "}
+        {taskCount === 1 ? "zadania" : "zadań"} oraz {childCount}{" "}
+        {childCount === 1 ? "podprojektu" : "podprojektów"}. Wybierz, co ma się z nimi stać.
       </p>
 
       {taskCount > 0 ? (
-        <DialogChoices legend={`Its ${taskCount} ${taskCount === 1 ? "task" : "tasks"}`}>
+        <DialogChoices legend={`Zadania (${taskCount})`}>
           <label>
             <input
               type="radio"
@@ -73,7 +73,7 @@ export function DeleteProjectDialog({ open, onClose, project, taskCount, childCo
               checked={taskDisposition === "move_to_inbox"}
               onChange={() => setTaskDisposition("move_to_inbox")}
             />
-            Move them to the Inbox
+            Przenieś je do Inboxu
           </label>
           <label>
             <input
@@ -83,7 +83,7 @@ export function DeleteProjectDialog({ open, onClose, project, taskCount, childCo
               checked={taskDisposition === "archive_with_tasks"}
               onChange={() => setTaskDisposition("archive_with_tasks")}
             />
-            Archive the project instead (keep its tasks)
+            Zamiast tego zarchiwizuj projekt (zachowaj zadania)
           </label>
           <label>
             <input
@@ -93,13 +93,13 @@ export function DeleteProjectDialog({ open, onClose, project, taskCount, childCo
               checked={taskDisposition === "cascade"}
               onChange={() => setTaskDisposition("cascade")}
             />
-            Delete them too
+            Usuń je również
           </label>
         </DialogChoices>
       ) : null}
 
       {childCount > 0 ? (
-        <DialogChoices legend={`Its ${childCount} ${childCount === 1 ? "sub-project" : "sub-projects"}`}>
+        <DialogChoices legend={`Podprojekty (${childCount})`}>
           <label>
             <input
               type="radio"
@@ -108,7 +108,7 @@ export function DeleteProjectDialog({ open, onClose, project, taskCount, childCo
               checked={childDisposition === "orphan_to_top"}
               onChange={() => setChildDisposition("orphan_to_top")}
             />
-            Promote them to top-level
+            Przenieś na najwyższy poziom
           </label>
           <label>
             <input
@@ -118,17 +118,17 @@ export function DeleteProjectDialog({ open, onClose, project, taskCount, childCo
               checked={childDisposition === "cascade"}
               onChange={() => setChildDisposition("cascade")}
             />
-            Delete them too
+            Usuń je również
           </label>
         </DialogChoices>
       ) : null}
 
       <DialogActions>
         <Button variant="secondary" onClick={onClose}>
-          Cancel
+          Anuluj
         </Button>
         <Button variant="danger" onClick={confirm} disabled={busy}>
-          Delete project
+          Usuń projekt
         </Button>
       </DialogActions>
     </Dialog>

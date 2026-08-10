@@ -79,12 +79,12 @@ test.describe("US-10 Project Management — wired UI (GREEN)", () => {
 
     // The sidebar's dedicated "New project" action opens the creation form (US-10.AS-01). The
     // command-palette path is slice 013; the dedicated action is the slice-004 surface.
-    await page.getByRole("button", { name: "New project" }).click();
+    await page.getByRole("button", { name: "Nowy projekt" }).click();
 
-    const dialog = page.getByRole("dialog", { name: "New project" });
+    const dialog = page.getByRole("dialog", { name: "Nowy projekt" });
     await expect(dialog).toBeVisible();
     // The four documented fields: name, a preset color picker, a preset icon picker, optional parent.
-    await expect(page.getByRole("textbox", { name: "Project name" })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Nazwa projektu" })).toBeVisible();
     await expect(dialog.getByRole("radio", { name: COLOR })).toBeVisible();
     await expect(dialog.getByRole("radio", { name: ICON })).toBeVisible();
     await expect(dialog.getByRole("combobox")).toBeVisible(); // the parent <select>
@@ -106,14 +106,14 @@ test.describe("US-10 Project Management — wired UI (GREEN)", () => {
     await expect(sidebarTree(seeded.page).getByText("Work", { exact: true })).toBeVisible();
 
     // Create a CHILD via the wired form, choosing "Work" as parent (AS-02).
-    await seeded.page.getByRole("button", { name: "New project" }).click();
-    const dialog = seeded.page.getByRole("dialog", { name: "New project" });
-    await seeded.page.getByRole("textbox", { name: "Project name" }).fill("Backend");
+    await seeded.page.getByRole("button", { name: "Nowy projekt" }).click();
+    const dialog = seeded.page.getByRole("dialog", { name: "Nowy projekt" });
+    await seeded.page.getByRole("textbox", { name: "Nazwa projektu" }).fill("Backend");
     await dialog.getByRole("combobox").selectOption({ label: "Work" });
     const created = seeded.page.waitForResponse(
       (r) => r.request().method() === "PUT" && /\/api\/projects\//.test(r.url()) && r.ok(),
     );
-    await dialog.getByRole("button", { name: "Create" }).click();
+    await dialog.getByRole("button", { name: "Utwórz" }).click();
     await created;
 
     // The child renders NESTED under the parent (one level): "Backend" lives inside the parent's
@@ -140,8 +140,8 @@ test.describe("US-10 Project Management — wired UI (GREEN)", () => {
     // Open the create form and inspect the parent <select>. AS-03's grandchild prevention is realized
     // on the create path by OMISSION: the picker lists "Parent" (top-level, a legal parent) but NOT
     // "Child" (already nested) — so there is no UI path to even attempt a grandchild (FR-012).
-    await seeded.page.getByRole("button", { name: "New project" }).click();
-    const select = seeded.page.getByRole("dialog", { name: "New project" }).getByRole("combobox");
+    await seeded.page.getByRole("button", { name: "Nowy projekt" }).click();
+    const select = seeded.page.getByRole("dialog", { name: "Nowy projekt" }).getByRole("combobox");
     // `exact` because the default "No parent (top-level)" option's name contains the substring
     // "parent" — a non-exact match would conflate the two.
     await expect(select.getByRole("option", { name: "Parent", exact: true })).toHaveCount(1);
@@ -183,7 +183,7 @@ test.describe("US-10 Project Management — wired UI (GREEN)", () => {
     await expect(sidebarTree(page).getByText("Dormant", { exact: true })).toHaveCount(0);
 
     // … but reachable via the keyboard-operable "Archived" disclosure (R8 bridge for AS-11).
-    await page.getByRole("button", { name: /Archived/ }).click();
+    await page.getByRole("button", { name: /Zarchiwizowane/ }).click();
     const archivedRow = page.locator(".tf-sidebar__archived-row").filter({ hasText: "Dormant" });
     await expect(archivedRow).toBeVisible();
 
@@ -191,7 +191,7 @@ test.describe("US-10 Project Management — wired UI (GREEN)", () => {
     const unarchived = page.waitForResponse(
       (r) => r.request().method() === "PATCH" && /\/unarchive$/.test(r.url()) && r.ok(),
     );
-    await archivedRow.getByRole("button", { name: "Unarchive" }).click();
+    await archivedRow.getByRole("button", { name: "Przywróć" }).click();
     await unarchived;
 
     await expect(sidebarTree(page).getByText("Dormant", { exact: true })).toBeVisible();
@@ -251,7 +251,7 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
       .getByRole("menuitem", { name: "Przenieś do projektu…" })
       .click();
 
-    const selector = seeded.page.getByRole("dialog", { name: /Move/ });
+    const selector = seeded.page.getByRole("dialog", { name: /Przenieś/ });
     await expect(selector).toBeVisible({ timeout: 5_000 });
     await expect(selector.getByRole("button", { name: "Inbox" })).toBeVisible();
     await expect(selector.getByRole("button", { name: /Target/ })).toBeVisible();
@@ -283,7 +283,7 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
       const moved = page.waitForResponse(
         (r) => r.request().method() === "PATCH" && /\/api\/tasks\/.*\/project$/.test(r.url()) && r.ok(),
       );
-      await page.getByRole("dialog", { name: /Move/ }).getByRole("button", { name: "Inbox" }).click();
+      await page.getByRole("dialog", { name: /Przenieś/ }).getByRole("button", { name: "Inbox" }).click();
       await moved;
 
       await page.goto("/");
@@ -307,10 +307,10 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
 
     // The sidebar row's "⋯" menu Edit item opens the editor seeded with the project; renaming +
     // Save persists and the sidebar reflects the new name.
-    await projectMenuAction(page, "Old name", "Edit");
-    await page.getByRole("dialog", { name: "Edit project" }).waitFor();
-    await page.getByRole("textbox", { name: "Project name" }).fill("New name");
-    await page.getByRole("button", { name: "Save" }).click();
+    await projectMenuAction(page, "Old name", "Edytuj");
+    await page.getByRole("dialog", { name: "Edytuj projekt" }).waitFor();
+    await page.getByRole("textbox", { name: "Nazwa projektu" }).fill("New name");
+    await page.getByRole("button", { name: "Zapisz" }).click();
     await expect(sidebarTree(page).getByText("New name", { exact: true })).toBeVisible();
 
     await context.close();
@@ -328,11 +328,11 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
 
     // Opening the editor on "Mover", choosing "NewParent" as parent, and saving nests it one
     // level under "NewParent" (AS-08, within FR-012).
-    await projectMenuAction(page, "Mover", "Edit");
-    const dialog = page.getByRole("dialog", { name: "Edit project" });
+    await projectMenuAction(page, "Mover", "Edytuj");
+    const dialog = page.getByRole("dialog", { name: "Edytuj projekt" });
     await dialog.waitFor();
     await dialog.getByRole("combobox").selectOption({ label: "NewParent" });
-    await page.getByRole("button", { name: "Save" }).click();
+    await page.getByRole("button", { name: "Zapisz" }).click();
     await expect(sidebarTree(page).locator(".tf-sidebar__children").getByText("Mover", { exact: true })).toBeVisible();
 
     await context.close();
@@ -353,12 +353,12 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
 
     // Opening the editor on "Mover" (which has children) and attempting to set "Root" as its parent
     // surfaces the inline one-level-nesting message (R15/FR-049) and disables Save.
-    await projectMenuAction(page, "Mover", "Edit");
-    const dialog = page.getByRole("dialog", { name: "Edit project" });
+    await projectMenuAction(page, "Mover", "Edytuj");
+    const dialog = page.getByRole("dialog", { name: "Edytuj projekt" });
     await dialog.waitFor();
     await dialog.getByRole("combobox").selectOption({ label: "Root" });
-    await expect(dialog.getByRole("status")).toHaveText(/one level|nest/i);
-    await expect(page.getByRole("button", { name: "Save" })).toBeDisabled();
+    await expect(dialog.getByRole("status")).toHaveText(/jeden poziom|zagnieżd/i);
+    await expect(page.getByRole("button", { name: "Zapisz" })).toBeDisabled();
 
     await context.close();
   });
@@ -378,12 +378,12 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
 
     // The sidebar menu's Delete item opens the DeleteProjectDialog with the THREE task dispositions
     // (move-to-Inbox / archive-with-tasks / cascade), defaulting to the least-destructive choice.
-    await projectMenuAction(page, "Busy", "Delete");
-    const dialog = page.getByRole("dialog", { name: "Delete project" });
+    await projectMenuAction(page, "Busy", "Usuń");
+    const dialog = page.getByRole("dialog", { name: "Usuń projekt" });
     await dialog.waitFor();
-    await expect(dialog.getByRole("radio", { name: /Move them to the Inbox/ })).toBeVisible();
-    await expect(dialog.getByRole("radio", { name: /Archive the project instead/ })).toBeVisible();
-    await expect(dialog.getByRole("radio", { name: /Delete them too/ })).toBeVisible();
+    await expect(dialog.getByRole("radio", { name: /Przenieś je do Inboxu/ })).toBeVisible();
+    await expect(dialog.getByRole("radio", { name: /Zamiast tego zarchiwizuj/ })).toBeVisible();
+    await expect(dialog.getByRole("radio", { name: /Usuń je również/ })).toBeVisible();
 
     await context.close();
   });
@@ -400,11 +400,47 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
 
     // The sidebar menu's Delete item surfaces the TWO-way child disposition with its blast radius
     // (Principle VII): orphan-to-top (default) vs cascade.
-    await projectMenuAction(page, "Umbrella", "Delete");
-    const dialog = page.getByRole("dialog", { name: "Delete project" });
+    await projectMenuAction(page, "Umbrella", "Usuń");
+    const dialog = page.getByRole("dialog", { name: "Usuń projekt" });
     await dialog.waitFor();
-    await expect(dialog.getByRole("radio", { name: /Promote them to top-level/ })).toBeVisible();
-    await expect(dialog.getByRole("radio", { name: /Delete them too/ })).toBeVisible();
+    await expect(dialog.getByRole("radio", { name: /Przenieś na najwyższy poziom/ })).toBeVisible();
+    await expect(dialog.getByRole("radio", { name: /Usuń je również/ })).toBeVisible();
+
+    await context.close();
+  });
+
+  test("AS-05 (childless archive): the menu's Archiwizuj archives IMMEDIATELY — no confirmation dialog [INV-075]", async ({
+    browser,
+  }) => {
+    const { page, context, api } = await signedInPage(browser, "inv075-direct-archive");
+    await api.createProject({ name: "Bezpotomny", color: COLOR, icon: ICON });
+
+    await page.goto("/");
+    await expect(sidebarTree(page).getByText("Bezpotomny", { exact: true })).toBeVisible();
+
+    // A CHILDLESS project archives optimistically straight from the menu (INV-075 —
+    // pre-redesign semantics preserved): no dialog, the PATCH fires, the row leaves the tree.
+    const archived = page.waitForResponse(
+      (r) => r.request().method() === "PATCH" && /\/archive$/.test(r.url()) && r.ok(),
+    );
+    await projectMenuAction(page, "Bezpotomny", "Archiwizuj");
+    await archived;
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(sidebarTree(page).getByText("Bezpotomny", { exact: true })).toHaveCount(0);
+
+    await context.close();
+  });
+
+  test("a nonexistent project id degrades gracefully — generic heading, no crash [INV-080]", async ({
+    browser,
+  }) => {
+    const { page, context, api } = await signedInPage(browser, "inv080-bad-id");
+    await api.createProject({ name: "Istniejący", color: COLOR, icon: ICON });
+
+    await page.goto("/projects/00000000-0000-7000-8000-000000000000");
+    // The view renders its generic heading (no crash, no error overlay) and the shell stays up.
+    await expect(page.getByRole("heading", { name: "Projekt", exact: true })).toBeVisible();
+    await expect(sidebarTree(page).getByText("Istniejący", { exact: true })).toBeVisible();
 
     await context.close();
   });
@@ -422,17 +458,17 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
     // AS-10 covers archive AS WELL AS delete: archiving a parent-with-children prompts the child
     // disposition (cascade-archive the subtree vs orphan-to-top) and states its blast radius — it does
     // NOT silently default. Archive keeps the project's tasks, so there is no task disposition.
-    await projectMenuAction(page, "Canopy", "Archive");
-    const dialog = page.getByRole("dialog", { name: "Archive project" });
+    await projectMenuAction(page, "Canopy", "Archiwizuj");
+    const dialog = page.getByRole("dialog", { name: "Archiwizuj projekt" });
     await dialog.waitFor();
-    await expect(dialog.getByRole("radio", { name: /Promote them to top-level/ })).toBeVisible();
-    await expect(dialog.getByRole("radio", { name: /Archive them too/ })).toBeVisible();
+    await expect(dialog.getByRole("radio", { name: /Przenieś na najwyższy poziom/ })).toBeVisible();
+    await expect(dialog.getByRole("radio", { name: /Archiwizuj je również/ })).toBeVisible();
 
     // Confirming with the default (orphan-to-top) archives the parent → it leaves the default tree.
     const archived = page.waitForResponse(
       (r) => r.request().method() === "PATCH" && /\/archive$/.test(r.url()) && r.ok(),
     );
-    await dialog.getByRole("button", { name: "Archive project" }).click();
+    await dialog.getByRole("button", { name: "Archiwizuj projekt" }).click();
     await archived;
     await expect(sidebarTree(page).getByText("Canopy", { exact: true })).toHaveCount(0);
     // The promoted child remains in the active tree (orphan-to-top), now top-level.

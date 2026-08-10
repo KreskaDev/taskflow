@@ -53,7 +53,7 @@ export function ProjectSelector({ open, onClose, task, onSelect }: ProjectSelect
 
   return (
     <Dialog open onClose={onClose} titleId={TITLE_ID}>
-      <DialogTitle id={TITLE_ID}>{task ? `Move "${task.title}" to…` : "Move to…"}</DialogTitle>
+      <DialogTitle id={TITLE_ID}>{task ? `Przenieś „${task.title}” do…` : "Przenieś do…"}</DialogTitle>
 
       <ul className={styles.list} role="list">
         <li>

@@ -89,14 +89,14 @@ function ProjectFormBody({ onClose, mode, project }: Omit<ProjectFormProps, "ope
 
   return (
     <Dialog open onClose={onClose} titleId={TITLE_ID}>
-      <DialogTitle id={TITLE_ID}>{mode === "edit" ? "Edit project" : "New project"}</DialogTitle>
+      <DialogTitle id={TITLE_ID}>{mode === "edit" ? "Edytuj projekt" : "Nowy projekt"}</DialogTitle>
 
       <label className={dialogStyles.fieldRow} htmlFor={NAME_ID}>
-        <span>Name</span>
+        <span>Nazwa</span>
         <Input
           id={NAME_ID}
           type="text"
-          aria-label="Project name"
+          aria-label="Nazwa projektu"
           maxLength={200}
           value={name}
           onChange={(event) => setName(event.target.value)}
@@ -104,7 +104,7 @@ function ProjectFormBody({ onClose, mode, project }: Omit<ProjectFormProps, "ope
       </label>
 
       <fieldset className={styles.colors}>
-        <legend>Color</legend>
+        <legend>Kolor</legend>
         {PROJECT_COLORS.map((c) => (
           <label key={c} className={styles.option}>
             <input
@@ -121,7 +121,7 @@ function ProjectFormBody({ onClose, mode, project }: Omit<ProjectFormProps, "ope
       </fieldset>
 
       <fieldset className={styles.icons}>
-        <legend>Icon</legend>
+        <legend>Ikona</legend>
         {PROJECT_ICONS.map((i) => (
           <label key={i} className={styles.option}>
             <input
@@ -137,13 +137,13 @@ function ProjectFormBody({ onClose, mode, project }: Omit<ProjectFormProps, "ope
       </fieldset>
 
       <label className={dialogStyles.fieldRow} htmlFor="project-form-parent">
-        <span>Parent project</span>
+        <span>Projekt nadrzędny</span>
         <select
           id="project-form-parent"
           value={parentId ?? ""}
           onChange={(event) => setParentId(event.target.value === "" ? null : event.target.value)}
         >
-          <option value="">No parent (top-level)</option>
+          <option value="">Bez nadrzędnego (najwyższy poziom)</option>
           {parentChoices.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
@@ -158,10 +158,10 @@ function ProjectFormBody({ onClose, mode, project }: Omit<ProjectFormProps, "ope
 
       <DialogActions>
         <Button variant="secondary" onClick={onClose}>
-          Cancel
+          Anuluj
         </Button>
         <Button onClick={submit} disabled={nestingError !== null}>
-          {mode === "edit" ? "Save" : "Create"}
+          {mode === "edit" ? "Zapisz" : "Utwórz"}
         </Button>
       </DialogActions>
     </Dialog>

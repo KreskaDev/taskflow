@@ -32,18 +32,18 @@ export function RemoveMemberDialog({ open, onClose, projectId, version, member }
 
   return (
     <Dialog open={open} onClose={onClose} titleId={TITLE_ID} descriptionId={DESC_ID}>
-      <DialogTitle id={TITLE_ID}>Remove member</DialogTitle>
+      <DialogTitle id={TITLE_ID}>Usuń członka</DialogTitle>
       <p id={DESC_ID}>
-        Removing <strong>{member.displayName}</strong> revokes all their access to this project immediately and
-        unassigns them from its tasks. This can&apos;t be undone — you&apos;d have to invite them again.
+        Usunięcie użytkownika <strong>{member.displayName}</strong> natychmiast odbiera mu wszelki dostęp do
+        projektu i cofa przypisania do zadań. Nie można tego cofnąć — trzeba by zaprosić go ponownie.
       </p>
 
       <DialogActions>
         <Button variant="secondary" onClick={onClose}>
-          Cancel
+          Anuluj
         </Button>
         <Button variant="danger" onClick={confirm}>
-          Remove member
+          Usuń członka
         </Button>
       </DialogActions>
     </Dialog>

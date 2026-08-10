@@ -28,7 +28,7 @@ async function signedInPage(
 }
 
 async function createViaInlineCapture(page: Page, title: string): Promise<void> {
-  const input = page.getByLabel("Task title");
+  const input = page.getByRole("textbox", { name: "Nowy task" });
   await input.fill(title);
   const settled = page.waitForResponse(
     (r) => r.request().method() === "PUT" && /\/api\/tasks\//.test(r.url()) && r.ok(),
@@ -45,7 +45,7 @@ test.describe("Shortcut-system removal (FR-111, S3.5)", () => {
     await page.goto("/");
     await createViaInlineCapture(page, "Nietykalny task");
 
-    const listbox = page.getByRole("listbox", { name: "Tasks" });
+    const listbox = page.getByRole("listbox", { name: "Zadania" });
     await expect(page.getByRole("option")).toHaveCount(1);
     await listbox.focus();
 
@@ -90,7 +90,7 @@ test.describe("Shortcut-system removal (FR-111, S3.5)", () => {
     await createViaInlineCapture(page, "Edytowalny");
 
     // Former shortcut characters land as literal text in the capture input.
-    const capture = page.getByLabel("Task title");
+    const capture = page.getByRole("textbox", { name: "Nowy task" });
     await capture.click();
     await capture.pressSequentially("celmta1234?");
     await expect(capture).toHaveValue("celmta1234?");
@@ -99,7 +99,7 @@ test.describe("Shortcut-system removal (FR-111, S3.5)", () => {
     await expect(capture).toHaveValue("");
 
     // Composite-widget keys still operate INSIDE the listbox (D5): arrows + Space.
-    const listbox = page.getByRole("listbox", { name: "Tasks" });
+    const listbox = page.getByRole("listbox", { name: "Zadania" });
     await listbox.focus();
     const option = page.getByRole("option").first();
     await expect(option).toHaveAttribute("aria-selected", "true");
@@ -112,10 +112,10 @@ test.describe("Shortcut-system removal (FR-111, S3.5)", () => {
 
     // Inline rename: Enter commits, Escape cancels (FR-030 editing keys intact).
     await page.getByRole("button", { name: "Edytuj „Edytowalny”" }).click();
-    const rename = page.getByRole("textbox", { name: "Rename task" });
+    const rename = page.getByRole("textbox", { name: "Zmień nazwę zadania" });
     await expect(rename).toBeFocused();
     await rename.press("Escape");
-    await expect(page.getByRole("textbox", { name: "Rename task" })).toHaveCount(0);
+    await expect(page.getByRole("textbox", { name: "Zmień nazwę zadania" })).toHaveCount(0);
 
     await context.close();
   });
