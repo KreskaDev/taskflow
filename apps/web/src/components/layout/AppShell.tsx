@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { Suspense, useState, type ReactNode } from "react";
 
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
+import { TaskDrawerHost } from "@/components/tasks/TaskDrawerHost";
 import styles from "./AppShell.module.css";
 
 /**
@@ -26,9 +27,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Sidebar />
       </div>
       <main className={styles.main}>{children}</main>
-      {/* Drawer host (T052): the deep-linkable task drawer renders into the shell level so
-          it can dock beside (or overlay) the list on every listing route. */}
-      <div id="drawer-host" className={styles.drawerHost} />
+      {/* Drawer host (T052): the deep-linkable task drawer renders at the shell level so
+          it works on every listing route. Suspense wraps useSearchParams (Next 15). */}
+      <Suspense fallback={null}>
+        <TaskDrawerHost />
+      </Suspense>
     </div>
   );
 }

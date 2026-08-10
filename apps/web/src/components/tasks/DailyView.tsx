@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 
 import { TaskRow, taskOptionId, type TaskRowActions } from "@/components/tasks/TaskRow";
 import { TaskEditor, type TaskEditorFields } from "@/components/tasks/TaskEditor";
@@ -51,6 +52,8 @@ interface DailyViewProps {
  * (priority/termin/etykiety/przypisz/duplikuj/usuń — FR-108).
  */
 export function DailyView({ label, groups, projectName, emptyMessage, emptyAction, loading = false }: DailyViewProps) {
+  const router = useRouter();
+  const pathname = usePathname();
   const { setTaskDone, setTaskPriority, rescheduleTask, editTask, setTaskAssignees, setTaskLabels, deleteTask } =
     useTaskMutations();
   const { duplicateTask } = useDuplicateTask();
@@ -86,6 +89,7 @@ export function DailyView({ label, groups, projectName, emptyMessage, emptyActio
     onOpenLabels: () => setLabelId(task.id),
     onOpenAssign: task.projectId != null ? () => setAssignId(task.id) : undefined,
     onDuplicate: () => duplicateTask(task),
+    onOpenDetails: () => router.push(`${pathname}?task=${task.id}`),
     onDelete: () => deleteTask(task.id),
   });
 
@@ -111,7 +115,7 @@ export function DailyView({ label, groups, projectName, emptyMessage, emptyActio
             onToggleSelected: selected
               ? () => setTaskDone(selected.id, selected.status !== "done")
               : undefined,
-            onActivateSelected: selected ? () => setEditorId(selected.id) : undefined,
+            onActivateSelected: selected ? () => router.push(`${pathname}?task=${selected.id}`) : undefined,
           })}
         >
           {groups.map((group) => (

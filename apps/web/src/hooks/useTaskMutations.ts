@@ -131,7 +131,18 @@ function findTaskInViewCaches(queryClient: QueryClient, id: string): TaskRespons
   // ONLY here (not Inbox/Today/Upcoming), so every DailyView operate verb on that surface must resolve its
   // row + version from this cache too — else they silently no-op there (FR-071).
   const assigned = queryClient.getQueryData<AssignedResponse>(ASSIGNED_QUERY_KEY);
-  return assigned?.groups.flatMap((g) => g.tasks).find((t) => t.id === id);
+  const assignedRow = assigned?.groups.flatMap((g) => g.tasks).find((t) => t.id === id);
+  if (assignedRow) return assignedRow;
+  // Project task lists (slice 019, T051): the drawer edits PROJECT tasks from the project
+  // route, whose rows live only in `['projects', <id>, 'tasks']` — resolve them too, else
+  // every drawer verb silently no-ops there (the same failure class as the FR-071 note).
+  for (const [key, data] of queryClient.getQueriesData<TaskResponse[]>({ queryKey: ["projects"] })) {
+    if (key.length === 3 && key[2] === "tasks") {
+      const row = data?.find((t) => t.id === id);
+      if (row) return row;
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -1201,7 +1212,8 @@ export function useTaskMutations() {
 
   const renameTask = (id: string, title: string): void => {
     const parsedTitle = taskTitleSchema.parse(title);
-    const row = currentTasks().find((t) => t.id === id);
+    // Cross-cache resolve (slice 019): the drawer renames from ANY listing surface.
+    const row = findTaskInViewCaches(queryClient, id);
     if (!row) return;
     renameMutation.mutate({ id, title: parsedTitle, version: row.version });
   };

@@ -1,97 +1,180 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
+import { LabelSelector } from "@/components/labels/LabelSelector";
 import { ProjectSelector } from "@/components/projects/ProjectSelector";
-import { TaskDetailPanel } from "@/components/tasks/TaskDetailPanel";
+import { PriorityPicker } from "@/components/tasks/PriorityPicker";
+import { RescheduleInput } from "@/components/tasks/RescheduleInput";
+import { TaskCapture } from "@/components/tasks/TaskCapture";
+import { TaskList } from "@/components/tasks/TaskList";
+import type { TaskRowActions } from "@/components/tasks/TaskRow";
+import { AssigneePicker } from "@/components/tasks/AssigneePicker";
+import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { useDuplicateTask } from "@/hooks/useDuplicateTask";
 import { useProjects } from "@/hooks/useProjects";
 import { useProjectTasks } from "@/hooks/useProjectTasks";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
+import type { TaskResponse } from "@/hooks/useTasks";
+
+const CAPTURE_INPUT_ID = "project-capture";
 
 /**
- * The project-tasks view (T051; FR-021/R6/R7/R16). Lists the tasks of one project via
- * {@link useProjectTasks} and lets the user move any row to another project — or back to the Inbox
- * (`projectId = null`) — through the {@link ProjectSelector}. A projected task is, by FR-021, absent
- * from the Inbox (`/`), so this is the surface its row + move affordance live on. The move rides the
- * shared optimistic recipe ({@link useTaskMutations}.moveTaskToProject) keyed on this project's
- * cache, so a move out of here removes the row optimistically.
- *
- * `params` is a Promise in the Next 15 App Router; unwrapped with React `use()`. The project NAME is
- * rendered as a React text node (escaped, FR-099).
+ * The project-tasks view (rebuilt in slice 019 — T054/T056, S5.1): full row surface
+ * (quick actions + complete "⋯" menu incl. Przypisz/Duplikuj), inline quick-add creating
+ * IN THIS PROJECT (FR-107), and the task drawer via `?task=` (T052) replacing the old
+ * comments modal (TaskDetailPanel — deleted, §J3.7). Viewer-role affordance gaps stay
+ * behaviorally unchanged (server-side denial authoritative — INV-017/S5.1).
  */
 export default function ProjectView({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
   const { data: projects } = useProjects();
   const project = (projects ?? []).find((p) => p.id === id);
-  const { data: tasks, isPending } = useProjectTasks(id);
-  const { moveTaskToProject } = useTaskMutations();
-  const [movingId, setMovingId] = useState<string | null>(null);
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const { data: tasks, isPending, isError, refetch } = useProjectTasks(id);
+  const {
+    renameTask,
+    setTaskDone,
+    deleteTask,
+    moveTaskToProject,
+    setTaskLabels,
+    setTaskPriority,
+    rescheduleTask,
+    setTaskAssignees,
+  } = useTaskMutations();
+  const { duplicateTask } = useDuplicateTask();
 
   const rows = tasks ?? [];
-  const detailTask = rows.find((t) => t.id === detailId);
-  // Comments exist ONLY on shared-project tasks (slice 009, FR-072) — a personal project shows no
-  // comment affordance at all (the server would 404 the thread anyway).
-  const isShared = project?.visibility === "shared";
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [movingId, setMovingId] = useState<string | null>(null);
+  const [labelingId, setLabelingId] = useState<string | null>(null);
+  const [priorityId, setPriorityId] = useState<string | null>(null);
+  const [reschedulingId, setReschedulingId] = useState<string | null>(null);
+  const [assignId, setAssignId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSelectedIndex((i) => Math.min(i, Math.max(0, rows.length - 1)));
+  }, [rows.length]);
+
+  const byId = (taskId: string | null): TaskResponse | undefined =>
+    taskId === null ? undefined : rows.find((t) => t.id === taskId);
+
+  const rowActions = (task: TaskResponse, index: number): TaskRowActions => ({
+    onToggleDone: () => setTaskDone(task.id, task.status !== "done"),
+    onEdit: () => {
+      setSelectedIndex(index);
+      setRenamingId(task.id);
+    },
+    onOpenPriority: () => setPriorityId(task.id),
+    onOpenReschedule: () => setReschedulingId(task.id),
+    onOpenLabels: () => setLabelingId(task.id),
+    onOpenMove: () => setMovingId(task.id),
+    onOpenAssign: () => setAssignId(task.id),
+    onDuplicate: () => duplicateTask(task),
+    onOpenDetails: () => router.push(`/projects/${id}?task=${task.id}`),
+    onDelete: () => deleteTask(task.id),
+  });
+
+  const commitRename = (title: string) => {
+    if (renamingId !== null) renameTask(renamingId, title);
+    setRenamingId(null);
+  };
+
+  const selectedTask = rows[selectedIndex];
 
   return (
-    <section aria-labelledby="project-heading" className="tf-workspace">
-      <h1 id="project-heading">{project?.name ?? "Project"}</h1>
+    <section aria-labelledby="project-heading">
+      <h1 id="project-heading">{project?.name ?? "Projekt"}</h1>
 
-      {isPending ? (
-        <p className="tf-workspace__empty">Loading…</p>
+      <TaskCapture contextProjectId={id} errorId="project-capture-error" inputId={CAPTURE_INPUT_ID} />
+
+      {isError ? (
+        <div role="alert">
+          <p>Nie udało się wczytać zadań projektu.</p>
+          <Button variant="secondary" onClick={() => void refetch()}>
+            Spróbuj ponownie
+          </Button>
+        </div>
+      ) : isPending ? (
+        <Skeleton variant="row" count={4} />
       ) : rows.length === 0 ? (
-        <p className="tf-workspace__empty">No tasks in this project yet.</p>
+        <EmptyState
+          hint="Ten projekt nie ma jeszcze zadań."
+          action={
+            <Button onClick={() => document.getElementById(CAPTURE_INPUT_ID)?.focus()}>
+              Dodaj zadanie
+            </Button>
+          }
+        />
       ) : (
-        <ul role="list" className="tf-project-tasks">
-          {rows.map((task) => (
-            <li key={task.id} className="tf-project-tasks__row">
-              <span className="tf-project-tasks__title">{task.title}</span>
-              {/* The pointer move affordance (the bare `M` shortcut targets the Inbox selection).
-                  Its accessible name names the task so AT users hear which row moves (FR-043). */}
-              <button
-                type="button"
-                className="tf-task-row__project"
-                aria-label={`Move ${task.title} to another project`}
-                onClick={() => setMovingId(task.id)}
-              >
-                Move to another project
-              </button>
-              {isShared ? (
-                // The slice-009 thread affordance: opens the task detail panel hosting the comment
-                // thread + composer (lazy fetch — the thread loads only when the panel opens, R14).
-                <button
-                  type="button"
-                  className="tf-task-row__project"
-                  aria-label={`Komentarze: ${task.title}`}
-                  onClick={() => setDetailId(task.id)}
-                >
-                  Komentarze
-                </button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
+        <TaskList
+          tasks={rows}
+          selectedIndex={selectedIndex}
+          onSelectedIndexChange={setSelectedIndex}
+          renamingId={renamingId}
+          onCommitRename={commitRename}
+          onCancelRename={() => setRenamingId(null)}
+          onToggleSelected={
+            selectedTask ? () => setTaskDone(selectedTask.id, selectedTask.status !== "done") : undefined
+          }
+          onActivateSelected={
+            selectedTask ? () => router.push(`/projects/${id}?task=${selectedTask.id}`) : undefined
+          }
+          rowActions={rowActions}
+        />
       )}
 
       <ProjectSelector
         open={movingId !== null}
         onClose={() => setMovingId(null)}
-        task={rows.find((t) => t.id === movingId)}
-        // The source is THIS project; choosing Inbox (null) returns the task to the Inbox (R6/R7).
+        task={byId(movingId)}
         onSelect={(projectId) => {
           if (movingId !== null) moveTaskToProject(movingId, projectId, id);
         }}
       />
-
-      {isShared && detailTask ? (
-        <TaskDetailPanel
+      {byId(labelingId) ? (
+        <LabelSelector
           open
-          onClose={() => setDetailId(null)}
-          taskId={detailTask.id}
-          taskTitle={detailTask.title}
+          current={byId(labelingId)!.labels}
+          onClose={() => setLabelingId(null)}
+          onSubmit={(ids) => {
+            setTaskLabels(labelingId!, ids);
+            setLabelingId(null);
+          }}
+        />
+      ) : null}
+      {byId(priorityId) ? (
+        <PriorityPicker
+          open
+          current={byId(priorityId)!.priority}
+          onClose={() => setPriorityId(null)}
+          onSelect={(priority) => setTaskPriority(priorityId!, priority)}
+        />
+      ) : null}
+      {byId(reschedulingId) ? (
+        <RescheduleInput
+          open
+          onClose={() => setReschedulingId(null)}
+          onSubmit={(dueDate, dueHasTime) => {
+            rescheduleTask(reschedulingId!, dueDate, dueHasTime);
+            setReschedulingId(null);
+          }}
+        />
+      ) : null}
+      {byId(assignId) ? (
+        <AssigneePicker
+          open
           projectId={id}
-          role={project?.role ?? null}
+          current={byId(assignId)!.assignees}
+          onClose={() => setAssignId(null)}
+          onSubmit={(ids) => {
+            setTaskAssignees(assignId!, ids);
+            setAssignId(null);
+          }}
         />
       ) : null}
     </section>
