@@ -13,7 +13,7 @@ interface LiveRegionProps {
  */
 export function LiveRegion({ politeness = "polite", children }: LiveRegionProps) {
   return (
-    <div className="tf-sr-only" role="status" aria-live={politeness} aria-atomic="true">
+    <div className="sr-only" role="status" aria-live={politeness} aria-atomic="true">
       {children}
     </div>
   );

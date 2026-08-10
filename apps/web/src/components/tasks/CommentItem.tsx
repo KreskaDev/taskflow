@@ -1,9 +1,11 @@
 "use client";
 
 import { Avatar } from "@/components/ui/Avatar";
+import { Button } from "@/components/ui/Button";
 import type { CommentResponse } from "@/hooks/useComments";
 import { SafeMarkdown } from "@/lib/markdown/safeMarkdown";
 import { formatInReferenceZone } from "@/lib/timezone";
+import styles from "./CommentThread.module.css";
 
 interface CommentItemProps {
   comment: CommentResponse;
@@ -27,8 +29,8 @@ export function CommentItem({ comment, onStartEdit, onRequestDelete }: CommentIt
   const absolute = formatInReferenceZone(created, "dd.MM.yyyy HH:mm");
 
   return (
-    <article className="tf-comment" aria-label={`Komentarz: ${comment.authorDisplayName}`}>
-      <header className="tf-comment__header">
+    <article className={styles.comment} aria-label={`Komentarz: ${comment.authorDisplayName}`}>
+      <header className={styles.commentHeader}>
         {/* Identity as an avatar wherever authorship shows (FR-105, T026). The API exposes
             no avatarUrl for other users, so this renders the deterministic initials
             fallback; a null authorId (deleted user) keys the tombstone-safe bucket. */}
@@ -37,13 +39,13 @@ export function CommentItem({ comment, onStartEdit, onRequestDelete }: CommentIt
           displayName={comment.authorDisplayName}
           size="md"
         />{" "}
-        <span className="tf-comment__author">{comment.authorDisplayName}</span>{" "}
-        <time className="tf-comment__time" dateTime={comment.createdAt} title={absolute}>
+        <span className={styles.author}>{comment.authorDisplayName}</span>{" "}
+        <time className={styles.time} dateTime={comment.createdAt} title={absolute}>
           {relativeLabel(created)}
         </time>
         {comment.editedAt != null ? (
           <span
-            className="tf-comment__edited"
+            className={styles.edited}
             title={formatInReferenceZone(new Date(comment.editedAt), "dd.MM.yyyy HH:mm")}
           >
             {" "}
@@ -52,28 +54,26 @@ export function CommentItem({ comment, onStartEdit, onRequestDelete }: CommentIt
         ) : null}
       </header>
 
-      <div className="tf-comment__body">
+      <div className={styles.body}>
         <SafeMarkdown body={comment.body} />
       </div>
 
       {comment.mentions.length > 0 ? (
-        <ul className="tf-comment__mentions" aria-label="Wzmianki">
+        <ul className={styles.mentions} aria-label="Wzmianki">
           {comment.mentions.map((m, index) => (
-            <li key={m.userId ?? `tombstone-${index}`} className="tf-comment__mention">
-              @{m.displayName}
-            </li>
+            <li key={m.userId ?? `tombstone-${index}`}>@{m.displayName}</li>
           ))}
         </ul>
       ) : null}
 
       {comment.canEdit ? (
-        <div className="tf-comment__actions">
-          <button type="button" className="tf-button tf-button--secondary" onClick={onStartEdit}>
+        <div className={styles.itemActions}>
+          <Button variant="secondary" onClick={onStartEdit}>
             Edytuj
-          </button>
-          <button type="button" className="tf-button tf-button--secondary" onClick={onRequestDelete}>
+          </Button>
+          <Button variant="secondary" onClick={onRequestDelete}>
             Usuń
-          </button>
+          </Button>
         </div>
       ) : null}
     </article>

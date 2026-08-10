@@ -3,6 +3,33 @@
 import { type ReactNode, useCallback, useEffect, useRef } from "react";
 import styles from "./Dialog.module.css";
 
+/**
+ * The dialog's heading — carries the id the Dialog's `aria-labelledby` points at.
+ * One catalog style for every dialog title (replaces the legacy `tf-dialog__title`).
+ */
+export function DialogTitle({ id, children }: { id: string; children: ReactNode }) {
+  return (
+    <h2 id={id} className={styles.title}>
+      {children}
+    </h2>
+  );
+}
+
+/** The dialog's trailing action row (confirm/cancel — replaces `tf-dialog__actions`). */
+export function DialogActions({ children }: { children: ReactNode }) {
+  return <div className={styles.actions}>{children}</div>;
+}
+
+/** A labelled radio/checkbox choice group (disposition prompts — AS-10/EC-03 dialogs). */
+export function DialogChoices({ legend, children }: { legend: ReactNode; children: ReactNode }) {
+  return (
+    <fieldset className={styles.choices}>
+      <legend>{legend}</legend>
+      {children}
+    </fieldset>
+  );
+}
+
 interface DialogProps {
   open: boolean;
   onClose: () => void;

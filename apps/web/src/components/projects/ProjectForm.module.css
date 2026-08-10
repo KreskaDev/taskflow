@@ -1,0 +1,67 @@
+/* Project create/edit form (T056) — preset color/icon pickers as wrapped chip grids;
+   color is decorative (the labelled name carries meaning — FR-044). */
+
+.colors,
+.icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: var(--space-3) 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: var(--space-2);
+}
+
+.colors legend,
+.icons legend {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-label);
+  color: var(--color-text-secondary);
+  padding: 0 var(--space-1);
+}
+
+.option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--hit-target);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-control);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.option:hover {
+  background: var(--color-bg-hover);
+}
+
+.option:has(input:checked) {
+  background: var(--color-bg-active);
+  outline: 1px solid var(--color-border-strong);
+}
+
+/* Preset-token tint mapping mirrors Chip's dot (decorative only — FR-044). */
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--color-text-tertiary);
+}
+
+.swatch[data-color="red"],
+.swatch[data-color="rose"] { background: var(--color-danger); }
+.swatch[data-color="orange"],
+.swatch[data-color="amber"] { background: var(--color-warning); }
+.swatch[data-color="green"],
+.swatch[data-color="teal"] { background: var(--color-green); }
+.swatch[data-color="blue"],
+.swatch[data-color="indigo"] { background: var(--color-accent); }
+.swatch[data-color="violet"],
+.swatch[data-color="pink"] { background: var(--color-accent-hover); }
+
+.status {
+  min-height: 1.2em;
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+}

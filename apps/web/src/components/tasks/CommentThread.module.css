@@ -1,0 +1,105 @@
+/* Comment thread + item + composer (T053/T061) — chronological entries in the drawer. */
+
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+}
+
+.empty {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+/* ── item ── */
+
+.comment {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.commentHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.author {
+  font-weight: var(--weight-label);
+}
+
+.time,
+.edited {
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+
+.body {
+  overflow-wrap: anywhere;
+}
+
+.body :is(p, ul, ol) {
+  margin: 0 0 var(--space-1);
+}
+
+.mentions {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  font-size: var(--text-xs);
+  color: var(--color-accent);
+}
+
+.itemActions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* ── composer ── */
+
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.composerError {
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+}
+
+.composerMentions {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  font-size: var(--text-xs);
+}
+
+.composerMention {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-accent);
+}
+
+.composerActions {
+  display: flex;
+  gap: var(--space-2);
+}

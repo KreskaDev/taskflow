@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 
-import { Dialog } from "@/components/ui/Dialog";
+import { Button } from "@/components/ui/Button";
+import { Dialog, DialogActions, DialogTitle } from "@/components/ui/Dialog";
+import dialogStyles from "@/components/ui/Dialog.module.css";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
 import type { components } from "@/lib/api/generated/schema";
 import { useProjects } from "@/hooks/useProjects";
 import type { Priority } from "@/lib/validation/task";
@@ -73,27 +77,25 @@ export function TaskEditor({ open, task, onClose, onSave }: TaskEditorProps) {
   return (
     <Dialog open={open} onClose={onClose} titleId={TITLE_ID}>
       <div onKeyDown={onKeyDown}>
-        <h2 id={TITLE_ID} className="tf-dialog__title">
-          Edytuj zadanie
-        </h2>
+        <DialogTitle id={TITLE_ID}>Edytuj zadanie</DialogTitle>
 
-        <label className="tf-field">
-          <span className="tf-field__label">Tytuł</span>
-          <input
+        <label className={dialogStyles.fieldRow}>
+          <span>Tytuł</span>
+          <Input
             type="text"
-            className="tf-field__input"
-            // Initial focus lands here (the first focusable in the dialog) — AS-06 "title field focused".
-            autoFocus
+            // Initial focus lands here as the dialog's FIRST focusable (AS-06 "title field
+            // focused") — via the Dialog's initial-focus step, NOT autoFocus: an input
+            // autofocus fires before the Dialog snapshots the invoker and would break the
+            // FR-101 focus return (the GlobalCaptureDialog bug class).
             maxLength={500}
             value={title}
             onChange={(event) => setTitle(event.target.value)}
           />
         </label>
 
-        <label className="tf-field">
-          <span className="tf-field__label">Opis</span>
-          <textarea
-            className="tf-field__input"
+        <label className={dialogStyles.fieldRow}>
+          <span>Opis</span>
+          <Textarea
             rows={4}
             maxLength={8000}
             value={description}
@@ -101,10 +103,9 @@ export function TaskEditor({ open, task, onClose, onSave }: TaskEditorProps) {
           />
         </label>
 
-        <label className="tf-field">
-          <span className="tf-field__label">Priorytet</span>
+        <label className={dialogStyles.fieldRow}>
+          <span>Priorytet</span>
           <select
-            className="tf-field__input"
             value={priority ?? ""}
             onChange={(event) => setPriority((event.target.value || null) as Priority)}
           >
@@ -116,10 +117,9 @@ export function TaskEditor({ open, task, onClose, onSave }: TaskEditorProps) {
           </select>
         </label>
 
-        <label className="tf-field">
-          <span className="tf-field__label">Projekt</span>
+        <label className={dialogStyles.fieldRow}>
+          <span>Projekt</span>
           <select
-            className="tf-field__input"
             value={projectId ?? ""}
             onChange={(event) => setProjectId(event.target.value || null)}
           >
@@ -133,20 +133,18 @@ export function TaskEditor({ open, task, onClose, onSave }: TaskEditorProps) {
         </label>
 
         {task.dueDate ? (
-          <label className="tf-field tf-field--inline">
+          <label className={dialogStyles.inlineRow}>
             <input type="checkbox" checked={clearDue} onChange={(event) => setClearDue(event.target.checked)} />
             <span>Usuń termin</span>
           </label>
         ) : null}
 
-        <div className="tf-dialog__actions">
-          <button type="button" className="tf-button" onClick={save}>
-            Zapisz (Ctrl+Enter)
-          </button>
-          <button type="button" className="tf-button tf-button--secondary" onClick={onClose}>
+        <DialogActions>
+          <Button onClick={save}>Zapisz (Ctrl+Enter)</Button>
+          <Button variant="secondary" onClick={onClose}>
             Anuluj (Esc)
-          </button>
-        </div>
+          </Button>
+        </DialogActions>
       </div>
     </Dialog>
   );

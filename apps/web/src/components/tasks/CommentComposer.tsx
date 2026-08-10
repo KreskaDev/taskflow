@@ -4,9 +4,13 @@ import { useState } from "react";
 import { X } from "lucide-react";
 
 import { MentionPicker } from "@/components/tasks/MentionPicker";
+import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
+import { Textarea } from "@/components/ui/Textarea";
 import type { CommentMention } from "@/hooks/useComments";
 import type { MemberResponse } from "@/hooks/useProjectMembers";
 import { commentSchema, MAX_COMMENT_LENGTH } from "@/lib/validation/comment";
+import styles from "./CommentThread.module.css";
 
 interface CommentComposerProps {
   /** Mention candidates — the CURRENT members of the task's shared project (slice-007 roster, R6). */
@@ -69,11 +73,10 @@ export function CommentComposer({
   };
 
   return (
-    <div className="tf-comment-composer">
-      <label className="tf-field">
-        <span className="tf-sr-only">Treść komentarza</span>
-        <textarea
-          className="tf-comment-composer__input"
+    <div className={styles.composer}>
+      <label>
+        <span className="sr-only">Treść komentarza</span>
+        <Textarea
           value={body}
           maxLength={MAX_COMMENT_LENGTH + 1}
           rows={3}
@@ -89,45 +92,36 @@ export function CommentComposer({
       </label>
 
       {error != null ? (
-        <p role="alert" className="tf-comment-composer__error">
+        <p role="alert" className={styles.composerError}>
           {error}
         </p>
       ) : null}
 
       {mentions.length > 0 ? (
-        <ul className="tf-comment-composer__mentions" aria-label="Wybrane wzmianki">
+        <ul className={styles.composerMentions} aria-label="Wybrane wzmianki">
           {mentions.map((m, index) => (
-            <li key={m.userId ?? `tombstone-${index}`} className="tf-comment-composer__mention">
+            <li key={m.userId ?? `tombstone-${index}`} className={styles.composerMention}>
               @{m.displayName}
-              <button
-                type="button"
-                className="tf-button tf-button--secondary"
+              <IconButton
                 aria-label={`Usuń wzmiankę ${m.displayName}`}
                 onClick={() => removeMention(m.userId)}
               >
                 <X size={14} strokeWidth={1.75} aria-hidden="true" />
-              </button>
+              </IconButton>
             </li>
           ))}
         </ul>
       ) : null}
 
-      <div className="tf-comment-composer__actions">
-        <button
-          type="button"
-          className="tf-button tf-button--secondary"
-          aria-haspopup="dialog"
-          onClick={() => setPickerOpen(true)}
-        >
+      <div className={styles.composerActions}>
+        <Button variant="secondary" aria-haspopup="dialog" onClick={() => setPickerOpen(true)}>
           @ Wspomnij
-        </button>
-        <button type="button" className="tf-button" onClick={submit}>
-          {submitLabel}
-        </button>
+        </Button>
+        <Button onClick={submit}>{submitLabel}</Button>
         {onCancel ? (
-          <button type="button" className="tf-button tf-button--secondary" onClick={onCancel}>
+          <Button variant="secondary" onClick={onCancel}>
             Anuluj
-          </button>
+          </Button>
         ) : null}
       </div>
 

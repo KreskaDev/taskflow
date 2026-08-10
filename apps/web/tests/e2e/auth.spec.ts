@@ -30,8 +30,9 @@ test.describe("US1 seeded-session (AS-02/03/04)", () => {
     await page.goto("/settings");
 
     await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-    await expect(page.locator(".tf-profile__name")).toHaveText("Ada Lovelace");
-    await expect(page.locator(".tf-profile__email")).toHaveText(profileEmail);
+    // The identity fields render as a definition list inside the main content (T060).
+    await expect(page.getByRole("main")).toContainText("Ada Lovelace");
+    await expect(page.getByRole("main")).toContainText(profileEmail);
     // The avatar identity element: the Google photo when it loads, else the FR-105
     // deterministic initials fallback (slice 019) — both expose the display name as the
     // accessible img name. The seeded avatars.test URL never resolves, so the fallback

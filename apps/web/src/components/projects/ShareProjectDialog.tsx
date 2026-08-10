@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/Button";
-import { Dialog } from "@/components/ui/Dialog";
+import { Dialog, DialogActions, DialogTitle } from "@/components/ui/Dialog";
 import { useMembershipMutations } from "@/hooks/useMembershipMutations";
 import type { ProjectResponse } from "@/hooks/useProjects";
 
@@ -39,7 +39,7 @@ export function ShareProjectDialog({ open, onClose, project, memberCount = 0 }: 
 
   return (
     <Dialog open={open} onClose={onClose} titleId={TITLE_ID} descriptionId={DESC_ID}>
-      <h2 id={TITLE_ID}>{isShared ? "Unshare project" : "Share project"}</h2>
+      <DialogTitle id={TITLE_ID}>{isShared ? "Unshare project" : "Share project"}</DialogTitle>
       {isShared ? (
         <p id={DESC_ID}>
           Unsharing <strong>{project.name}</strong> makes it personal again. {memberCount}{" "}
@@ -52,14 +52,14 @@ export function ShareProjectDialog({ open, onClose, project, memberCount = 0 }: 
         </p>
       )}
 
-      <div className="tf-dialog__actions">
+      <DialogActions>
         <Button variant="secondary" onClick={onClose}>
           Cancel
         </Button>
         <Button variant={isShared ? "danger" : "primary"} onClick={confirm}>
           {isShared ? "Unshare project" : "Share project"}
         </Button>
-      </div>
+      </DialogActions>
     </Dialog>
   );
 }

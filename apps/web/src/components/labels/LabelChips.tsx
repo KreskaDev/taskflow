@@ -1,13 +1,16 @@
 "use client";
 
+import { Chip } from "@/components/ui/Chip";
 import { useLabelRoster } from "@/hooks/useLabels";
+import styles from "./LabelChips.module.css";
 
 /**
- * Renders a task's CALLER-scoped label chips by NAME (slice 006, R6/R11). Resolves the caller's label ids to
- * names/colors from the `['labels']` roster (a shared, deduped query — many rows read it from cache). The
- * NAME carries the meaning and is React-escaped (FR-099); the preset color is a decorative `data-color` hook,
- * NEVER the sole carrier (FR-044). An id not yet in the roster (an optimistic create still settling) is
- * skipped rather than rendered as a raw id.
+ * Renders a task's CALLER-scoped label chips by NAME (slice 006, R6/R11; on the catalog
+ * {@link Chip} since slice 019 — T061). Resolves the caller's label ids to names/colors from
+ * the `['labels']` roster (a shared, deduped query — many rows read it from cache). The NAME
+ * carries the meaning and is React-escaped (FR-099); the preset color is the Chip's decorative
+ * dot, NEVER the sole carrier (FR-044). An id not yet in the roster (an optimistic create
+ * still settling) is skipped rather than rendered as a raw id.
  */
 export function LabelChips({ labelIds }: { labelIds: string[] }) {
   const { data } = useLabelRoster();
@@ -23,12 +26,10 @@ export function LabelChips({ labelIds }: { labelIds: string[] }) {
   }
 
   return (
-    <span className="tf-task-row__labels">
-      <span className="tf-sr-only">etykiety: </span>
+    <span className={styles.chips}>
+      <span className="sr-only">etykiety: </span>
       {resolved.map((label) => (
-        <span key={label.id} className="tf-label-chip" data-color={label.color ?? undefined}>
-          {label.name}
-        </span>
+        <Chip key={label.id} label={label.name} color={label.color} />
       ))}
     </span>
   );

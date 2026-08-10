@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/Button";
-import { Dialog } from "@/components/ui/Dialog";
+import { Dialog, DialogActions, DialogChoices, DialogTitle } from "@/components/ui/Dialog";
 import { useProjectMutations } from "@/hooks/useProjectMutations";
 import type { ProjectResponse } from "@/hooks/useProjects";
 import type { ChildDisposition } from "@/lib/validation/project";
@@ -41,14 +41,13 @@ export function ArchiveProjectDialog({ open, onClose, project, childCount }: Arc
 
   return (
     <Dialog open={open} onClose={onClose} titleId={TITLE_ID} descriptionId={DESC_ID}>
-      <h2 id={TITLE_ID}>Archive project</h2>
+      <DialogTitle id={TITLE_ID}>Archive project</DialogTitle>
       <p id={DESC_ID}>
         Archiving <strong>{project.name}</strong> hides it and affects {childCount}{" "}
         {childCount === 1 ? "sub-project" : "sub-projects"}. Choose what happens to them.
       </p>
 
-      <fieldset className="tf-archive-project__children">
-        <legend>Its {childCount} {childCount === 1 ? "sub-project" : "sub-projects"}</legend>
+      <DialogChoices legend={`Its ${childCount} ${childCount === 1 ? "sub-project" : "sub-projects"}`}>
         <label>
           <input
             type="radio"
@@ -69,14 +68,14 @@ export function ArchiveProjectDialog({ open, onClose, project, childCount }: Arc
           />
           Archive them too
         </label>
-      </fieldset>
+      </DialogChoices>
 
-      <div className="tf-dialog__actions">
+      <DialogActions>
         <Button variant="secondary" onClick={onClose}>
           Cancel
         </Button>
         <Button onClick={confirm}>Archive project</Button>
-      </div>
+      </DialogActions>
     </Dialog>
   );
 }

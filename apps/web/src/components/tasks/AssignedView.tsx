@@ -3,6 +3,8 @@
 import { useMemo } from "react";
 
 import { DailyView, type DailyGroup } from "@/components/tasks/DailyView";
+import { Button } from "@/components/ui/Button";
+import { ErrorState } from "@/components/ui/ErrorState";
 import { useAssignedTasks } from "@/hooks/useAssignedTasks";
 import { useProjects } from "@/hooks/useProjects";
 
@@ -33,12 +35,14 @@ export function AssignedView() {
 
   if (isError) {
     return (
-      <div className="tf-daily-view" role="alert">
-        <p>Nie udało się wczytać widoku Przypisane do mnie.</p>
-        <button type="button" className="tf-button" onClick={() => void refetch()}>
-          Spróbuj ponownie
-        </button>
-      </div>
+      <ErrorState
+        message="Nie udało się wczytać widoku Przypisane do mnie."
+        action={
+          <Button variant="secondary" onClick={() => void refetch()}>
+            Spróbuj ponownie
+          </Button>
+        }
+      />
     );
   }
 
