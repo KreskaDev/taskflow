@@ -4,6 +4,11 @@
 
 **Created**: 2026-06-13
 
+**Updated**: 2026-08-10 — aligned to constitution v5.1.0 (Principle I: UI-First Operability) and
+the product-vision UI-first reinterpretation clause; slice 019 (ui-design-system) executes BEFORE
+this slice and removed the single-key shortcut system (FR-111, OOS-20), so every keyboard-triggered
+step below is reinterpreted as a visible-UI-control trigger with unchanged behavior.
+
 **Status**: Draft
 
 **Input**: Slice 010 of the TaskFlow MVP. Source of truth: `.specify/memory/product-vision.md`. Goal: a project Kanban board with status columns (Backlog, Todo, In Progress, Done) and a groupable project list view, so a member can manage a single project's workflow visually. This builds on the projects introduced in slice 004 (project-management) and the task/priority handling delivered in slice 005 (daily-planning), and is access-scoped via the sharing model from slice 007 (project-sharing-membership).
@@ -19,7 +24,11 @@ Slice-specific:
 - EC-11 (cancelled tasks not displayed on the Board)
 
 Cross-cutting (realized in this slice):
-- FR-031 (suppress single-key shortcuts in text inputs)
+- FR-103 (every operation reachable through a visible affordance — UI-first operability; per the
+  slicing rule it is realized in every slice that adds an operation)
+- FR-108 (task rows expose quick actions + a complete "⋯" menu; the project List rows reuse the
+  slice-019 catalog, and Board cards get the same affordance contract)
+- FR-110 (empty states present a hint + action; applies to the empty Board columns and List groups)
 - FR-042 (visible focus indicator)
 - FR-043 (ARIA roles/labels)
 - FR-044 (text contrast ≥ 4.5:1)
@@ -52,31 +61,39 @@ Depends on:
 - Slice 005 (daily-planning) — provides priorities and the full task editor, supporting the "group by priority" control on the List view and the per-task selection model reused on the Board
 - Slice 007 (project-sharing-membership) — provides project visibility (personal/shared), the ProjectMembership set, and roles, which scope who may view the Board/List and who may move tasks (editor/owner)
 
-Exercised-but-not-owned (mechanics exercised here; canonical keyboard-shortcut requirement lives in a later slice):
-- The arrow-move keys that move a selected task between Board columns (US-03.AS-04, AS-05, AS-06) are members of FR-029 (list shortcuts: arrows move, etc.), which is owned by slice 011 (cycles). This slice owns the Board-move acceptance scenarios but not the FR-029 shortcut requirement; the column-to-status mapping driving those moves is owned here via FR-025.
+Keyboard-trigger deferral (product-vision UI-first reinterpretation clause, constitution v5.0.0+):
+- The `G P` navigation chord (US-03.AS-01) and the arrow-move keys (US-03.AS-04, AS-05, AS-06) are
+  members of FR-028/FR-029, which are **[DEFERRED]** with the custom shortcut system (OOS-20) — no
+  slice currently owns delivering them. This slice owns the Board-move acceptance scenarios'
+  BEHAVIOR and the column-to-status mapping driving them (FR-025); the triggers are visible UI
+  controls per FR-103 (drag-and-drop between columns and the card's "⋯" menu move actions; the
+  project list opens from the sidebar, FR-109). If the accelerator slice ever lands FR-028/FR-029,
+  those bindings layer ON TOP of the affordances shipped here.
 
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 3 - Project Kanban Workflow (Priority: P2)
 
-User navigates to a specific project and views tasks on a Kanban board with columns for Backlog, Todo, In Progress, and Done. They move tasks between columns using keyboard arrows and manage the project workflow visually.
+User navigates to a specific project and views tasks on a Kanban board with columns for Backlog, Todo, In Progress, and Done. They move tasks between columns through visible controls — dragging cards or the card's "⋯" menu — and manage the project workflow visually. (Product-vision narrative retains the arrow-key phrasing for the future accelerator slice; triggers here follow the UI-first reinterpretation clause.)
 
 **Why this priority**: Project-level organization is essential for users managing work beyond simple daily lists, but depends on core task and project entities being functional first.
 
-**Independent Test**: Can be tested by creating a project, adding tasks to it with different statuses, opening the project Board view, and moving tasks between columns using arrow keys.
+**Independent Test**: Can be tested by creating a project, adding tasks to it with different statuses, opening the project Board view, and moving tasks between columns via drag-and-drop and the card menu.
 
-> Scope note: the arrow keys that move a task between columns (AS-04, AS-05, AS-06) are members of FR-029 (list shortcuts), owned by slice 011 (cycles); this slice owns the Board-move acceptance scenarios and the column-to-status mapping (FR-025) that those moves drive. Cancelled tasks are hidden from the Board (EC-11 / FR-025) and remain reachable via the List view, search, and command palette.
+> Scope note: the keyboard triggers named in the acceptance scenarios (`G P`, arrow-move) belong to FR-028/FR-029, **[DEFERRED]** with the shortcut system per OOS-20 — the scenarios are read through the product-vision UI-first reinterpretation clause: same behavior, visible-UI triggers (sidebar project list per FR-109; column moves via drag-and-drop and the card "⋯" menu per FR-103). This slice owns the Board-move acceptance scenarios and the column-to-status mapping (FR-025) that those moves drive. Cancelled tasks are hidden from the Board (EC-11 / FR-025) and remain reachable via the List view — and, once slice 013 lands, via search and the command palette.
 
 > Scope note (US-03.AS-07 group-by split): the List view's group-by control (FR-024) offers grouping by cycle, status, or priority. This slice OWNS grouping by **status** and **priority** (both available from the Task entity owned by slice 002 and priorities from slice 005). Grouping **by cycle** depends on cycle assignment and is DEFERRED to slice 011 (cycles), which owns the Cycle entity and task-to-cycle assignment; until slice 011 lands, the by-cycle option is not offered.
 
-**Acceptance Scenarios** (owned by this slice):
+**Acceptance Scenarios** (owned by this slice; triggers read through the UI-first
+reinterpretation clause — original keyboard phrasing retained in product-vision.md for the
+future accelerator slice, OOS-20):
 
-1. **(US-03.AS-01) Given** user is on any view, **When** they press `G P`, **Then** a project list appears for selection.
+1. **(US-03.AS-01) Given** user is on any view, **When** they open the projects list via the sidebar's visible projects entry (FR-109; the original `G P` trigger is deferred per OOS-20), **Then** a project list appears for selection.
 2. **(US-03.AS-02) Given** the project list is open, **When** user selects a project, **Then** the project view opens in the last-used mode (List or Board).
 3. **(US-03.AS-03) Given** the project Board view is open, **When** the view renders, **Then** tasks are displayed in columns: Backlog, Todo, In Progress, Done.
-4. **(US-03.AS-04) Given** a task is selected on the Board view, **When** user presses right arrow, **Then** the task moves one column to the right (e.g., Todo to In Progress) and its status updates accordingly.
-5. **(US-03.AS-05) Given** a task is in the Done column, **When** user presses right arrow, **Then** nothing happens (Done is the last column).
-6. **(US-03.AS-06) Given** a task is selected on the Board view, **When** user presses left arrow, **Then** the task moves one column to the left.
+4. **(US-03.AS-04) Given** a task card is on the Board view, **When** user moves it one column to the right via a visible control — dragging the card to the adjacent column or the card's "⋯" menu move action (the original arrow-key trigger is deferred per OOS-20), **Then** the task moves one column to the right (e.g., Todo to In Progress) and its status updates accordingly.
+5. **(US-03.AS-05) Given** a task is in the Done column, **When** user invokes move-right, **Then** nothing happens (Done is the last column; the "⋯" menu does not offer a further-right move).
+6. **(US-03.AS-06) Given** a task card is on the Board view, **When** user moves it one column to the left (drag or "⋯" menu), **Then** the task moves one column to the left.
 7. **(US-03.AS-07) Given** the project List view is open, **When** the view renders, **Then** tasks are displayed as a flat list, groupable by cycle, status, or priority via a group-by control.
 
 ### Edge Cases
@@ -92,8 +109,16 @@ User navigates to a specific project and views tasks on a Kanban board with colu
 
 ### Cross-cutting Requirements (realized in this slice)
 
+UI-First Operability (per Constitution Principle I; verbatim from product-vision.md):
+- **FR-103**: Every operation the product offers MUST have a visible affordance on the surface where it applies — directly, or via an explicit overflow/context menu ("⋯") on the item it targets. No functionality may exist only behind a keyboard shortcut.
+- **FR-108**: Each task row MUST expose quick actions on hover/focus (complete, edit, overflow) and a "⋯" menu containing every operation available on that task; all row actions MUST have keyboard-focus-triggered equivalents (FR-046) and correct hit targets/stacking so pointer clicks always land (Principle I).
+- **FR-110**: Every empty list state MUST present a short explanatory hint plus the relevant action button; onboarding wizards and first-run modal tours remain prohibited (Principle IV).
+
+> FR-031 (single-key suppression in text inputs), listed in the original draft of this spec, is
+> **[DORMANT]** per product-vision — no single-key shortcuts exist after slice 019 (FR-111); it
+> re-activates only with the future accelerator slice (OOS-20) and is NOT realized here.
+
 Accessibility (per Constitution Principle II):
-- **FR-031**: Single-key shortcuts MUST be suppressed when a text input is focused; only modifier-based shortcuts remain active during text input.
 - **FR-042**: Every focusable element MUST have a visible focus indicator.
 - **FR-043**: All interactive elements MUST have correct ARIA roles and labels for screen reader compatibility.
 - **FR-044**: Text contrast ratio MUST be at least 4.5:1 (3:1 for large text).
@@ -125,11 +150,11 @@ This slice introduces no new slice-specific success criteria. The measurable out
 
 ## Constitution Compliance
 
-This slice is evaluated against constitution v4.0.0. Cross-cutting principles realized here:
+This slice is evaluated against constitution v5.1.0. Cross-cutting principles realized here:
 
-- **I. Keyboard-First**: the project list is opened with `G P` (US-03.AS-01), a project is selected from it (US-03.AS-02), and tasks are moved between Board columns with the arrow keys (US-03.AS-04, AS-05, AS-06) — every Board and List interaction is keyboard-driven, with no required mouse action.
-- **II. Accessibility (WCAG 2.1 AA)**: FR-042 (focus indicator on the selected card and the group-by control), FR-043 (ARIA roles/labels for columns, cards, and the list), FR-044 (contrast ≥ 4.5:1, so column/status is never conveyed by color alone), FR-045 (no AT-binding collisions for the arrow-move keys), FR-046 (no hover-only content), FR-047 (prefers-reduced-motion for column-move transitions). FR-031 keeps single-key shortcuts inert while a text input (e.g., the editor or search) is focused. **FR-101 is load-bearing here**: the Board/List of a shared project is a server-pushed surface, so when another member moves a task between columns the resulting card relocation MUST be announced to assistive technology via an ARIA live region (polite, coalesced under concurrent fan-out) WITHOUT stealing focus from the current selection; and the `G P` project-picker dialog (US-03.AS-01/AS-02) MUST follow the dialog focus contract — set initial focus into the picker, trap focus, dismiss on Esc, and return focus to the invoker on close.
-- **III. Instant Response**: SC-003 (owned by slice 002, task-capture) — selecting a card, moving it between columns, and switching the List group-by all paint their optimistic result within one animation frame while the C# API reconciles or rolls back the status change asynchronously (server-confirmed mutations within a p95 < 200ms budget). Because the Board/List of a shared project is a shared view, it also receives server-initiated updates over SignalR when another member moves a task: an inbound remote patch resolves under last-write-wins but MUST yield to a pending local optimistic move until that move's server-ack resolves, then reconcile — a remote update never clobbers an in-flight local column move.
+- **I. UI-First Operability**: every Board and List operation has a visible affordance (FR-103) — the project list opens from the sidebar's projects section (FR-109; US-03.AS-01), a project is selected by clicking/activating its entry (US-03.AS-02), the List/Board mode switch is a visible control, the group-by control is a visible select (US-03.AS-07), and a card moves between columns by drag-and-drop or via its "⋯" menu move actions (US-03.AS-04..06). No operation exists only behind a keyboard shortcut; standard keyboard operability (Tab/Enter/Esc, arrow navigation within composite widgets, focus management) remains required via Principle II.
+- **II. Accessibility (WCAG 2.1 AA)**: FR-042 (focus indicator on the focused card, the mode switch, and the group-by control), FR-043 (ARIA roles/labels for columns, cards, and the list — the Board is a composite widget with arrow navigation as WCAG operability, not a shortcut system), FR-044 (contrast ≥ 4.5:1, so column/status is never conveyed by color alone), FR-045 (no custom shortcuts are introduced, so no AT-binding collisions arise), FR-046 (no hover-only content — card quick actions have focus-triggered equivalents per FR-108), FR-047 (prefers-reduced-motion for column-move transitions). **FR-101**: status changes surfaced by this slice (a failed/rolled-back move's toast) use the established persistent `role="status"` region without stealing focus; announcing ANOTHER member's remote column move arrives with the real-time transport (slice 016) — this slice's obligation is that the Board/List does not preclude that announcement (the transfer-note mechanism established in slice 019, D11). Any dialog this slice ships follows the catalog Dialog's focus contract.
+- **III. Instant Response**: SC-003 (owned by slice 002, task-capture) — selecting a card, moving it between columns, and switching the List group-by all paint their optimistic result within one animation frame while the C# API reconciles or rolls back the status change asynchronously (server-confirmed mutations within a p95 < 200ms budget), on the established optimistic mutation-factory pattern (snapshot/rollback/invalidate). The real-time transport is slice 016: when it lands, an inbound remote patch resolves under last-write-wins but MUST yield to a pending local optimistic move until that move's server-ack resolves, then reconcile — this slice's cache/mutation design MUST NOT preclude that (transfer note per D11).
 - **IV. Minimalist UI**: the Board surfaces the four workflow columns and hides cancelled tasks (FR-025 / EC-11), and the List exposes grouping on demand through a single group-by control (FR-024), keeping density without clutter. Skeleton screens are permitted for the initial network-bound load of a project's tasks; they MUST NOT mask a column move whose optimistic result could be shown instead.
 - **V. Connected, Server-Authoritative**: SC-004 (owned by slice 002, task-capture) — both views read and write task status through the app's own C# API and PostgreSQL database, the system of record, with no third-party runtime data service (the sole permitted external runtime dependency is Google OAuth, for sign-in only).
 - **VI. Type Safety End-to-End**: the column-to-status mapping (FR-025) is expressed over the typed status enum (backlog/todo/in_progress/done/cancelled) from the schema; a right/left move resolves to a valid adjacent status, with the Done boundary (US-03.AS-05) enforced as a typed no-op.
@@ -140,7 +165,7 @@ This slice is evaluated against constitution v4.0.0. Cross-cutting principles re
 - **XI. Privacy & Personal Data**: the Board/List surfaces personal identifiers (`createdBy`, assignee display names/avatars) on cards. This slice introduces no new personal-data store and owns no erasure path — account deletion and the erasure cascade (FR-085/FR-086, US-17) are owned by the privacy slice (data-export-import / account management). When a member leaves, is removed, or a project is unshared, they lose all access to this Board/List (FR-066) so no residual personal data is exposed to a non-member here.
 - **XII. Security by Default**: task titles and markdown descriptions rendered on Board cards and List rows are untrusted, user-authored content and MUST be output-encoded/sanitized to a constrained safe subset so raw HTML injection is impossible, behind the production Content-Security-Policy and security response headers (FR-099). The secrets clause of Principle XII (session key, OAuth secret, DB/broker credentials) is infrastructure-level and not exercised by this slice's view handlers.
 
-**Known compliance gap (deferred, accepted at slicing time):** Principle I (Keyboard-First) is exercised here through the arrow-move keys, but the canonical shortcut requirement for those keys — FR-029 (list shortcuts: arrows move, `E` edit, `Space` toggle done, `1-4` priority, etc.) — is owned by slice 011 (cycles). This slice owns the Board-move acceptance scenarios (US-03.AS-04, AS-05, AS-06) and the column-to-status mapping that drives them (FR-025), but does not own FR-029; the shortcut requirement is delivered in slice 011. No FR-040 undo gap arises here: moving a task between columns is a reversible status change (move it back), not one of FR-040's destructive/irreversible actions.
+**Former compliance gap — resolved by constitution v5.0.0:** the original draft recorded a Keyboard-First gap (the arrow-move keys' canonical requirement FR-029 living in a later slice). Principle I is now UI-First Operability and FR-028/FR-029 are **[DEFERRED]** with the whole shortcut system (OOS-20), so no keyboard-trigger gap exists: every operation this slice ships is fully operable through visible affordances (FR-103), and WCAG keyboard operability (Principle II) covers focus/arrow navigation within the Board as a composite widget. No FR-040 undo gap arises here: moving a task between columns is a reversible status change (move it back), not one of FR-040's destructive/irreversible actions.
 
 ## Assumptions
 
@@ -151,7 +176,7 @@ This slice introduces no new assumptions. The assumptions owned by earlier slice
 
 ## Out of Scope
 
-This slice confirms the full MVP out-of-scope boundary (OOS-01..OOS-19 from product-vision.md):
+This slice confirms the full MVP out-of-scope boundary (OOS-01..OOS-20 from product-vision.md):
 
 - **OOS-01**: [PROMOTED to in-scope in v3.0.0 — see US-11, US-12] Multi-user collaboration, sharing, permissions
 - **OOS-02**: Cross-device sync, cloud storage
@@ -172,7 +197,8 @@ This slice confirms the full MVP out-of-scope boundary (OOS-01..OOS-19 from prod
 - **OOS-17**: Organizations / multi-tenancy beyond the single team, and non-Google SSO / additional identity providers
 - **OOS-18**: Pending / pre-account invitations (invites are by email resolved against existing signed-in Users only)
 - **OOS-19**: Per-user timezones (the instance uses a single reference timezone, ASM-12)
+- **OOS-20**: The custom keyboard shortcut system — single-key commands, chords, and the shortcuts help overlay (US-08, FR-027..029/031/033, SC-001) — deferred per constitution v5.0.0 to a future opt-in accelerator slice layered on top of complete UI operability (US-18). Standard editing keys and WCAG keyboard operability are NOT out of scope.
 
 Note: multi-user collaboration, sharing, and in-app notifications are IN scope for the MVP (US-11/US-12/US-16); the OOS-01 and OOS-06 markers above are retained verbatim as historical promotion notes, not as current out-of-scope assertions.
 
-Also out of scope for this slice specifically (deferred to later slices): the canonical list-shortcut requirement FR-029, including the arrow-move keys exercised here, is owned by slice 011 (cycles); grouping the List view **by cycle** (one option of FR-024's group-by control, exercised via US-03.AS-07) depends on cycle assignment, which is owned by slice 011 (cycles) — this slice ships group-by status and priority only; the command palette and search paths through which cancelled tasks remain reachable (EC-11) are owned by slice 013 (command-palette-search); the 30-second undo window for destructive actions (FR-040) is owned by slice 014 (undo); the account-deletion / erasure path (FR-085/FR-086, US-17) is owned by the account-management/data slice.
+Also out of scope for this slice specifically (deferred to later slices): the keyboard triggers named by US-03's scenarios (`G P`, arrow-move — members of FR-028/FR-029) are deferred with the shortcut system per OOS-20; grouping the List view **by cycle** (one option of FR-024's group-by control, exercised via US-03.AS-07) depends on cycle assignment, which is owned by slice 011 (cycles) — this slice ships group-by status and priority only; the command palette and search paths through which cancelled tasks remain reachable (EC-11) are owned by slice 013 (command-palette-search); the 30-second undo window for destructive actions (FR-040) is owned by slice 014 (undo); the account-deletion / erasure path (FR-085/FR-086, US-17) is owned by the account-management/data slice; the real-time fan-out of another member's Board/List changes (SignalR) is owned by slice 016 (real-time-collaboration) — this slice records transfer notes (D11 mechanism) instead of realizing them.
