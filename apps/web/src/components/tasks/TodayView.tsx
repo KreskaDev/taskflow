@@ -13,7 +13,7 @@ import { useTodayTasks } from "@/hooks/useTodayTasks";
  * project ids to names and maps the wire groups to the view's shape.
  */
 export function TodayView() {
-  const { data, isError, refetch } = useTodayTasks();
+  const { data, isError, isPending, refetch } = useTodayTasks();
   const { data: projects } = useProjects();
 
   const projectNames = useMemo(() => {
@@ -47,7 +47,8 @@ export function TodayView() {
       label="Dziś"
       groups={groups}
       projectName={projectName}
-      emptyMessage="Brak zadań na dziś. Naciśnij C, aby dodać zadanie."
+      loading={isPending}
+      emptyMessage="Brak zadań na dziś."
     />
   );
 }

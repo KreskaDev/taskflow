@@ -2,6 +2,7 @@
 
 import { type QueryClient, useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { invalidateViewCounts } from "@/hooks/useViewCounts";
 import { apiClient, mapError, type ProblemDetails } from "@/lib/api/client";
 import type { components } from "@/lib/api/generated/schema";
 import { buildTodayGroups, buildUpcomingGroups, flattenToday, flattenUpcoming } from "@/lib/dailyViews";
@@ -113,6 +114,7 @@ async function settleViewCaches(queryClient: QueryClient): Promise<void> {
   // edit) reconcile an assigned-only task on the "Assigned to me" surface. Do NOT add exact:true here without
   // an explicit ASSIGNED_QUERY_KEY invalidate, or that surface goes stale.
   await queryClient.invalidateQueries({ queryKey: TASKS_QUERY_KEY });
+  await invalidateViewCounts(queryClient);
   await queryClient.invalidateQueries({ queryKey: TODAY_QUERY_KEY });
   await queryClient.invalidateQueries({ queryKey: UPCOMING_QUERY_KEY });
 }
@@ -273,6 +275,7 @@ export function createTaskMutationOptions(queryClient: QueryClient): OptimisticC
     ): Promise<void> => {
       // Reconcile with server truth regardless of success or failure.
       await queryClient.invalidateQueries({ queryKey: TASKS_QUERY_KEY });
+  await invalidateViewCounts(queryClient);
     },
   };
 }
@@ -390,6 +393,7 @@ export function renameTaskMutationOptions(queryClient: QueryClient): RenameTaskO
         );
       }
       await queryClient.invalidateQueries({ queryKey: TASKS_QUERY_KEY });
+  await invalidateViewCounts(queryClient);
     },
   };
 }
@@ -595,6 +599,7 @@ export function reorderTaskMutationOptions(queryClient: QueryClient): ReorderTas
         );
       }
       await queryClient.invalidateQueries({ queryKey: TASKS_QUERY_KEY });
+  await invalidateViewCounts(queryClient);
     },
   };
 }
@@ -661,6 +666,7 @@ export function deleteTaskMutationOptions(queryClient: QueryClient): DeleteTaskO
 
     onSettled: async (): Promise<void> => {
       await queryClient.invalidateQueries({ queryKey: TASKS_QUERY_KEY });
+  await invalidateViewCounts(queryClient);
     },
   };
 }
@@ -794,6 +800,7 @@ export function moveTaskToProjectMutationOptions(queryClient: QueryClient): Move
       if (!context) return;
       await queryClient.invalidateQueries({ queryKey: context.sourceKey });
       await queryClient.invalidateQueries({ queryKey: context.targetKey });
+      await invalidateViewCounts(queryClient);
     },
   };
 }
@@ -1041,6 +1048,7 @@ export function setTaskAssigneesMutationOptions(queryClient: QueryClient): ViewM
       await settleViewCaches(queryClient);
       // The "Assigned to me" membership can change (self-assign/unassign) — reconcile with server truth.
       await queryClient.invalidateQueries({ queryKey: ASSIGNED_QUERY_KEY });
+      await invalidateViewCounts(queryClient);
     },
   };
 }
@@ -1093,6 +1101,7 @@ export function setTaskLabelsMutationOptions(queryClient: QueryClient): ViewMuta
       if (data) patchLabelsInViewCaches(queryClient, data.id, data.labels);
       await settleViewCaches(queryClient);
       await queryClient.invalidateQueries({ queryKey: ASSIGNED_QUERY_KEY });
+      await invalidateViewCounts(queryClient);
     },
   };
 }
@@ -1143,23 +1152,51 @@ export function useTaskMutations() {
 
   const currentTasks = (): TaskResponse[] => queryClient.getQueryData<TaskResponse[]>(TASKS_QUERY_KEY) ?? [];
 
-  const createTask = (input: { title: string; dueDate?: Date; dueHasTime?: boolean }): void => {
+  const createTask = (input: {
+    title: string;
+    dueDate?: Date;
+    dueHasTime?: boolean;
+    /** Create in this project's context (slice 019, FR-107): composed create → move. */
+    projectId?: string | null;
+  }): void => {
     // Defensive boundary parse (Constitution VI) — validates the title AND the R8 due-date
     // pairing in one schema, replacing the prior `taskTitleSchema.parse`.
-    const parsed = createTaskSchema.parse(input);
+    const parsed = createTaskSchema.parse({
+      title: input.title,
+      dueDate: input.dueDate,
+      dueHasTime: input.dueHasTime,
+    });
 
     const head = currentTasks()[0];
     const position = between(null, head ? head.position : null);
 
     // The resolved `Date` becomes the wire/optimistic ISO string here, once — the recipe
     // layer only ever handles the string shape (matching the nullable `TaskResponse` type).
-    createMutation.mutate({
-      id: newTaskId(),
+    const id = newTaskId();
+    const request = {
+      id,
       title: parsed.title,
       position,
       dueDate: parsed.dueDate?.toISOString(),
       dueHasTime: parsed.dueHasTime,
-    });
+    };
+
+    const targetProject = input.projectId ?? null;
+    if (targetProject === null) {
+      createMutation.mutate(request);
+      return;
+    }
+
+    // Project-context create (FR-107 clarification): the create paints optimistically at
+    // once (Inbox cache), then the optimistic move relocates it into the project's list as
+    // soon as the create is acknowledged (the move needs the persisted row to PATCH).
+    // Failures surface through each mutation's own announcer path.
+    void createMutation
+      .mutateAsync(request)
+      .then(() => {
+        moveTaskToProject(id, targetProject, null);
+      })
+      .catch(() => undefined);
   };
 
   const renameTask = (id: string, title: string): void => {

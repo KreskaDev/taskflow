@@ -12,7 +12,7 @@ import { useUpcomingTasks } from "@/hooks/useUpcomingTasks";
  * priority badge. The server owns the 7-day window, the day grouping, and the order.
  */
 export function UpcomingView() {
-  const { data, isError, refetch } = useUpcomingTasks();
+  const { data, isError, isPending, refetch } = useUpcomingTasks();
   const { data: projects } = useProjects();
 
   const projectNames = useMemo(() => {
@@ -46,6 +46,7 @@ export function UpcomingView() {
       label="Nadchodzące"
       groups={groups}
       projectName={projectName}
+      loading={isPending}
       emptyMessage="Brak zadań w najbliższych 7 dniach."
     />
   );

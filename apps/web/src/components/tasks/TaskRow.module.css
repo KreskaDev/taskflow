@@ -1,0 +1,164 @@
+/* TaskRow (T040) — 13px density, 32-40px row, hover/focus action zone (opacity-hidden,
+   NEVER display:none — Tab must reach the actions in both directions), correct stacking
+   over virtualized translateY rows. */
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2) 0 var(--space-1);
+  border-bottom: 1px solid var(--color-border);
+  overflow: hidden;
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+  color: var(--color-text-primary);
+  cursor: default;
+}
+
+.row:hover {
+  background: var(--color-bg-hover);
+}
+
+.selected {
+  background: var(--color-selection);
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+
+.checkbox {
+  flex: none;
+}
+
+.stateGlyph {
+  width: 15px;
+  height: 15px;
+  margin: 0 calc((var(--hit-target) - 15px) / 2);
+  border: 1.5px solid var(--color-fg-disabled);
+  border-radius: 50%;
+  flex: none;
+}
+
+.stateGlyph[data-done="true"] {
+  background: var(--color-green);
+  border-color: var(--color-green);
+}
+
+.title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.titleButton {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  text-align: left;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.titleButton:hover .title {
+  color: var(--color-accent);
+}
+
+.done .title {
+  color: var(--color-text-secondary);
+  text-decoration: line-through;
+}
+
+.projectChip,
+.assignees {
+  flex: none;
+  padding: 0 var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  white-space: nowrap;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.priority {
+  flex: none;
+  padding: 0 var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heading);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text-primary);
+}
+
+.priority[data-priority="P0"] {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.priority[data-priority="P1"] {
+  color: var(--color-warning);
+  border-color: var(--color-warning);
+}
+
+.overdue {
+  flex: none;
+  padding: 0 var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heading);
+  border-radius: var(--radius-control);
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+}
+
+.due {
+  flex: none;
+  margin-left: auto;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Hover/focus-revealed quick actions (FR-108, spec Edge Cases): opacity-hidden while
+   idle so they stay in the tab order and Shift+Tab traverses them backwards; revealed on
+   row hover, keyboard focus-within, and while the row is the active option. */
+.actionZone {
+  display: flex;
+  align-items: center;
+  flex: none;
+  margin-left: var(--space-1);
+  opacity: 0;
+  transition: opacity var(--motion-fast) var(--motion-ease);
+}
+
+.row:hover .actionZone,
+.row:focus-within .actionZone,
+.selected .actionZone {
+  opacity: 1;
+}
+
+.action {
+  width: var(--hit-target);
+  height: 28px;
+  min-height: 28px;
+}
+
+.ellipsis {
+  font-size: var(--text-lg);
+  line-height: 1;
+}
+
+.renameInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: inherit;
+  color: inherit;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-control);
+  padding: 2px var(--space-2);
+}

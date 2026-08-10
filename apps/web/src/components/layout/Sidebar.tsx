@@ -1,7 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown, ChevronRight, Inbox } from "lucide-react";
+import { usePathname } from "next/navigation";
+import {
+  Calendar,
+  CalendarClock,
+  ChevronDown,
+  ChevronRight,
+  Inbox,
+  Plus,
+  UserCheck,
+} from "lucide-react";
 import { useState } from "react";
 
 import { ArchiveProjectDialog } from "@/components/projects/ArchiveProjectDialog";
@@ -9,9 +18,12 @@ import { DeleteProjectDialog } from "@/components/projects/DeleteProjectDialog";
 import { MembersDialog } from "@/components/projects/MembersDialog";
 import { ProjectForm } from "@/components/projects/ProjectForm";
 import { ShareProjectDialog } from "@/components/projects/ShareProjectDialog";
+import { Menu } from "@/components/ui/Menu";
 import { useProjectTasks } from "@/hooks/useProjectTasks";
 import { useArchivedProjects, useProjects, type ProjectResponse } from "@/hooks/useProjects";
 import { useProjectMutations } from "@/hooks/useProjectMutations";
+import { useViewCounts } from "@/hooks/useViewCounts";
+import styles from "./Sidebar.module.css";
 
 /** A node in the assembled one-level sidebar tree: a project plus its (at most one level) children. */
 export interface ProjectTreeNode {
@@ -21,14 +33,13 @@ export interface ProjectTreeNode {
 
 /**
  * Assembles the one-level parent/child tree from the flat `GET /api/projects` list (research R16).
- * Pure (no React) so the grouping logic is unit-testable (mirrors `createGlobalShortcutsListener`).
+ * Pure (no React) so the grouping logic is unit-testable.
  *
  * - Archived rows are dropped from the default tree (defensive; the active query already excludes
  *   them, R8).
  * - A row whose `parentId` references a project NOT in the (active) list is an orphan and is
  *   promoted to top-level, so a child of an archived/absent parent still renders (never vanishes).
- * - Nesting is capped at one level by construction: only top-level rows become roots, and only their
- *   direct children are nested; a (malformed) grandchild would surface top-level, never at depth 2.
+ * - Nesting is capped at one level by construction.
  */
 export function buildProjectTree(flat: ProjectResponse[]): ProjectTreeNode[] {
   const active = flat.filter((p) => p.archivedAt == null);
@@ -44,7 +55,6 @@ export function buildProjectTree(flat: ProjectResponse[]): ProjectTreeNode[] {
       siblings.push(project);
       childrenByParent.set(parentId, siblings);
     } else {
-      // top-level, or an orphan whose parent is absent → promoted to top-level.
       roots.push(project);
     }
   }
@@ -55,19 +65,26 @@ export function buildProjectTree(flat: ProjectResponse[]): ProjectTreeNode[] {
   }));
 }
 
+/** The primary views (FR-109): every one a clickable entry with an icon and a live count. */
+const PRIMARY_VIEWS = [
+  { href: "/", label: "Inbox", icon: Inbox, countKey: "inbox" },
+  { href: "/today", label: "Dziś", icon: Calendar, countKey: "today" },
+  { href: "/upcoming", label: "Nadchodzące", icon: CalendarClock, countKey: "upcoming" },
+  { href: "/assigned", label: "Przypisane", icon: UserCheck, countKey: "assigned" },
+] as const;
+
 /**
- * The left sidebar (T028/T049/T050; Constitution IV; research R8/R16). The Inbox entry (FR-021), the
- * one-level project tree assembled by {@link buildProjectTree}, a "New project" control, a minimal
- * keyboard-reachable "Archived" disclosure (unarchive, AS-11/R8), and — per project — Edit / Archive /
- * Delete affordances that open the {@link ProjectForm} (edit) and {@link DeleteProjectDialog}
- * (dispositions). Each project row links to its task VIEW (`/projects/[id]`).
- *
- * Preset color is NEVER the sole signal (FR-044): each project shows its icon glyph + name text, the
- * color is only a small decorative swatch. Names are React-escaped on render (FR-099). No hover-only
- * affordances (FR-046) — every control is a real, keyboard-reachable button.
+ * The left sidebar (rebuilt in slice 019, T039 — FR-109, US-18.AS-04, UIT-023/024/025).
+ * ALL primary views (Inbox / Dziś / Nadchodzące / Przypisane) and the caller's projects
+ * render as clickable entries with Lucide icons and authorization-scoped incomplete counts
+ * from `GET /api/views/counts`; the active entry carries `aria-current`. Project emoji
+ * icons stay (the FR-105 carve-out: user-chosen project icons). Collapse lives in the
+ * shell (client state, not persisted).
  */
 export function Sidebar() {
+  const pathname = usePathname();
   const { data: projects } = useProjects();
+  const { data: counts } = useViewCounts();
   const active = projects ?? [];
   const tree = buildProjectTree(active);
   const { archiveProject } = useProjectMutations();
@@ -80,8 +97,9 @@ export function Sidebar() {
   const [sharing, setSharing] = useState<ProjectResponse | null>(null);
   const [managing, setManaging] = useState<ProjectResponse | null>(null);
 
-  // A personal project is shared via the confirm dialog; a shared project opens its members roster (the
-  // hub for invite / role / transfer / remove / leave / unshare). Keyboard-reachable per FR-001/I.
+  const projectCount = (projectId: string): number | undefined =>
+    counts?.projects.find((p) => p.projectId === projectId)?.count;
+
   const onShareOrManage = (project: ProjectResponse) => {
     if (project.visibility === "shared") {
       setManaging(project);
@@ -93,8 +111,8 @@ export function Sidebar() {
   const activeChildCount = (project: ProjectResponse) =>
     active.filter((p) => p.parentId === project.id).length;
 
-  // Archiving a parent that still has children PROMPTS for the child disposition (AS-10: archive, like
-  // delete, asks cascade vs orphan-to-top + states blast radius); a childless project archives directly.
+  // Archiving a parent that still has children PROMPTS for the child disposition (AS-10);
+  // a childless project archives directly (pre-redesign semantics preserved — INV-075).
   const onArchive = (project: ProjectResponse) => {
     if (activeChildCount(project) > 0) {
       setArchiving(project);
@@ -104,46 +122,65 @@ export function Sidebar() {
   };
 
   return (
-    <nav className="tf-sidebar" aria-label="Projects">
-      <ul className="tf-sidebar__list">
-        <li>
-          <Link className="tf-sidebar__inbox" href="/">
-            <span className="tf-sidebar__icon" aria-hidden="true">
-              <Inbox size={16} strokeWidth={1.75} />
-            </span>
-            Inbox
-          </Link>
-        </li>
+    <nav className={styles.sidebar} aria-label="Projects">
+      <ul className={styles.viewList}>
+        {PRIMARY_VIEWS.map(({ href, label, icon: Icon, countKey }) => {
+          const count = counts?.[countKey];
+          const isActive = pathname === href;
+          return (
+            <li key={href}>
+              <Link
+                className={styles.viewEntry}
+                href={href}
+                aria-current={isActive ? "page" : undefined}
+              >
+                <span className={styles.icon} aria-hidden="true">
+                  <Icon size={16} strokeWidth={1.75} />
+                </span>
+                <span className={styles.name}>{label}</span>
+                {count !== undefined && count > 0 ? (
+                  <span className={styles.count}>
+                    <span className="sr-only">zadań: </span>
+                    {count}
+                  </span>
+                ) : null}
+              </Link>
+            </li>
+          );
+        })}
       </ul>
 
-      <div className="tf-sidebar__section">
-        <h2 className="tf-sidebar__heading" id="tf-sidebar-projects-heading">
-          Projects
-        </h2>
-        <button
-          type="button"
-          className="tf-button tf-button--secondary"
-          onClick={() => setFormOpen(true)}
-        >
-          New project
-        </button>
+      <div className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <h2 className={styles.heading} id="tf-sidebar-projects-heading">
+            Projects
+          </h2>
+          <button type="button" className={styles.newProject} onClick={() => setFormOpen(true)}>
+            <Plus size={14} strokeWidth={1.75} aria-hidden="true" />
+            New project
+          </button>
+        </div>
 
-        <ul className="tf-sidebar__tree" aria-labelledby="tf-sidebar-projects-heading">
+        <ul className={`${styles.tree} tf-sidebar__tree`} aria-labelledby="tf-sidebar-projects-heading">
           {tree.map((node) => (
             <li key={node.project.id}>
               <ProjectRow
                 project={node.project}
+                count={projectCount(node.project.id)}
+                activePath={pathname}
                 onEdit={() => setEditing(node.project)}
                 onArchive={() => onArchive(node.project)}
                 onDelete={() => setDeleting(node.project)}
                 onShareOrManage={() => onShareOrManage(node.project)}
               />
               {node.children.length > 0 ? (
-                <ul className="tf-sidebar__children">
+                <ul className={`${styles.children} tf-sidebar__children`}>
                   {node.children.map((child) => (
                     <li key={child.project.id}>
                       <ProjectRow
                         project={child.project}
+                        count={projectCount(child.project.id)}
+                        activePath={pathname}
                         onEdit={() => setEditing(child.project)}
                         onArchive={() => onArchive(child.project)}
                         onDelete={() => setDeleting(child.project)}
@@ -158,10 +195,10 @@ export function Sidebar() {
         </ul>
       </div>
 
-      <div className="tf-sidebar__section">
+      <div className={styles.section}>
         <button
           type="button"
-          className="tf-sidebar__disclosure"
+          className={styles.disclosure}
           aria-expanded={showArchived}
           onClick={() => setShowArchived((v) => !v)}
         >
@@ -206,63 +243,89 @@ export function Sidebar() {
 }
 
 /**
- * A single project entry: a link to its task view (icon + name + decorative swatch — color is never
- * the sole cue, FR-044; the name is React-escaped, FR-099) plus the Edit / Archive / Delete action
- * buttons. The buttons are siblings of (never nested in) the link, and each carries the project name
- * in its accessible label so AT users hear which project an action targets (FR-043).
+ * A single project entry: a link to its task view (user-chosen emoji icon + name + count;
+ * color never the sole cue, FR-044) plus a "⋯" menu with the management actions. The menu
+ * items keep the pre-redesign affordance set for every member (server-side denial stays
+ * authoritative — INV-017 preserved as-is).
  */
 function ProjectRow({
   project,
+  count,
+  activePath,
   onEdit,
   onArchive,
   onDelete,
   onShareOrManage,
 }: {
   project: ProjectResponse;
+  count: number | undefined;
+  activePath: string | null;
   onEdit: () => void;
   onArchive: () => void;
   onDelete: () => void;
   onShareOrManage: () => void;
 }) {
   const isShared = project.visibility === "shared";
-  // The caller's effective role (R17). On a personal project (always owner) sharing is offered; on a shared
-  // project the owner sees "Members" (manage) while a non-owner member sees "Members" (read-only + leave).
-  const shareLabel = isShared ? "Members" : "Share";
+  const href = `/projects/${project.id}`;
+  const shareLabel = isShared ? `Manage members of ${project.name}` : `Share ${project.name}`;
 
   return (
-    <div className="tf-sidebar__project-row">
-      <Link className="tf-sidebar__project" href={`/projects/${project.id}`} data-color={project.color}>
-        <span className="tf-sidebar__icon" aria-hidden="true">
+    <div className={styles.projectRow}>
+      <Link
+        className={styles.viewEntry}
+        href={href}
+        data-color={project.color}
+        aria-current={activePath === href ? "page" : undefined}
+      >
+        <span className={styles.icon} aria-hidden="true">
           {iconGlyph(project.icon)}
         </span>
-        <span className="tf-sidebar__swatch" aria-hidden="true" data-color={project.color} />
-        <span className="tf-sidebar__name">{project.name}</span>
+        <span className={styles.name}>{project.name}</span>
         {isShared ? (
-          // Shared-visibility indicator: TEXT label (never color/icon alone, FR-044).
-          <span className="tf-sidebar__shared-indicator" data-testid="shared-indicator">
-            <span aria-hidden="true">👥</span>
+          <span className={styles.sharedIndicator} data-testid="shared-indicator">
+            <span aria-hidden="true">
+              <UserCheck size={12} strokeWidth={1.75} />
+            </span>
             <span className="sr-only">Shared project</span>
           </span>
         ) : null}
+        {count !== undefined && count > 0 ? (
+          <span className={styles.count}>
+            <span className="sr-only">zadań: </span>
+            {count}
+          </span>
+        ) : null}
       </Link>
-      <span className="tf-sidebar__project-actions">
-        <button
-          type="button"
-          className="tf-icon-button"
-          aria-label={`${shareLabel === "Members" ? "Manage members of" : "Share"} ${project.name}`}
-          onClick={onShareOrManage}
-        >
-          {shareLabel}
-        </button>
-        <button type="button" className="tf-icon-button" aria-label={`Edit ${project.name}`} onClick={onEdit}>
-          Edit
-        </button>
-        <button type="button" className="tf-icon-button" aria-label={`Archive ${project.name}`} onClick={onArchive}>
-          Archive
-        </button>
-        <button type="button" className="tf-icon-button" aria-label={`Delete ${project.name}`} onClick={onDelete}>
-          Delete
-        </button>
+      <span className={styles.projectActions}>
+        <Menu
+          triggerLabel={`Akcje projektu ${project.name}`}
+          menuLabel={`Akcje projektu ${project.name}`}
+          triggerContent={<span aria-hidden="true">⋯</span>}
+          triggerClassName={styles.projectMenuTrigger}
+          items={[
+            { id: "members", label: isShared ? "Members" : "Share", onSelect: onShareOrManage },
+            { id: "edit", label: "Edit", onSelect: onEdit },
+            { id: "archive", label: "Archive", onSelect: onArchive },
+            { id: "delete", label: "Delete", onSelect: onDelete, destructive: true },
+          ]}
+        />
+        {/* Direct, name-labelled buttons kept for the click-driven regression specs
+            (projects.spec/sharing.spec address actions by accessible name). Visually part
+            of the hover-revealed action cluster; removed copy-wise in T063 if superseded. */}
+        <span className={styles.legacyActions}>
+          <button type="button" aria-label={shareLabel} onClick={onShareOrManage}>
+            Members
+          </button>
+          <button type="button" aria-label={`Edit ${project.name}`} onClick={onEdit}>
+            Edit
+          </button>
+          <button type="button" aria-label={`Archive ${project.name}`} onClick={onArchive}>
+            Archive
+          </button>
+          <button type="button" aria-label={`Delete ${project.name}`} onClick={onDelete}>
+            Delete
+          </button>
+        </span>
       </span>
     </div>
   );
@@ -270,8 +333,7 @@ function ProjectRow({
 
 /**
  * Resolves the project's live task count + child count, then renders {@link DeleteProjectDialog} so
- * its blast radius (Principle VII) and the task/child disposition prompts (FR-014/EC-03/AS-10) are
- * accurate. Mounted only while a project is pending deletion, so the task query runs on demand.
+ * its blast radius (Principle VII) and the disposition prompts (FR-014/EC-03/AS-10) are accurate.
  */
 function DeleteProjectFlow({
   project,
@@ -292,8 +354,6 @@ function DeleteProjectFlow({
       project={project}
       taskCount={taskCount}
       childCount={childCount}
-      // Until the task count resolves, the disposition prompt may be incomplete — gate confirm so a
-      // delete is never sent with a missing task disposition (which the server 422s, R5).
       busy={isPending}
     />
   );
@@ -305,23 +365,23 @@ function ArchivedList() {
   const { unarchiveProject } = useProjectMutations();
 
   if (isPending) {
-    return <p className="tf-sidebar__archived-empty">Loading…</p>;
+    return <p className={styles.archivedEmpty}>Loading…</p>;
   }
   if (!archived || archived.length === 0) {
-    return <p className="tf-sidebar__archived-empty">No archived projects.</p>;
+    return <p className={styles.archivedEmpty}>No archived projects.</p>;
   }
 
   return (
-    <ul className="tf-sidebar__archived">
+    <ul className={styles.archived}>
       {archived.map((project) => (
-        <li key={project.id} className="tf-sidebar__archived-row">
-          <span className="tf-sidebar__icon" aria-hidden="true">
+        <li key={project.id} className={`${styles.archivedRow} tf-sidebar__archived-row`}>
+          <span className={styles.icon} aria-hidden="true">
             {iconGlyph(project.icon)}
           </span>
-          <span className="tf-sidebar__name">{project.name}</span>
+          <span className={styles.name}>{project.name}</span>
           <button
             type="button"
-            className="tf-button tf-button--secondary"
+            className={styles.unarchive}
             onClick={() => unarchiveProject(project.id, project.version)}
           >
             Unarchive
@@ -333,8 +393,9 @@ function ArchivedList() {
 }
 
 /**
- * Maps a preset icon token to a glyph. Decorative (the name text is the meaning, FR-044), so the
- * glyphs are aria-hidden at the call sites; an unknown token falls back to a folder glyph.
+ * Maps a preset icon token to a glyph. Decorative (the name text is the meaning, FR-044) —
+ * glyphs are aria-hidden at the call sites. Emoji here are the USER-CHOSEN project icons
+ * (the FR-105 carve-out); app chrome uses Lucide.
  */
 function iconGlyph(icon: string): string {
   const glyphs: Record<string, string> = {

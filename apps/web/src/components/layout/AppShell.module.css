@@ -1,0 +1,36 @@
+/* AppShell (T037) — topbar 44px / sidebar 240px / main grid; collapse folds the sidebar
+   column; no horizontal scroll at any width ≥768px (S5.5). */
+
+.shell {
+  display: grid;
+  grid-template-areas:
+    "topbar topbar"
+    "sidebar main";
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  grid-template-rows: var(--topbar-height) minmax(0, 1fr);
+  height: 100vh;
+  background: var(--color-bg-primary);
+}
+
+.collapsed {
+  grid-template-columns: 0 minmax(0, 1fr);
+}
+
+.sidebar {
+  grid-area: sidebar;
+  overflow-y: auto;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-bg-deep);
+  z-index: var(--z-sidebar);
+}
+
+.main {
+  grid-area: main;
+  overflow-y: auto;
+  min-width: 0;
+  padding: var(--space-4);
+}
+
+.drawerHost {
+  display: contents;
+}

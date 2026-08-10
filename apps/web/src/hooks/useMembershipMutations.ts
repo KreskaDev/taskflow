@@ -1,5 +1,6 @@
 "use client";
 
+import { invalidateViewCounts } from "@/hooks/useViewCounts";
 import { type QueryClient, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { apiClient, mapError, type ProblemDetails } from "@/lib/api/client";
@@ -21,6 +22,8 @@ import type { MembershipRole } from "@/lib/validation/membership";
 /** Re-invalidates the roster on settle; visibility/owner-changing ops also refresh the sidebar lists. */
 async function invalidateRoster(queryClient: QueryClient, projectId: string, alsoProjectLists: boolean): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: membersKey(projectId) });
+  // Membership/project changes shift the sidebar counts (slice 019, D6).
+  await invalidateViewCounts(queryClient);
   if (alsoProjectLists) {
     await queryClient.invalidateQueries({ queryKey: ACTIVE_PROJECTS_KEY });
     await queryClient.invalidateQueries({ queryKey: ARCHIVED_PROJECTS_KEY });
