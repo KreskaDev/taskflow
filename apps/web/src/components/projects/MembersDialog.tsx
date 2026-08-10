@@ -1,5 +1,6 @@
 "use client";
 
+import { Avatar } from "@/components/ui/Avatar";
 import { useState } from "react";
 
 import { InviteMemberForm } from "@/components/projects/InviteMemberForm";
@@ -62,6 +63,7 @@ export function MembersDialog({ open, onClose, project }: MembersDialogProps) {
           <ul className="tf-members__list" aria-label="Project members">
             {members.map((member) => (
               <li key={member.userId} className="tf-members__row">
+                <Avatar userId={member.userId} displayName={member.displayName} size="md" />
                 <span className="tf-members__name">{member.displayName}</span>
                 <RoleBadge role={member.role} />
                 {isOwner && !member.isOwner ? (

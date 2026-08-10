@@ -1,5 +1,6 @@
 "use client";
 
+import { Avatar } from "@/components/ui/Avatar";
 import type { CommentResponse } from "@/hooks/useComments";
 import { SafeMarkdown } from "@/lib/markdown/safeMarkdown";
 import { formatInReferenceZone } from "@/lib/timezone";
@@ -28,6 +29,14 @@ export function CommentItem({ comment, onStartEdit, onRequestDelete }: CommentIt
   return (
     <article className="tf-comment" aria-label={`Komentarz: ${comment.authorDisplayName}`}>
       <header className="tf-comment__header">
+        {/* Identity as an avatar wherever authorship shows (FR-105, T026). The API exposes
+            no avatarUrl for other users, so this renders the deterministic initials
+            fallback; a null authorId (deleted user) keys the tombstone-safe bucket. */}
+        <Avatar
+          userId={comment.authorId ?? "deleted-user"}
+          displayName={comment.authorDisplayName}
+          size="md"
+        />{" "}
         <span className="tf-comment__author">{comment.authorDisplayName}</span>{" "}
         <time className="tf-comment__time" dateTime={comment.createdAt} title={absolute}>
           {relativeLabel(created)}

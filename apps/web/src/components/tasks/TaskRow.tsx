@@ -1,6 +1,7 @@
 "use client";
 
 import { type CSSProperties, useState } from "react";
+import { Check, Circle } from "lucide-react";
 
 import { LabelChips } from "@/components/labels/LabelChips";
 import type { TaskResponse } from "@/hooks/useTasks";
@@ -129,7 +130,7 @@ export function TaskRow({
       onClick={onSelect}
     >
       <span className="tf-task-row__state" aria-hidden="true">
-        {done ? "✓" : "○"}
+        {done ? <Check size={15} strokeWidth={2} /> : <Circle size={15} strokeWidth={1.75} />}
       </span>
       {isRenaming ? (
         <RenameInput

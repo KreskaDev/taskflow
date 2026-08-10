@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { X } from "lucide-react";
 
 import { MentionPicker } from "@/components/tasks/MentionPicker";
 import type { CommentMention } from "@/hooks/useComments";
@@ -104,7 +105,7 @@ export function CommentComposer({
                 aria-label={`Usuń wzmiankę ${m.displayName}`}
                 onClick={() => removeMention(m.userId)}
               >
-                ×
+                <X size={14} strokeWidth={1.75} aria-hidden="true" />
               </button>
             </li>
           ))}
