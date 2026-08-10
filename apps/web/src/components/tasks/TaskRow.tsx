@@ -1,7 +1,7 @@
 "use client";
 
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
-import { Pencil } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil } from "lucide-react";
 
 import { LabelChips } from "@/components/labels/LabelChips";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -58,6 +58,14 @@ export interface TaskRowActions {
   onMoveUp?: () => void;
   /** Reorder one rank down ("Przenieś niżej"). */
   onMoveDown?: () => void;
+  /**
+   * Board column move one column LEFT ("Przenieś w lewo" — slice 010, D7/AS-05). The caller
+   * maps presence via `adjacentStatus`: at the Backlog boundary the callback is absent and
+   * the item is OMITTED (never disabled). Wired only on Board cards.
+   */
+  onMoveLeft?: () => void;
+  /** Board column move one column RIGHT ("Przenieś w prawo") — omitted in Zrobione (AS-05). */
+  onMoveRight?: () => void;
   /** Delete ("Usuń", destructive). */
   onDelete?: () => void;
 }
@@ -97,9 +105,19 @@ function priorityLabel(priority: string | null | undefined): string | null {
   }
 }
 
-/** Builds the complete "⋯" menu (FR-103/FR-108: every wired operation appears). */
-function buildMenuItems(task: TaskResponse, actions: TaskRowActions): MenuItemSpec[] {
+/**
+ * Builds the complete "⋯" menu (FR-103/FR-108: every wired operation appears). Exported as
+ * the SINGLE source of menu order/copy — the Board card (slice 010, D7) reuses it verbatim,
+ * so its move-left/right items and the standard set never drift between surfaces.
+ */
+export function buildMenuItems(task: TaskResponse, actions: TaskRowActions): MenuItemSpec[] {
   const done = task.status === "done";
+  const moveLabel = (chevron: ReactNode, text: string): ReactNode => (
+    <>
+      {chevron}
+      {text}
+    </>
+  );
   const items: (MenuItemSpec | null)[] = [
     actions.onToggleDone
       ? { id: "toggle", label: done ? "Oznacz jako niezrobione" : "Oznacz jako zrobione", onSelect: actions.onToggleDone }
@@ -114,6 +132,22 @@ function buildMenuItems(task: TaskResponse, actions: TaskRowActions): MenuItemSp
     actions.onOpenDetails ? { id: "details", label: "Szczegóły i komentarze", onSelect: actions.onOpenDetails } : null,
     actions.onMoveUp ? { id: "move-up", label: "Przenieś wyżej", onSelect: actions.onMoveUp } : null,
     actions.onMoveDown ? { id: "move-down", label: "Przenieś niżej", onSelect: actions.onMoveDown } : null,
+    // Board column moves (slice 010, AS-05/AS-06): presence = the caller found a neighbour
+    // column via adjacentStatus; a boundary column simply has no item (omitted, not disabled).
+    actions.onMoveLeft
+      ? {
+          id: "move-left",
+          label: moveLabel(<ChevronLeft size={14} strokeWidth={1.75} aria-hidden="true" />, "Przenieś w lewo"),
+          onSelect: actions.onMoveLeft,
+        }
+      : null,
+    actions.onMoveRight
+      ? {
+          id: "move-right",
+          label: moveLabel(<ChevronRight size={14} strokeWidth={1.75} aria-hidden="true" />, "Przenieś w prawo"),
+          onSelect: actions.onMoveRight,
+        }
+      : null,
     actions.onDelete ? { id: "delete", label: "Usuń", onSelect: actions.onDelete, destructive: true } : null,
   ];
   return items.filter((i): i is MenuItemSpec => i !== null);
