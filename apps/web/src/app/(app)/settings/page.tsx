@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "@/hooks/useSession";
+import { Avatar } from "@/components/ui/Avatar";
 import { DeleteAccountDialog } from "@/components/ui/DeleteAccountDialog";
 
 /**
@@ -36,16 +37,13 @@ export default function SettingsPage() {
         </p>
       ) : data?.authenticated && data.user ? (
         <div className="tf-profile">
-          {data.user.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- external Google avatar; next/image remote config is deferred to a later slice.
-            <img
-              className="tf-profile__avatar"
-              src={data.user.avatarUrl}
-              alt=""
-              width={64}
-              height={64}
-            />
-          ) : null}
+          <Avatar
+            userId={data.user.id}
+            displayName={data.user.displayName}
+            avatarUrl={data.user.avatarUrl}
+            size="lg"
+            className="tf-profile__avatar"
+          />
           <dl className="tf-profile__fields">
             <dt>Name</dt>
             <dd className="tf-profile__name">{data.user.displayName}</dd>

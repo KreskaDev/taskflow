@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ChevronDown, ChevronRight, Inbox } from "lucide-react";
 import { useState } from "react";
 
 import { ArchiveProjectDialog } from "@/components/projects/ArchiveProjectDialog";
@@ -108,7 +109,7 @@ export function Sidebar() {
         <li>
           <Link className="tf-sidebar__inbox" href="/">
             <span className="tf-sidebar__icon" aria-hidden="true">
-              {iconGlyph("inbox")}
+              <Inbox size={16} strokeWidth={1.75} />
             </span>
             Inbox
           </Link>
@@ -164,7 +165,14 @@ export function Sidebar() {
           aria-expanded={showArchived}
           onClick={() => setShowArchived((v) => !v)}
         >
-          {showArchived ? "▾" : "▸"} Archived
+          <span aria-hidden="true">
+            {showArchived ? (
+              <ChevronDown size={14} strokeWidth={1.75} />
+            ) : (
+              <ChevronRight size={14} strokeWidth={1.75} />
+            )}
+          </span>{" "}
+          Archived
         </button>
         {showArchived ? <ArchivedList /> : null}
       </div>

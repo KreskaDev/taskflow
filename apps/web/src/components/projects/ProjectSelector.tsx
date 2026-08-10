@@ -1,5 +1,6 @@
 "use client";
 
+import { Inbox } from "lucide-react";
 import { Dialog } from "@/components/ui/Dialog";
 import { useProjects, type ProjectResponse } from "@/hooks/useProjects";
 
@@ -62,7 +63,7 @@ export function ProjectSelector({ open, onClose, task, onSelect }: ProjectSelect
             onClick={() => choose(null)}
           >
             <span className="tf-project-selector__icon" aria-hidden="true">
-              📥
+              <Inbox size={16} strokeWidth={1.75} />
             </span>
             Inbox
           </button>

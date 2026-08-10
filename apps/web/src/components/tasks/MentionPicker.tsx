@@ -1,5 +1,6 @@
 "use client";
 
+import { Avatar } from "@/components/ui/Avatar";
 import { Dialog } from "@/components/ui/Dialog";
 import type { MemberResponse } from "@/hooks/useProjectMembers";
 
@@ -51,7 +52,9 @@ export function MentionPicker({ open, members, chosen, onClose, onPick }: Mentio
                     onClose();
                   }}
                 >
-                  @{m.displayName}
+                  <Avatar userId={m.userId} displayName={m.displayName} size="sm" />
+                  {" @"}
+                  {m.displayName}
                   {m.isOwner ? <span className="tf-sr-only"> (właściciel)</span> : null}
                   {alreadyChosen ? <span className="tf-sr-only"> (już wspomniano)</span> : null}
                 </button>

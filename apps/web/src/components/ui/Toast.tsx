@@ -10,6 +10,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { X } from "lucide-react";
 import { LiveRegion } from "@/components/ui/LiveRegion";
 import styles from "./Toast.module.css";
 
@@ -47,7 +48,7 @@ export function Toast({ message, variant = "info", onDismiss }: ToastProps) {
       <span>{message}</span>
       {onDismiss ? (
         <button type="button" className={styles.dismiss} aria-label="Zamknij powiadomienie" onClick={onDismiss}>
-          {"×"}
+          <X size={14} strokeWidth={1.75} aria-hidden="true" />
         </button>
       ) : null}
     </div>

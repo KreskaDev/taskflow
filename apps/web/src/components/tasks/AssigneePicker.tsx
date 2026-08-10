@@ -1,5 +1,6 @@
 "use client";
 
+import { Avatar } from "@/components/ui/Avatar";
 import { useState } from "react";
 
 import { Dialog } from "@/components/ui/Dialog";
@@ -73,6 +74,7 @@ export function AssigneePicker({ open, projectId, current, onClose, onSubmit }: 
                     checked={selected.has(m.userId)}
                     onChange={() => toggle(m.userId)}
                   />
+                  <Avatar userId={m.userId} displayName={m.displayName} size="sm" />
                   <span>
                     {m.displayName}
                     {m.isOwner ? <span className="tf-sr-only"> (właściciel)</span> : null}
