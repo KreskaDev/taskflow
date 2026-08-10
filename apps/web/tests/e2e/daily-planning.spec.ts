@@ -2,12 +2,15 @@ import { expect, test, type Browser, type BrowserContext, type Page } from "@pla
 import { apiAs, ensureUser, insertSession } from "./helpers/seed";
 
 /**
- * Daily Planning E2E (slice 005, T032/T033; US-02 AS-01..AS-08, US-08 AS-01/AS-02). Drives the real
- * keyboard daily loop — `G T`/`G I`/`G U` navigation, `1`-`4` priority, `T` reschedule, `Space`
- * toggle-done, `E` editor (`Ctrl+Enter` save / `Esc` discard) — through the REAL BFF→proxy→API path
- * against a migrated Postgres + .NET API (no mocking). Each test mints its own identity (isolation) and
- * seeds tasks with due dates via the API so they land in Today/Upcoming. The booted API uses the real
- * clock, so a "due today" seed uses the current instant (reliably the current Warsaw day).
+ * Daily Planning E2E (slice 005, T032/T033; US-02 AS-01..AS-08, US-08 AS-01/AS-02 — re-driven through
+ * the slice-019 UI after FR-111 removed the single-key shortcut system). The daily loop now runs on
+ * visible affordances: sidebar links replace the `G` chords, the row's "⋯" menu ("Akcje taska") carries
+ * "Priorytet…"/"Termin…", the row's `Edytuj „…”` quick action opens the full editor (`Ctrl+Enter` save /
+ * `Esc` discard), and Space toggles done via the focused `role="listbox"` — all through the REAL
+ * BFF→proxy→API path against a migrated Postgres + .NET API (no mocking). Each test mints its own
+ * identity (isolation) and seeds tasks with due dates via the API so they land in Today/Upcoming. The
+ * booted API uses the real clock, so a "due today" seed uses the current instant (reliably the current
+ * Warsaw day).
  *
  * SC-008 (WCAG 2.1 AA): asserted structurally here (the repo carries no axe dependency) — the Today and
  * Upcoming views expose a labelled `role="listbox"` of `role="option"` rows, and the editor/reschedule are
@@ -44,15 +47,20 @@ function dueInDays(days: number): string {
   return d.toISOString();
 }
 
+/** Opens the row's "⋯" menu and picks a menu item (the slice-019 replacement for the key bindings). */
+async function pickRowMenuItem(page: Page, taskTitle: string, itemName: string): Promise<void> {
+  await page.getByRole("button", { name: `Więcej akcji: ${taskTitle}` }).click();
+  await page.getByRole("menu", { name: "Akcje taska" }).getByRole("menuitem", { name: itemName }).click();
+}
+
 test.describe("US-02 Daily Planning Session (AS-01..AS-08)", () => {
-  test("AS-01/AS-02: G T opens Today showing the due-today task in a labelled listbox [INV-012] [INV-050]", async ({ browser }) => {
+  test("AS-01/AS-02: the sidebar 'Dziś' link opens Today showing the due-today task in a labelled listbox [INV-012] [INV-050]", async ({ browser }) => {
     const { page, context, userId } = await signedInPage(browser, "dp-today");
     await apiAs(userId).createTask({ title: "Review the day", position: "a0", dueDate: dueToday() });
 
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Your workspace" })).toBeVisible();
-    await page.keyboard.press("g");
-    await page.keyboard.press("t");
+    await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
+    await page.getByRole("link", { name: "Dziś" }).click();
 
     await expect(page.getByRole("heading", { name: "Dziś" })).toBeVisible();
     const listbox = page.getByRole("listbox", { name: "Dziś" });
@@ -62,44 +70,49 @@ test.describe("US-02 Daily Planning Session (AS-01..AS-08)", () => {
     await context.close();
   });
 
-  test("AS-04: pressing 1 sets the selected task to P0 with a visible badge [INV-054]", async ({ browser }) => {
+  test("AS-04: 'Priorytet…' in the row menu sets P0 with a visible badge [INV-054]", async ({ browser }) => {
     const { page, context, userId } = await signedInPage(browser, "dp-prio");
     await apiAs(userId).createTask({ title: "Prioritize me", position: "a0", dueDate: dueToday() });
 
     await page.goto("/today");
     await expect(page.getByRole("option").filter({ hasText: "Prioritize me" })).toBeVisible();
 
+    await pickRowMenuItem(page, "Prioritize me", "Priorytet…");
+    const dialog = page.getByRole("dialog", { name: "Priorytet" });
+    await expect(dialog).toBeVisible();
     const settled = page.waitForResponse((r) => r.request().method() === "PATCH" && /\/priority/.test(r.url()) && r.ok());
-    await page.keyboard.press("1");
+    await dialog.getByRole("button", { name: "P0 — najwyższy" }).click();
     await settled;
 
     await expect(page.getByRole("option").filter({ hasText: "Prioritize me" }).getByText("P0")).toBeVisible();
     await context.close();
   });
 
-  test("AS-03: Space toggles done and the row leaves Today [INV-050]", async ({ browser }) => {
+  test("AS-03: Space (on the focused listbox) toggles done and the row leaves Today [INV-050]", async ({ browser }) => {
     const { page, context, userId } = await signedInPage(browser, "dp-done");
     await apiAs(userId).createTask({ title: "Finish me", position: "a0", dueDate: dueToday() });
 
     await page.goto("/today");
     await expect(page.getByRole("option").filter({ hasText: "Finish me" })).toBeVisible();
 
+    // FR-111: keyboard operability lives INSIDE the listbox now — focus it, then Space.
     const settled = page.waitForResponse((r) => r.request().method() === "PATCH" && /\/status/.test(r.url()) && r.ok());
-    await page.keyboard.press(" ");
+    await page.getByRole("listbox", { name: "Dziś" }).press(" ");
     await settled;
 
     await expect(page.getByRole("option").filter({ hasText: "Finish me" })).toHaveCount(0);
     await context.close();
   });
 
-  test("AS-05: T then 'jutro' reschedules to tomorrow and the task leaves Today [INV-055]", async ({ browser }) => {
+  test("AS-05: 'Termin…' then 'jutro' reschedules to tomorrow and the task leaves Today [INV-055]", async ({ browser }) => {
     const { page, context, userId } = await signedInPage(browser, "dp-resched");
     await apiAs(userId).createTask({ title: "Move me to tomorrow", position: "a0", dueDate: dueToday() });
 
     await page.goto("/today");
     await expect(page.getByRole("option").filter({ hasText: "Move me to tomorrow" })).toBeVisible();
 
-    await page.keyboard.press("t");
+    await pickRowMenuItem(page, "Move me to tomorrow", "Termin…");
+    await expect(page.getByRole("dialog", { name: "Zmień termin" })).toBeVisible();
     const input = page.getByRole("textbox", { name: /termin/i });
     await expect(input).toBeFocused();
     await input.fill("jutro");
@@ -111,15 +124,15 @@ test.describe("US-02 Daily Planning Session (AS-01..AS-08)", () => {
     await context.close();
   });
 
-  test("AS-06/AS-07: E opens the editor (title focused); Ctrl+Enter saves [INV-057]", async ({ browser }) => {
+  test("AS-06/AS-07: the row's edit action opens the editor (title focused); Ctrl+Enter saves [INV-057]", async ({ browser }) => {
     const { page, context, userId } = await signedInPage(browser, "dp-edit-save");
     await apiAs(userId).createTask({ title: "Edit me", position: "a0", dueDate: dueToday() });
 
     await page.goto("/today");
     await expect(page.getByRole("option").filter({ hasText: "Edit me" })).toBeVisible();
 
-    await page.keyboard.press("e");
-    const dialog = page.getByRole("dialog");
+    await page.getByRole("button", { name: "Edytuj „Edit me”" }).click();
+    const dialog = page.getByRole("dialog", { name: "Edytuj zadanie" });
     await expect(dialog).toBeVisible();
     const title = dialog.getByLabel("Tytuł");
     await expect(title).toBeFocused(); // AS-06: title field focused
@@ -141,8 +154,8 @@ test.describe("US-02 Daily Planning Session (AS-01..AS-08)", () => {
     await page.goto("/today");
     await expect(page.getByRole("option").filter({ hasText: "Keep my title" })).toBeVisible();
 
-    await page.keyboard.press("e");
-    const dialog = page.getByRole("dialog");
+    await page.getByRole("button", { name: "Edytuj „Keep my title”" }).click();
+    const dialog = page.getByRole("dialog", { name: "Edytuj zadanie" });
     await dialog.getByLabel("Tytuł").fill("Discarded edit");
     await page.keyboard.press("Escape");
 
@@ -153,17 +166,14 @@ test.describe("US-02 Daily Planning Session (AS-01..AS-08)", () => {
   });
 });
 
-test.describe("US-08 Keyboard Navigation (AS-01/AS-02)", () => {
-  test("AS-02: G U opens Upcoming showing the next-7-days task grouped by day [INV-053]", async ({ browser }) => {
+test.describe("US-08 View Navigation (AS-01/AS-02)", () => {
+  test("AS-02: the sidebar 'Nadchodzące' link opens Upcoming showing the next-7-days task grouped by day [INV-053]", async ({ browser }) => {
     const { page, context, userId } = await signedInPage(browser, "dp-upcoming");
     await apiAs(userId).createTask({ title: "Upcoming task", position: "a0", dueDate: dueInDays(2) });
 
     await page.goto("/");
-    // Wait for the Inbox to be interactive (hydrated + the global key listener attached) before the chord,
-    // so `G U` is not raced against hydration.
-    await expect(page.getByRole("heading", { name: "Your workspace" })).toBeVisible();
-    await page.keyboard.press("g");
-    await page.keyboard.press("u");
+    await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
+    await page.getByRole("link", { name: "Nadchodzące" }).click();
 
     await expect(page.getByRole("heading", { name: "Nadchodzące" })).toBeVisible();
     await expect(page.getByRole("listbox", { name: "Nadchodzące" })).toBeVisible();
@@ -171,15 +181,14 @@ test.describe("US-08 Keyboard Navigation (AS-01/AS-02)", () => {
     await context.close();
   });
 
-  test("AS-01: G I returns to the Inbox [INV-012]", async ({ browser }) => {
+  test("AS-01: the sidebar 'Inbox' link returns to the Inbox [INV-012]", async ({ browser }) => {
     const { page, context } = await signedInPage(browser, "dp-inbox");
 
     await page.goto("/today");
     await expect(page.getByRole("heading", { name: "Dziś" })).toBeVisible();
-    await page.keyboard.press("g");
-    await page.keyboard.press("i");
+    await page.getByRole("link", { name: "Inbox" }).click();
 
-    await expect(page.getByRole("heading", { name: "Your workspace" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
     await context.close();
   });
 });

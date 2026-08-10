@@ -2,11 +2,12 @@ import { expect, test, type Browser, type BrowserContext, type Page } from "@pla
 import { apiAs, ensureUser, insertSession } from "./helpers/seed";
 
 /**
- * Task Assignment E2E (slice 008, T031; US-13 AS-01..AS-04). Drives the real keyboard assignment flow —
- * `A` opens the assignee picker on a shared-project task, check a member, save; the row shows the assignee
- * count; `G A` opens "Assigned to me" for the assigned member; a personal (Inbox) task offers no picker —
- * through the real BFF→API path (no mocking). The booted API uses the real clock, so a "due today" seed
- * uses the current instant.
+ * Task Assignment E2E (slice 008, T031; US-13 AS-01..AS-04 — re-driven through the slice-019 UI after
+ * FR-111 removed the single-key shortcut system). The assignment flow now runs on visible affordances:
+ * the shared-project row's "⋯" menu ("Akcje taska") carries "Przypisz…" which opens the assignee picker;
+ * check a member, save; the member reaches "Przypisane do mnie" via the sidebar "Przypisane" link; a
+ * personal (Inbox) task's menu offers NO "Przypisz…" item — through the real BFF→API path (no mocking).
+ * The booted API uses the real clock, so a "due today" seed uses the current instant.
  *
  * SC-008 (a11y): asserted structurally — the picker is a labelled role="dialog" with role="checkbox" rows
  * (FR-101 focus contract); the assigned view is a labelled role="listbox".
@@ -40,23 +41,25 @@ test.describe("US-13 Task Assignment (AS-01..AS-04)", () => {
     const task = await owner.createTask({ title: "Coordinate launch", position: "a0", dueDate: dueToday() });
     await owner.moveTask(task.id, project.id, task.version);
 
-    // Owner opens Today, selects the task, opens the assignee picker (A), checks the editor, saves.
+    // Owner opens Today, opens the row's "⋯" menu → "Przypisz…", checks the editor, saves.
     await page.goto("/today");
     const row = page.getByRole("option").filter({ hasText: "Coordinate launch" });
     await expect(row).toBeVisible();
-    await page.keyboard.press("a");
-    const dialog = page.getByRole("dialog");
+    await page.getByRole("button", { name: "Więcej akcji: Coordinate launch" }).click();
+    await page.getByRole("menu", { name: "Akcje taska" }).getByRole("menuitem", { name: "Przypisz…" }).click();
+    const dialog = page.getByRole("dialog", { name: "Przypisz osoby" });
     await expect(dialog).toBeVisible();
     const editorBox = dialog.getByRole("checkbox", { name: /Edith Editor/ });
     await editorBox.check();
     const settled = page.waitForResponse((r) => r.request().method() === "PATCH" && /\/assignees/.test(r.url()) && r.ok());
-    await page.keyboard.press("Control+Enter");
+    await dialog.getByRole("button", { name: "Zapisz (Ctrl+Enter)" }).click();
     await settled;
     await expect(dialog).toHaveCount(0);
 
     // AS-02: re-opening the picker shows the editor checked (the assignment persisted).
-    await page.keyboard.press("a");
-    await expect(page.getByRole("dialog").getByRole("checkbox", { name: /Edith Editor/ })).toBeChecked();
+    await page.getByRole("button", { name: "Więcej akcji: Coordinate launch" }).click();
+    await page.getByRole("menu", { name: "Akcje taska" }).getByRole("menuitem", { name: "Przypisz…" }).click();
+    await expect(page.getByRole("dialog", { name: "Przypisz osoby" }).getByRole("checkbox", { name: /Edith Editor/ })).toBeChecked();
     await page.keyboard.press("Escape");
     await context.close();
 
@@ -71,16 +74,24 @@ test.describe("US-13 Task Assignment (AS-01..AS-04)", () => {
     await editorContext.close();
   });
 
-  test("AS-04: a personal (Inbox) task offers no assignment picker [INV-061]", async ({ browser }) => {
+  test("AS-04: a personal (Inbox) task's menu offers no 'Przypisz…' item [INV-061]", async ({ browser }) => {
     const { page, context, userId } = await signedInPage(browser, "ta-personal");
     await apiAs(userId).createTask({ title: "Personal errand", position: "a0" });
 
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Your workspace" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
     await expect(page.getByRole("option").filter({ hasText: "Personal errand" })).toBeVisible();
 
-    await page.keyboard.press("a"); // no assignment control on a personal task (AS-04)
+    // No assignment affordance on a personal task (AS-04): the "⋯" menu is populated but
+    // carries no "Przypisz…" entry, and no picker dialog exists.
+    await page.getByRole("button", { name: "Więcej akcji: Personal errand" }).click();
+    const menu = page.getByRole("menu", { name: "Akcje taska" });
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole("menuitem", { name: "Duplikuj" })).toBeVisible(); // the menu is rendered…
+    await expect(menu.getByRole("menuitem", { name: "Przypisz…" })).toHaveCount(0); // …but offers no picker
     await expect(page.getByRole("dialog")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(menu).toHaveCount(0);
     await context.close();
   });
 });

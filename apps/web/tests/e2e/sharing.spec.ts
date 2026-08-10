@@ -38,6 +38,15 @@ function sidebarTree(page: Page) {
   return page.locator(".tf-sidebar__tree");
 }
 
+/** Opens the sidebar project row's "⋯" menu and activates the given management item (slice 019). */
+async function projectMenuAction(page: Page, projectName: string, item: string): Promise<void> {
+  await page.getByRole("button", { name: `Akcje projektu ${projectName}` }).click();
+  await page
+    .getByRole("menu", { name: `Akcje projektu ${projectName}` })
+    .getByRole("menuitem", { name: item, exact: true })
+    .click();
+}
+
 test.describe("US-12 Project Sharing — wired UI", () => {
   test("AS-01/AS-02: owner shares + invites by email; the member sees a role-gated read-only roster [INV-085] [INV-086] [INV-087] [INV-088] [INV-016]", async ({
     browser,
@@ -51,14 +60,13 @@ test.describe("US-12 Project Sharing — wired UI", () => {
     await expect(sidebarTree(owner.page).getByText("Team Space", { exact: true })).toBeVisible();
 
     const shared = owner.page.waitForResponse((r) => r.request().method() === "PATCH" && /\/share$/.test(r.url()) && r.ok());
-    await owner.page.getByRole("button", { name: "Share Team Space" }).click();
+    await projectMenuAction(owner.page, "Team Space", "Share");
     await owner.page.getByRole("dialog", { name: "Share project" }).getByRole("button", { name: "Share project" }).click();
     await shared;
 
-    // The shared indicator now renders; the entry point becomes "Manage members".
+    // The shared indicator now renders; the menu entry point becomes "Members".
     await expect(owner.page.getByTestId("shared-indicator").first()).toBeVisible();
-    const manage = owner.page.getByRole("button", { name: "Manage members of Team Space" });
-    await manage.click();
+    await projectMenuAction(owner.page, "Team Space", "Members");
 
     const dialog = owner.page.getByRole("dialog", { name: "Members of Team Space" });
     await expect(dialog).toBeVisible();
@@ -77,7 +85,7 @@ test.describe("US-12 Project Sharing — wired UI", () => {
     await member.page.goto("/");
     await expect(sidebarTree(member.page).getByText("Team Space", { exact: true })).toBeVisible();
     await expect(member.page.getByTestId("shared-indicator").first()).toBeVisible();
-    await member.page.getByRole("button", { name: "Manage members of Team Space" }).click();
+    await projectMenuAction(member.page, "Team Space", "Members");
     const memberDialog = member.page.getByRole("dialog", { name: "Members of Team Space" });
     await expect(memberDialog).toBeVisible();
     await expect(memberDialog.getByRole("button", { name: "Leave project" })).toBeVisible();
@@ -105,7 +113,7 @@ test.describe("US-12 Project Sharing — wired UI", () => {
 
     // The owner removes the member through the wired roster.
     await owner.page.goto("/");
-    await owner.page.getByRole("button", { name: "Manage members of Shared Plan" }).click();
+    await projectMenuAction(owner.page, "Shared Plan", "Members");
     const dialog = owner.page.getByRole("dialog", { name: "Members of Shared Plan" });
     const removed = owner.page.waitForResponse((r) => r.request().method() === "DELETE" && /\/members\//.test(r.url()) && r.ok());
     await dialog.getByRole("button", { name: "Remove Mia Member" }).click();
@@ -121,9 +129,15 @@ test.describe("US-12 Project Sharing — wired UI", () => {
     await dialog.getByRole("button", { name: "Unshare project" }).click();
     await owner.page.getByRole("dialog", { name: "Unshare project" }).getByRole("button", { name: "Unshare project" }).click();
     await unshared;
-    // Close the (now-stale) members dialog and confirm the sidebar offers "Share" again (personal again).
+    // Close the (now-stale) members dialog and confirm the row menu offers "Share" again
+    // (the project round-tripped to personal).
     await owner.page.keyboard.press("Escape");
-    await expect(owner.page.getByRole("button", { name: "Share Shared Plan" })).toBeVisible();
+    await owner.page.getByRole("button", { name: "Akcje projektu Shared Plan" }).click();
+    await expect(
+      owner.page
+        .getByRole("menu", { name: "Akcje projektu Shared Plan" })
+        .getByRole("menuitem", { name: "Share", exact: true }),
+    ).toBeVisible();
 
     await owner.context.close();
     await member.context.close();

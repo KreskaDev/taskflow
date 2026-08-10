@@ -30,9 +30,10 @@ test.describe("US1 sign-in via OAuth (AS-01)", () => {
     await page.goto("/signin");
     await page.getByRole("link", { name: /sign in with google/i }).click();
 
-    // Through the IdP and back to the callback, landing in the workspace.
+    // Through the IdP and back to the callback, landing in the workspace (the Inbox view
+    // since the slice-019 shell rebuild).
     await page.waitForURL("http://localhost:3000/");
-    await expect(page.getByRole("heading", { name: "Your workspace" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
 
     // Account was created.
     expect(await userExistsByGoogleSub(sub)).toBe(true);

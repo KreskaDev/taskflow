@@ -1,14 +1,15 @@
-import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { expect, test, type Browser, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import { apiAs, deleteMembershipRow, ensureUser, insertSession } from "./helpers/seed";
 
 /**
- * Comments & @Mentions E2E (slice 009, T039; US-14 AS-01..AS-04 + the edge cases). Drives the real
- * browser flow — the project view's "Komentarze" affordance opens the task detail panel hosting the
- * thread + composer — through the real BFF→API path (no mocking). The deny cells that a correct UI never
- * exposes (direct post as viewer, non-author edit, former-member access) are asserted as REAL API status
- * codes via the seeding client, proving the server gate is authoritative regardless of the UI (FR-068).
- * The sanitization case posts a hostile payload through the REAL composer and asserts it renders INERT
- * (the stored-XSS regression at the journey level, Constitution XII).
+ * Comments & @Mentions E2E (slice 009, T039; US-14 AS-01..AS-04 + the edge cases — re-driven through
+ * the slice-019 task DRAWER after T053/T054 replaced the comments modal: clicking the task title on
+ * the project view opens the non-modal drawer hosting the thread + composer). Runs through the real
+ * BFF→API path (no mocking). The deny cells that a correct UI never exposes (direct post as viewer,
+ * non-author edit, former-member access) are asserted as REAL API status codes via the seeding client,
+ * proving the server gate is authoritative regardless of the UI (FR-068). The sanitization case posts
+ * a hostile payload through the REAL composer and asserts it renders INERT (the stored-XSS regression
+ * at the journey level, Constitution XII).
  */
 
 async function signedInPage(
@@ -42,11 +43,22 @@ async function seedSharedTask(
   return { projectId: project.id, taskId: task.id, taskTitle };
 }
 
-/** Opens the task detail panel (the comment thread) from the project view. */
-async function openThread(page: Page, projectId: string, taskTitle: string): Promise<void> {
+/**
+ * Opens the task drawer (hosting the comment thread — T053) from the project view: the row's
+ * title button pushes `?task=<id>` and the non-modal drawer mounts (FR-106). Returns the drawer.
+ */
+async function openThread(page: Page, projectId: string, taskTitle: string): Promise<Locator> {
   await page.goto(`/projects/${projectId}`);
-  await page.getByRole("button", { name: `Komentarze: ${taskTitle}` }).click();
-  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.getByRole("button", { name: taskTitle, exact: true }).click();
+  const drawer = page.getByRole("complementary");
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByRole("heading", { name: "Komentarze" })).toBeVisible();
+  return drawer;
+}
+
+/** The comment composer's textarea (sr-labelled "Treść komentarza") — scoped to the drawer. */
+function composerBox(drawer: Locator): Locator {
+  return drawer.getByRole("textbox", { name: "Treść komentarza" });
 }
 
 test.describe("US-14 Comments & @Mentions (AS-01..AS-04)", () => {
@@ -55,18 +67,18 @@ test.describe("US-14 Comments & @Mentions (AS-01..AS-04)", () => {
     const { page, context } = await signedInPage(browser, "cm-editor1", "Edith Editor");
     const { projectId, taskTitle } = await seedSharedTask(owner.id, "cm-editor1@taskflow.test", "editor", "A");
 
-    await openThread(page, projectId, taskTitle);
+    const drawer = await openThread(page, projectId, taskTitle);
 
     // AS-01: compose + post — the comment appears with author + timestamp.
-    await page.getByRole("textbox").fill("Pierwszy **komentarz** w wątku");
+    await composerBox(drawer).fill("Pierwszy **komentarz** w wątku");
     // AS-02: @mention the owner via the TYPED picker (never prose parsing).
-    await page.getByRole("button", { name: "@ Wspomnij" }).click();
+    await drawer.getByRole("button", { name: "@ Wspomnij" }).click();
     await page.getByRole("button", { name: /@Olga Owner/ }).click();
     const posted = page.waitForResponse((r) => r.request().method() === "POST" && /\/comments/.test(r.url()) && r.ok());
-    await page.getByRole("button", { name: "Dodaj komentarz" }).click();
+    await drawer.getByRole("button", { name: "Dodaj komentarz" }).click();
     await posted;
 
-    const article = page.getByRole("article");
+    const article = drawer.getByRole("article");
     await expect(article).toBeVisible();
     await expect(article).toContainText("Edith Editor");
     await expect(article.locator("strong")).toHaveText("komentarz");
@@ -74,26 +86,27 @@ test.describe("US-14 Comments & @Mentions (AS-01..AS-04)", () => {
     await expect(article.locator("time")).toBeVisible();
 
     // AS-04 (edit): the author revises the body; the thread shows the update + the edited affordance.
-    await page.getByRole("button", { name: "Edytuj" }).click();
-    // Two textboxes exist while editing (the in-place edit composer inside the list item + the fresh-post
-    // composer below the thread) — scope to the list item's one.
-    const editBox = page.getByRole("listitem").getByRole("textbox");
+    await article.getByRole("button", { name: "Edytuj" }).click();
+    // Two composers exist while editing (the in-place edit composer inside the list item + the
+    // fresh-post composer below the thread) — scope to the list item's one.
+    const editBox = drawer.getByRole("listitem").getByRole("textbox", { name: "Treść komentarza" });
     await editBox.fill("Poprawiona treść komentarza");
     const edited = page.waitForResponse((r) => r.request().method() === "PATCH" && /\/api\/comments\//.test(r.url()) && r.ok());
-    await page.getByRole("button", { name: "Zapisz zmiany" }).click();
+    await drawer.getByRole("button", { name: "Zapisz zmiany" }).click();
     await edited;
-    await expect(page.getByRole("article")).toContainText("Poprawiona treść komentarza");
-    await expect(page.getByRole("article")).toContainText("(edytowano)");
+    await expect(drawer.getByRole("article")).toContainText("Poprawiona treść komentarza");
+    await expect(drawer.getByRole("article")).toContainText("(edytowano)");
 
-    // AS-04 (delete): confirm via the FR-101 dialog; the comment leaves the thread.
-    await page.getByRole("button", { name: "Usuń", exact: true }).click();
+    // AS-04 (delete): confirm via the FR-101 dialog; the comment leaves the thread. The "Usuń"
+    // affordance is scoped to the ARTICLE — the drawer carries its own task-level "Usuń" button.
+    await drawer.getByRole("article").getByRole("button", { name: "Usuń", exact: true }).click();
     const confirm = page.getByRole("dialog", { name: "Usunąć komentarz?" });
     await expect(confirm).toBeVisible();
     const deleted = page.waitForResponse((r) => r.request().method() === "DELETE" && /\/api\/comments\//.test(r.url()) && r.ok());
     await confirm.getByRole("button", { name: "Usuń", exact: true }).click();
     await deleted;
-    await expect(page.getByRole("article")).toHaveCount(0);
-    await expect(page.getByText("Brak komentarzy.")).toBeVisible();
+    await expect(drawer.getByRole("article")).toHaveCount(0);
+    await expect(drawer.getByText("Brak komentarzy.")).toBeVisible();
 
     await context.close();
   });
@@ -110,13 +123,14 @@ test.describe("US-14 Comments & @Mentions (AS-01..AS-04)", () => {
     });
     expect(post.status).toBe(200);
 
-    await openThread(page, projectId, taskTitle);
+    const drawer = await openThread(page, projectId, taskTitle);
 
     // The full thread is readable...
-    await expect(page.getByRole("article")).toContainText("Komentarz właściciela");
-    // ...but there is NO composer at all (AS-03): no textbox, no post affordance.
-    await expect(page.getByRole("textbox")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Dodaj komentarz" })).toHaveCount(0);
+    await expect(drawer.getByRole("article")).toContainText("Komentarz właściciela");
+    // ...but there is NO composer at all (AS-03): no comment textbox, no post affordance. (The
+    // drawer's task FIELDS remain rendered — the viewer-role affordance gap applies to the thread.)
+    await expect(composerBox(drawer)).toHaveCount(0);
+    await expect(drawer.getByRole("button", { name: "Dodaj komentarz" })).toHaveCount(0);
 
     // The UI gate is convenience only — the SERVER denies a direct viewer post with 403 (FR-068).
     const denied = await apiAs(viewerId).request("POST", `/api/tasks/${taskId}/comments`, {
@@ -143,10 +157,11 @@ test.describe("US-14 Comments & @Mentions (AS-01..AS-04)", () => {
 
     // The OWNER opens the thread: the comment is readable but carries NO edit/delete affordance
     // (canEdit=false — FR-075: role does not override authorship).
-    await openThread(page, projectId, taskTitle);
-    await expect(page.getByRole("article")).toContainText("Komentarz edytora");
-    await expect(page.getByRole("button", { name: "Edytuj" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Usuń", exact: true })).toHaveCount(0);
+    const drawer = await openThread(page, projectId, taskTitle);
+    const article = drawer.getByRole("article");
+    await expect(article).toContainText("Komentarz edytora");
+    await expect(article.getByRole("button", { name: "Edytuj" })).toHaveCount(0);
+    await expect(article.getByRole("button", { name: "Usuń", exact: true })).toHaveCount(0);
 
     // The server backs the affordance gate: a direct owner edit/delete is 403.
     const ownerEdit = await apiAs(ownerId).request("PATCH", `/api/comments/${comment.id}`, {
@@ -177,15 +192,15 @@ test.describe("US-14 Comments & @Mentions (AS-01..AS-04)", () => {
     const { page, context, userId: editorId } = await signedInPage(browser, "cm-editor4", "Edith Editor");
     const { projectId, taskId, taskTitle } = await seedSharedTask(owner.id, "cm-editor4@taskflow.test", "editor", "D");
 
-    await openThread(page, projectId, taskTitle);
+    const drawer = await openThread(page, projectId, taskTitle);
 
     // An empty/whitespace-only body is rejected at the trust boundary with an actionable message (FR-049)
     // and creates NO thread entry.
-    await page.getByRole("textbox").fill("   ");
-    await page.getByRole("button", { name: "Dodaj komentarz" }).click();
+    await composerBox(drawer).fill("   ");
+    await drawer.getByRole("button", { name: "Dodaj komentarz" }).click();
     // Next's route announcer is also role=alert — assert on the composer's specific FR-049 message.
     await expect(page.getByText("Komentarz nie może być pusty.")).toBeVisible();
-    await expect(page.getByRole("article")).toHaveCount(0);
+    await expect(drawer.getByRole("article")).toHaveCount(0);
 
     // The server is authoritative for over-length: a direct 4001-char post is 422 (FR-098).
     const overLength = await apiAs(editorId).request("POST", `/api/tasks/${taskId}/comments`, {
@@ -199,12 +214,12 @@ test.describe("US-14 Comments & @Mentions (AS-01..AS-04)", () => {
     // trailing text on the same line (it is dropped whole — inert either way); splitting lets the spec
     // assert BOTH properties — the hostile blocks vanish AND the safe subset still renders.
     const hostile = '<script>window.__xss=1</script>\n\n<img src="x" onerror="window.__xss=2">\n\n**pogrubione**';
-    await page.getByRole("textbox").fill(hostile);
+    await composerBox(drawer).fill(hostile);
     const posted = page.waitForResponse((r) => r.request().method() === "POST" && /\/comments/.test(r.url()) && r.ok());
-    await page.getByRole("button", { name: "Dodaj komentarz" }).click();
+    await drawer.getByRole("button", { name: "Dodaj komentarz" }).click();
     await posted;
 
-    const article = page.getByRole("article");
+    const article = drawer.getByRole("article");
     await expect(article).toBeVisible();
     await expect(article.locator("strong")).toHaveText("pogrubione", { useInnerText: true });
     await expect(article.locator("script")).toHaveCount(0);
