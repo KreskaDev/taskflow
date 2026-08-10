@@ -233,7 +233,7 @@ function ProjectRow({
           // Shared-visibility indicator: TEXT label (never color/icon alone, FR-044).
           <span className="tf-sidebar__shared-indicator" data-testid="shared-indicator">
             <span aria-hidden="true">👥</span>
-            <span className="tf-visually-hidden">Shared project</span>
+            <span className="sr-only">Shared project</span>
           </span>
         ) : null}
       </Link>

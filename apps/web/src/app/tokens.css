@@ -1,0 +1,217 @@
+/**
+ * tokens.css — THE single design-token source (slice 019, FR-104, contracts/ui-theme.md, D1).
+ *
+ * The ONLY file in the repository allowed to contain raw color values (hex/rgb) —
+ * enforced by the hex-audit test (UIT-004). Token names and palette values are carried
+ * 1:1 from the KreskaDev blog token system (ADR-039/ADR-041 dual-palette), plus the
+ * documented TaskFlow app extensions and scale tokens (design-brief.md). Extraction to
+ * a future shared "common" package = moving this one file.
+ *
+ * Palette switching: a composite class on <html> — `dark-cool` (default) | `dark-warm` |
+ * `light-cool` | `light-warm`. `:root` re-declares the full `dark-cool` set so a missing
+ * class still renders correctly before hydration (SSR fallback, S1.2/UIT-001). Tests
+ * force palettes by swapping the class ONLY (contracts/ui-theme.md).
+ *
+ * Light-mode traps (contrast review 2026-08-09, design-brief.md):
+ *  - elevated surfaces (cards/drawer/menu/modal) are #FFFFFF + border; the blog's
+ *    bg-secondary serves as the `bg-deep` chrome background instead;
+ *  - warning is #8F7F36 (the blog's #A89640 is only 2.8:1 on light backgrounds);
+ *  - selection in dark uses a translucent accent (accent-soft is 1.05–1.08:1 there);
+ *  - primary-button hover goes DARKER via accent-strong-hover, never accent-hover
+ *    (dark accent-hover is a lightened TEXT tint — white labels drop to 2.4–4.0:1);
+ *  - checkbox/radio outlines use fg-disabled (~4.2:1), never border-strong (~2:1).
+ */
+
+/* ── Scale tokens (palette-invariant) ─────────────────────────────────────── */
+:root {
+  /* spacing — 4px rhythm */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* radii — 6px controls, 8px cards/drawer/menu */
+  --radius-control: 6px;
+  --radius-surface: 8px;
+
+  /* z-index scale (UIT-101): sticky 10 / sidebar 20 / drawer 40 / menu-popover 60 /
+     modal 100 / toast 1000 */
+  --z-sticky: 10;
+  --z-sidebar: 20;
+  --z-drawer: 40;
+  --z-menu: 60;
+  --z-modal: 100;
+  --z-toast: 1000;
+
+  /* type scale — 13px UI base (denser than the blog's 16px prose; app, not prose) */
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 18px;
+  --text-2xl: 20px;
+  --leading-tight: 1.3;
+  --leading-normal: 1.5;
+  --weight-body: 400;
+  --weight-label: 500;
+  --weight-heading: 600;
+
+  /* motion — 100–150ms ease-out entries, ~100ms exits; reduced-motion guard in globals */
+  --motion-fast: 100ms;
+  --motion-base: 150ms;
+  --motion-ease: ease-out;
+
+  /* layout */
+  --sidebar-width: 240px;
+  --topbar-height: 44px;
+  --drawer-width: 440px;
+  --hit-target: 32px;
+
+  /* avatar palette — AA-safe for white initials (≥4.5:1), deterministic pick per userId
+     draws ONLY from this list (FR-105) */
+  --avatar-a: #356d97;
+  --avatar-b: #4a7c57;
+  --avatar-c: #a05a20;
+}
+
+/* ── dark-cool (DEFAULT) — :root duplicates it as the SSR fallback ───────── */
+:root,
+html.dark-cool {
+  /* blog tokens 1:1 */
+  --color-bg-primary: #181818;
+  --color-bg-secondary: #222222;
+  --color-text-primary: #e8e4dc;
+  --color-text-secondary: #b5b0a6;
+  --color-text-tertiary: #8a857c;
+  --color-accent: #5290bd;
+  --color-accent-hover: #7aaacf;
+  --color-accent-soft: #11212d;
+  --color-burgundy: #c97e87;
+  --color-green: #7ba887;
+  --color-border: #383330;
+  --color-border-strong: #524c47;
+  --color-surface-elevated: rgba(255, 255, 255, 0.06);
+
+  /* app extensions */
+  --color-bg-deep: #141414;
+  --color-bg-elevated: #222222;
+  --color-bg-hover: rgba(255, 255, 255, 0.05);
+  --color-bg-active: rgba(255, 255, 255, 0.08);
+  --color-on-accent: #ffffff;
+  --color-accent-strong: #356d97;
+  --color-accent-strong-hover: #2d5e7e;
+  --color-danger: #c97e87;
+  --color-danger-hover: #d9959c;
+  --color-danger-strong: #9d4754;
+  --color-danger-strong-hover: #844050;
+  --color-warning: #c9b850;
+  --color-selection: rgba(82, 144, 189, 0.3);
+  --color-fg-disabled: #8a857c;
+
+  color-scheme: dark;
+}
+
+/* ── dark-warm ────────────────────────────────────────────────────────────── */
+html.dark-warm {
+  --color-bg-primary: #1a1816;
+  --color-bg-secondary: #221f1c;
+  --color-text-primary: #e8e4dc;
+  --color-text-secondary: #b5b0a6;
+  --color-text-tertiary: #8a857c;
+  --color-accent: #c97e87;
+  --color-accent-hover: #d9959c;
+  --color-accent-soft: #2f1518;
+  --color-burgundy: #c97e87;
+  --color-green: #7ba887;
+  --color-border: #383330;
+  --color-border-strong: #524c47;
+  --color-surface-elevated: rgba(255, 255, 255, 0.06);
+
+  --color-bg-deep: #161412;
+  --color-bg-elevated: #221f1c;
+  --color-bg-hover: rgba(255, 255, 255, 0.05);
+  --color-bg-active: rgba(255, 255, 255, 0.08);
+  --color-on-accent: #ffffff;
+  --color-accent-strong: #9d4754;
+  --color-accent-strong-hover: #844050;
+  --color-danger: #c97e87;
+  --color-danger-hover: #d9959c;
+  --color-danger-strong: #9d4754;
+  --color-danger-strong-hover: #844050;
+  --color-warning: #c9b850;
+  --color-selection: rgba(201, 126, 135, 0.3);
+  --color-fg-disabled: #8a857c;
+
+  color-scheme: dark;
+}
+
+/* ── light-cool ───────────────────────────────────────────────────────────── */
+html.light-cool {
+  --color-bg-primary: #fafafa;
+  --color-bg-secondary: #f2f2f2;
+  --color-text-primary: #2a2520;
+  --color-text-secondary: #5c5a55;
+  --color-text-tertiary: #807b72;
+  --color-accent: #3a7194;
+  --color-accent-hover: #2d5e7e;
+  --color-accent-soft: #e5eff6;
+  --color-burgundy: #9d4754;
+  --color-green: #4a7c57;
+  --color-border: #e5e0d8;
+  --color-border-strong: #c9c0b0;
+  --color-surface-elevated: rgba(0, 0, 0, 0.04);
+
+  --color-bg-deep: #f2f2f2;
+  --color-bg-elevated: #ffffff;
+  --color-bg-hover: rgba(0, 0, 0, 0.045);
+  --color-bg-active: rgba(0, 0, 0, 0.08);
+  --color-on-accent: #ffffff;
+  --color-accent-strong: #3a7194;
+  --color-accent-strong-hover: #2d5e7e;
+  --color-danger: #9d4754;
+  --color-danger-hover: #844050;
+  --color-danger-strong: #9d4754;
+  --color-danger-strong-hover: #844050;
+  --color-warning: #8f7f36;
+  --color-selection: #e5eff6;
+  --color-fg-disabled: #807b72;
+
+  color-scheme: light;
+}
+
+/* ── light-warm ───────────────────────────────────────────────────────────── */
+html.light-warm {
+  --color-bg-primary: #faf7f2;
+  --color-bg-secondary: #f2efe8;
+  --color-text-primary: #2a2520;
+  --color-text-secondary: #5c5a55;
+  --color-text-tertiary: #807b72;
+  --color-accent: #9d4754;
+  --color-accent-hover: #844050;
+  --color-accent-soft: #f1e3e5;
+  --color-burgundy: #9d4754;
+  --color-green: #4a7c57;
+  --color-border: #e5e0d8;
+  --color-border-strong: #c9c0b0;
+  --color-surface-elevated: rgba(0, 0, 0, 0.04);
+
+  --color-bg-deep: #f2efe8;
+  --color-bg-elevated: #ffffff;
+  --color-bg-hover: rgba(0, 0, 0, 0.045);
+  --color-bg-active: rgba(0, 0, 0, 0.08);
+  --color-on-accent: #ffffff;
+  --color-accent-strong: #9d4754;
+  --color-accent-strong-hover: #844050;
+  --color-danger: #9d4754;
+  --color-danger-hover: #844050;
+  --color-danger-strong: #9d4754;
+  --color-danger-strong-hover: #844050;
+  --color-warning: #8f7f36;
+  --color-selection: #f1e3e5;
+  --color-fg-disabled: #807b72;
+
+  color-scheme: light;
+}
