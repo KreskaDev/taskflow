@@ -131,6 +131,20 @@ public abstract class SharingTestBase : IntegrationTestBase
         return await db.ProjectMemberships.Where(m => m.ProjectId == ProjectId.From(projectId)).ToListAsync();
     }
 
+    /// <summary>
+    /// Deletes a membership row DIRECTLY (no command, no domain event) — used to fabricate the
+    /// "stale ex-member assignee" state that the event-driven assignment cleanup would normally
+    /// prevent (slice 019 DuplicateTask re-validation coverage).
+    /// </summary>
+    protected async Task DeleteMembershipRowAsync(Guid projectId, UserId userId)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await db.ProjectMemberships
+            .Where(m => m.ProjectId == ProjectId.From(projectId) && m.UserId == userId)
+            .ExecuteDeleteAsync();
+    }
+
     /// <summary>Loads the persisted project aggregate (query-filters ignored), or null.</summary>
     protected async Task<DomainProject?> LoadProjectAsync(Guid id)
     {

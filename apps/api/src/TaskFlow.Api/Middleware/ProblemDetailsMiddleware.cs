@@ -91,6 +91,9 @@ internal sealed class ProblemDetailsMiddleware(RequestDelegate next, ILogger<Pro
         // The code was pre-provisioned in the ErrorCodes array since slice 004; only this mapping is new.
         LastOwnerException => (StatusCodes.Status409Conflict, "last_owner", "Last owner", null),
         VersionConflictException => (StatusCodes.Status409Conflict, "version_conflict", "Version conflict", null),
+        // duplicate_id (slice 019): a DuplicateTask newTaskId already taken by an unrelated row.
+        // The create path still catches this exception internally; it surfaces ONLY from duplicateTask.
+        DuplicateTaskIdException => (StatusCodes.Status409Conflict, "duplicate_id", "Duplicate id", null),
         ValidationException ve => (StatusCodes.Status422UnprocessableEntity, "validation_failed", "Validation failed", ToErrors(ve)),
         _ => (StatusCodes.Status500InternalServerError, "internal_error", "An unexpected error occurred", null),
     };

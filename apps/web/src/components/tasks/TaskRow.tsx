@@ -1,12 +1,16 @@
 "use client";
 
-import { type CSSProperties, useState } from "react";
-import { Check, Circle } from "lucide-react";
+import { type CSSProperties, type ReactNode, useState } from "react";
+import { Pencil } from "lucide-react";
 
 import { LabelChips } from "@/components/labels/LabelChips";
+import { Checkbox } from "@/components/ui/Checkbox";
+import { IconButton } from "@/components/ui/IconButton";
+import { Menu, type MenuItemSpec } from "@/components/ui/Menu";
 import type { TaskResponse } from "@/hooks/useTasks";
 import { formatInReferenceZone } from "@/lib/timezone";
 import { taskTitleSchema } from "@/lib/validation/task";
+import styles from "./TaskRow.module.css";
 
 /** Stable, deterministic option id derived from the task id (research R18). */
 export function taskOptionId(taskId: string): string {
@@ -14,94 +18,117 @@ export function taskOptionId(taskId: string): string {
 }
 
 /**
- * Formats a stored due-date UTC instant for display in the reference zone (R9). The
- * instant is interpreted in Europe/Warsaw by {@link formatInReferenceZone} — passing the
- * raw UTC `Date` straight in (do NOT pre-convert with `toReferenceZone`, which would shift
- * twice), so a date-only `due_date` (midnight-Warsaw → UTC) recovers the correct calendar
- * day rather than landing a day early. Tokens are locale-neutral and numeric, mirroring the
- * two-digit `DD.MM` capture grammar: `dd.MM.yyyy HH:mm` when `dueHasTime`, `dd.MM.yyyy`
- * otherwise (zero-padded day for symmetry with the zero-padded month).
+ * Formats a stored due-date UTC instant for display in the reference zone (R9). The instant
+ * is interpreted in Europe/Warsaw by {@link formatInReferenceZone} — a date-only `due_date`
+ * (midnight-Warsaw → UTC) recovers the correct calendar day. `dd.MM.yyyy HH:mm` when
+ * `dueHasTime`, `dd.MM.yyyy` otherwise.
  */
 function formatDueDate(dueDate: string, dueHasTime: boolean | null | undefined): string {
   const instant = new Date(dueDate);
   return formatInReferenceZone(instant, dueHasTime ? "dd.MM.yyyy HH:mm" : "dd.MM.yyyy");
 }
 
+/**
+ * The row's operation set (slice 019, T040/T041 — FR-108/FR-112, US-18.AS-02). Each view
+ * wires what it supports; the "⋯" menu exposes EVERY wired operation (FR-103) and the
+ * hover/focus quick-action bar carries the 2–3 most frequent (complete, edit, "⋯").
+ * All optional — an unwired operation simply does not render.
+ */
+export interface TaskRowActions {
+  /** Complete/uncomplete (the row Checkbox + the menu item). */
+  onToggleDone?: () => void;
+  /** Edit — inline rename (Inbox) or the full editor (daily views); per-view semantics. */
+  onEdit?: () => void;
+  /** Priority picker ("Priorytet…"). */
+  onOpenPriority?: () => void;
+  /** Due-date input ("Termin…"). */
+  onOpenReschedule?: () => void;
+  /** Label selector ("Etykiety…"). */
+  onOpenLabels?: () => void;
+  /** Move-to-project selector ("Przenieś do projektu…"). */
+  onOpenMove?: () => void;
+  /** Assignee picker ("Przypisz…") — shared-project tasks only (FR-069). */
+  onOpenAssign?: () => void;
+  /** Duplicate (FR-112, "Duplikuj"). */
+  onDuplicate?: () => void;
+  /** Open the task's detail surface ("Szczegóły i komentarze"). */
+  onOpenDetails?: () => void;
+  /** Reorder one rank up ("Przenieś wyżej") — the keyboard-reachable reorder (S3.7). */
+  onMoveUp?: () => void;
+  /** Reorder one rank down ("Przenieś niżej"). */
+  onMoveDown?: () => void;
+  /** Delete ("Usuń", destructive). */
+  onDelete?: () => void;
+}
+
 interface TaskRowProps {
   task: TaskResponse;
-  /**
-   * Whether this row is the selected (active) option. Drives `aria-selected`, which is
-   * BOTH the screen-reader selection state and the CSS hook for the visible selection
-   * indicator (`.tf-task-row[aria-selected="true"]`, NOT `:focus` — DOM focus stays on
-   * the listbox container, never the row; FR-042 / research R10).
-   */
+  /** Selected (active) option — drives `aria-selected` (focus stays on the listbox container). */
   selected: boolean;
-  /**
-   * Whether this row is in inline-rename mode (T058). When true the row renders an
-   * `<input>` (autofocused) instead of the static title; the page owns which id is
-   * renaming so only the selected row ever enters this mode.
-   */
+  /** Inline-rename mode (Inbox); the row renders an autofocused input instead of the title. */
   isRenaming: boolean;
-  /** Commit the rename with a NEW title (already validated by the row). */
   onCommitRename: (title: string) => void;
-  /** Cancel inline rename (Esc or blur) without changing the title. */
   onCancelRename: () => void;
-  /** Selects this row on pointer click — the controlled selection path (US8/T055). */
+  /** Selects this row on pointer interaction. */
   onSelect?: () => void;
-  /**
-   * The display name of the project this task is in (T041). When present (the task is projected,
-   * R16), the row renders a project chip; absent → the task is in the Inbox and no chip shows.
-   * Resolved by the parent from the loaded project tree so the row holds no query dependency.
-   */
+  /** The containing project's display name (renders the project chip when present). */
   projectName?: string | null;
-  /**
-   * Opens the move-to-project selector for THIS row (T041; FR-021/AS-05). Optional so the
-   * virtualized {@link TaskList} can omit it; wired to the chip button when supplied. The bare
-   * `M` shortcut targets the SELECTED row via the global gate — this is the pointer affordance.
-   */
-  onOpenMove?: () => void;
-  /**
-   * Whether the task is overdue (slice 005, Today view only). When true the row renders an
-   * "overdue" label — a text signal, never color alone (FR-044). Defaults to false.
-   */
+  /** Overdue flag (Today view): a text label, never color alone (FR-044). */
   isOverdue?: boolean;
+  /** The wired operation set — quick actions + the complete "⋯" menu (FR-108). */
+  actions?: TaskRowActions;
+  /** Drag-handle slot (T043) — rendered inside the action zone when reordering is wired. */
+  dragHandle?: ReactNode;
   /** Absolute position styles supplied by the virtualizer for this row. */
   style: CSSProperties;
 }
 
-/** Maps a priority token to its human label (FR-044: text always accompanies any color cue). */
+/** Maps a priority token to its human label (FR-044: text always carries the meaning). */
 function priorityLabel(priority: string | null | undefined): string | null {
   switch (priority) {
     case "P0":
-      return "P0";
     case "P1":
-      return "P1";
     case "P2":
-      return "P2";
     case "P3":
-      return "P3";
+      return priority;
     default:
       return null;
   }
 }
 
+/** Builds the complete "⋯" menu (FR-103/FR-108: every wired operation appears). */
+function buildMenuItems(task: TaskResponse, actions: TaskRowActions): MenuItemSpec[] {
+  const done = task.status === "done";
+  const items: (MenuItemSpec | null)[] = [
+    actions.onToggleDone
+      ? { id: "toggle", label: done ? "Oznacz jako niezrobione" : "Oznacz jako zrobione", onSelect: actions.onToggleDone }
+      : null,
+    actions.onEdit ? { id: "edit", label: "Edytuj", onSelect: actions.onEdit } : null,
+    actions.onOpenPriority ? { id: "priority", label: "Priorytet…", onSelect: actions.onOpenPriority } : null,
+    actions.onOpenReschedule ? { id: "due", label: "Termin…", onSelect: actions.onOpenReschedule } : null,
+    actions.onOpenLabels ? { id: "labels", label: "Etykiety…", onSelect: actions.onOpenLabels } : null,
+    actions.onOpenMove ? { id: "move", label: "Przenieś do projektu…", onSelect: actions.onOpenMove } : null,
+    actions.onOpenAssign ? { id: "assign", label: "Przypisz…", onSelect: actions.onOpenAssign } : null,
+    actions.onDuplicate ? { id: "duplicate", label: "Duplikuj", onSelect: actions.onDuplicate } : null,
+    actions.onOpenDetails ? { id: "details", label: "Szczegóły i komentarze", onSelect: actions.onOpenDetails } : null,
+    actions.onMoveUp ? { id: "move-up", label: "Przenieś wyżej", onSelect: actions.onMoveUp } : null,
+    actions.onMoveDown ? { id: "move-down", label: "Przenieś niżej", onSelect: actions.onMoveDown } : null,
+    actions.onDelete ? { id: "delete", label: "Usuń", onSelect: actions.onDelete, destructive: true } : null,
+  ];
+  return items.filter((i): i is MenuItemSpec => i !== null);
+}
+
 /**
- * A single listbox option (T038 baseline, controlled selection T055, operate affordances
- * T058). `role="option"` with a STABLE `id` derived from the task id so the listbox's
- * `aria-activedescendant` can address it even across virtualizer mount/unmount, and an
- * accessible name equal to the task title — plus, for a due-bearing row, a visually-hidden
- * "termin:" qualifier in front of the date so it is announced as a labelled due date rather
- * than as a bare trailing number; the decorative status glyph is excluded from the name
- * (`aria-hidden`) (FR-043). `aria-selected` reflects the active
- * option and is the ONLY selection signal — the visible indicator is styled on it, not on
- * `:focus`, because focus lives on the stable container (research R10).
+ * A single listbox option (rebuilt in slice 019 — T040/T041; FR-108, US-18.AS-02, 13px
+ * density). `role="option"` with a STABLE id (the listbox's `aria-activedescendant`
+ * addresses it across virtualizer mount/unmount); accessible name = title + labelled
+ * qualifiers (sr-only "termin:"/"priorytet:" prefixes).
  *
- * Operate keys (Space toggle, `E` rename, `Del` delete, Alt+↑/↓ reorder) are dispatched by
- * the GLOBAL gate ({@link useGlobalShortcuts}) acting on the page's `selectedIndex` — the
- * row holds no per-row keydown listener for them (DOM focus stays on the listbox container).
- * The row's ONLY local interaction is the inline-rename `<input>` it renders while
- * `isRenaming`: it validates with the shared Zod schema (Constitution VI), commits on Enter
- * (surfacing the server 422 through the global announcer), and cancels on Esc/blur.
+ * Quick actions (complete / edit / "⋯") live in an action zone that is VISIBLE on row
+ * hover AND on keyboard focus-within, and is Tab/Shift+Tab traversable in both directions
+ * (opacity-hidden, never `display:none` — spec Edge Cases, FR-046). The "⋯" {@link Menu}
+ * exposes every wired operation, keyboard-navigable, in a portal above the virtualized
+ * `translateY` rows (the documented stacking trap). Hit targets ≥32px (FR-108).
  */
 export function TaskRow({
   task,
@@ -111,8 +138,9 @@ export function TaskRow({
   onCancelRename,
   onSelect,
   projectName,
-  onOpenMove,
   isOverdue = false,
+  actions,
+  dragHandle,
   style,
 }: TaskRowProps) {
   const done = task.status === "done";
@@ -125,83 +153,95 @@ export function TaskRow({
       role="option"
       aria-selected={selected}
       data-status={task.status}
-      className={`tf-task-row${done ? " tf-task-row--done" : ""}`}
+      className={[styles.row, done ? styles.done : null, selected ? styles.selected : null]
+        .filter(Boolean)
+        .join(" ")}
       style={style}
       onClick={onSelect}
     >
-      <span className="tf-task-row__state" aria-hidden="true">
-        {done ? <Check size={15} strokeWidth={2} /> : <Circle size={15} strokeWidth={1.75} />}
-      </span>
-      {isRenaming ? (
-        <RenameInput
-          initialTitle={task.title}
-          onCommit={onCommitRename}
-          onCancel={onCancelRename}
+      {actions?.onToggleDone ? (
+        <Checkbox
+          aria-label={done ? `Oznacz „${task.title}” jako niezrobione` : `Oznacz „${task.title}” jako zrobione`}
+          checked={done}
+          onChange={() => actions.onToggleDone?.()}
+          onClick={(event) => event.stopPropagation()}
+          className={styles.checkbox}
         />
       ) : (
-        <span className="tf-task-row__title">{task.title}</span>
+        <span className={styles.stateGlyph} aria-hidden="true" data-done={done} />
       )}
-      {!isRenaming && projected ? (
-        // Project chip (T041, R16): a visible, always-rendered placement label (FR-046: no
-        // hover-only affordance). The project NAME carries the meaning (never color alone,
-        // FR-044) and is a React text node so it is escaped (FR-099). When `onOpenMove` is
-        // supplied the chip is a button that opens the move selector (pointer affordance for
-        // the `M` shortcut); `stopPropagation` keeps the row's select `onClick` from also firing.
-        onOpenMove ? (
-          <button
-            type="button"
-            className="tf-task-row__project"
-            aria-label={`In project ${projectName ?? ""}. Move to another project`}
-            onClick={(event) => {
-              event.stopPropagation();
-              onOpenMove();
-            }}
-          >
-            {projectName ?? "Project"}
-          </button>
-        ) : (
-          <span className="tf-task-row__project">
-            <span className="tf-sr-only">projekt: </span>
-            {projectName ?? "Project"}
-          </span>
-        )
+
+      {isRenaming ? (
+        <RenameInput initialTitle={task.title} onCommit={onCommitRename} onCancel={onCancelRename} />
+      ) : actions?.onOpenDetails ? (
+        // The title is the drawer trigger (UIT-036: a real button, never hover-only).
+        <button
+          type="button"
+          className={styles.titleButton}
+          onClick={(event) => {
+            event.stopPropagation();
+            onSelect?.();
+            actions.onOpenDetails?.();
+          }}
+        >
+          <span className={styles.title}>{task.title}</span>
+        </button>
+      ) : (
+        <span className={styles.title}>{task.title}</span>
+      )}
+
+      {!isRenaming && projected && projectName ? (
+        <span className={styles.projectChip}>
+          <span className="sr-only">projekt: </span>
+          {projectName}
+        </span>
       ) : null}
+
       {!isRenaming && priority ? (
-        // Priority badge (slice 005, FR-044): the P0–P3 TEXT label always carries the meaning — a
-        // color class may accompany it, but the text is the signal, never color alone. The
-        // `data-priority` hook lets CSS tint it without the color being the sole carrier.
-        <span className="tf-task-row__priority" data-priority={task.priority}>
-          <span className="tf-sr-only">priorytet: </span>
+        <span className={styles.priority} data-priority={task.priority}>
+          <span className="sr-only">priorytet: </span>
           {priority}
         </span>
       ) : null}
-      {!isRenaming && isOverdue ? (
-        // Overdue flag (slice 005, Today view): a text label, never color alone (FR-044).
-        <span className="tf-task-row__overdue">zaległe</span>
-      ) : null}
+
+      {!isRenaming && isOverdue ? <span className={styles.overdue}>zaległe</span> : null}
+
       {!isRenaming && task.assignees.length > 0 ? (
-        // Assignee count (slice 008) — a text badge (never color/avatar alone, FR-044); the names live in
-        // the assignee picker. Announced with a labelled count (FR-043).
-        <span className="tf-task-row__assignees">
-          <span className="tf-sr-only">przypisani: </span>
+        <span className={styles.assignees}>
+          <span className="sr-only">przypisani: </span>
           {task.assignees.length}
         </span>
       ) : null}
-      {!isRenaming ? (
-        // Label chips (slice 006, US-08.AS-04): the caller's own labels by NAME (resolved from the roster);
-        // renders nothing when the task carries none. Name is the carrier, color decorative (FR-044/FR-099).
-        <LabelChips labelIds={task.labels} />
-      ) : null}
+
+      {!isRenaming ? <LabelChips labelIds={task.labels} /> : null}
+
       {!isRenaming && task.dueDate ? (
-        // Visible, always-rendered text label (FR-046: no hover-only affordance). The
-        // calendar day/time is the meaning — never color alone (FR-044) — and it carries no
-        // keybinding. The pairing invariant (R8) makes a truthy `dueDate` a sufficient guard.
-        // The leading `tf-sr-only` "termin:" is concatenated into the option's accessible
-        // name so the date is announced as a labelled due date, not a bare trailing number
-        // (FR-043); the visible date text node stays visible for sighted users.
-        <span className="tf-task-row__due">
-          <span className="tf-sr-only">termin: </span>
+        <span className={styles.due}>
+          <span className="sr-only">termin: </span>
           {formatDueDate(task.dueDate, task.dueHasTime)}
+        </span>
+      ) : null}
+
+      {!isRenaming && actions ? (
+        <span
+          className={styles.actionZone}
+          // The action zone is presentation-level chrome inside the option; its buttons are
+          // individually labelled. Clicks inside must not re-fire row selection handlers twice.
+          onClick={(event) => event.stopPropagation()}
+        >
+          {dragHandle}
+          {actions.onEdit ? (
+            <IconButton aria-label={`Edytuj „${task.title}”`} className={styles.action} onClick={actions.onEdit}>
+              <Pencil size={14} strokeWidth={1.75} aria-hidden="true" />
+            </IconButton>
+          ) : null}
+          <Menu
+            items={buildMenuItems(task, actions)}
+            triggerLabel={`Więcej akcji: ${task.title}`}
+            menuLabel="Akcje taska"
+            triggerContent={<span aria-hidden="true" className={styles.ellipsis}>⋯</span>}
+            triggerClassName={styles.action}
+          />
         </span>
       ) : null}
     </div>
@@ -209,13 +249,9 @@ export function TaskRow({
 }
 
 /**
- * The inline-rename editor (T058; FR-093, US-08 `E`). Mounts autofocused inside the selected
- * row, seeded with the current title. Enter validates via the shared Zod schema and commits
- * the trimmed value (a 422 from the server surfaces through the global MutationCache
- * announcer — no bespoke toast here); an empty-after-trim title is a no-op that stays in
- * edit mode (mirrors {@link TaskCapture}). Esc cancels without changing the title; blur
- * cancels too so focus can never get stranded on a hidden input. `stopPropagation` keeps the
- * row's `onClick` (select) from firing while editing.
+ * The inline-rename editor (Inbox "edit" quick action). Enter validates via the shared Zod
+ * schema and commits; Esc/blur cancels. `stopPropagation` keeps the row's select onClick
+ * from firing while editing.
  */
 function RenameInput({
   initialTitle,
@@ -237,7 +273,6 @@ function RenameInput({
       return;
     }
     if (event.key === "Escape") {
-      // Stop the Dialog/global Esc handling — Esc here only cancels the rename.
       event.preventDefault();
       event.stopPropagation();
       onCancel();
@@ -247,11 +282,10 @@ function RenameInput({
   return (
     <input
       type="text"
-      // Intentional autofocus: the rename input steals focus from the listbox so the user
-      // can type immediately. TaskList refocuses the listbox on commit/cancel so arrow-nav
-      // resumes (so focus is never stranded — the usual no-autofocus concern).
+      // Intentional autofocus: the rename input steals focus from the listbox; TaskList
+      // refocuses the listbox on commit/cancel so arrow-nav resumes.
       autoFocus
-      className="tf-task-row__rename-input"
+      className={styles.renameInput}
       aria-label="Rename task"
       maxLength={500}
       value={value}

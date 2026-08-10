@@ -44,6 +44,8 @@ const ERROR_UX = {
   conflict_lww: { message: "Your change conflicted with a newer update. Review and retry.", redirectToSignIn: false },
   version_conflict: { message: "This item was changed elsewhere. We've reloaded the latest version — review it and retry.", redirectToSignIn: false },
   last_owner: { message: "You can't remove the last owner of a shared project.", redirectToSignIn: false },
+  // slice 019 (FR-112): a DuplicateTask newTaskId already taken by an unrelated row.
+  duplicate_id: { message: "Nie udało się zduplikować zadania — spróbuj ponownie.", redirectToSignIn: false },
   internal_error: { message: "Something went wrong. Please try again.", redirectToSignIn: false },
 } satisfies Record<ErrorCode, ErrorUx>;
 
