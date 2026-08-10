@@ -39,7 +39,7 @@ interface ToastProps {
  * announcer. (The app-level `<LiveRegion />` in `layout.tsx` is left unfed; this
  * provider owns its own region — never feed two regions, that is the footgun.)
  */
-export function Toast({ message, variant = "info", onDismiss }: ToastProps) {
+function Toast({ message, variant = "info", onDismiss }: ToastProps) {
   const classes = [styles.toast, variant !== "info" ? styles[variant] : null]
     .filter(Boolean)
     .join(" ");

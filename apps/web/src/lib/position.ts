@@ -19,7 +19,7 @@ import { BASE_62_DIGITS, generateKeyBetween } from "fractional-indexing";
  * client is the sole rank generator; the server validates the format (`[0-9A-Za-z]+`)
  * and is the sole writer under the `version` guard, but never generates ranks.
  */
-export const POSITION_ALPHABET = BASE_62_DIGITS;
+const POSITION_ALPHABET = BASE_62_DIGITS;
 
 /**
  * Computes a fractional rank strictly between `left` and `right` under code-unit ordering.

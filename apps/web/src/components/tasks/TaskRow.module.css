@@ -50,6 +50,14 @@
   white-space: nowrap;
 }
 
+/* The Tooltip wrapper around a truncated title must keep participating in the row's
+   flex truncation (S5.4) — without min-width:0 the wrapper would grow past the row. */
+.titleTooltip {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+}
+
 .titleButton {
   flex: 1 1 auto;
   min-width: 0;

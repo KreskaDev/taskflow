@@ -8,7 +8,7 @@
  * owns the diagnostic trail.
  */
 
-export type ErrorSeverity = "warning" | "error" | "critical";
+type ErrorSeverity = "warning" | "error" | "critical";
 
 export interface LogErrorEntry {
   /** How bad it is: `warning` recoverable/retryable, `error` failed operation, `critical` app-level. */

@@ -44,15 +44,5 @@ export const PROJECT_ICONS = [
   "tag",
 ] as const;
 
-export type ProjectColor = (typeof PROJECT_COLORS)[number];
-export type ProjectIcon = (typeof PROJECT_ICONS)[number];
-
-/** Whether `color` is a member of the frozen preset color set. */
-export function isValidProjectColor(color: string): color is ProjectColor {
-  return (PROJECT_COLORS as readonly string[]).includes(color);
-}
-
-/** Whether `icon` is a member of the frozen preset icon set. */
-export function isValidProjectIcon(icon: string): icon is ProjectIcon {
-  return (PROJECT_ICONS as readonly string[]).includes(icon);
-}
+// The former isValidProjectColor/Icon guards died unreferenced in the slice-019 dead-code
+// sweep (T064) — projectSchema builds its enums from the arrays above directly.

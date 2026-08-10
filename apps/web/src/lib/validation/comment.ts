@@ -23,7 +23,7 @@ export const commentSchema = z.object({
 });
 
 /** The post-comment payload (`POST /api/tasks/{taskId}/comments`). */
-export type PostCommentInput = z.infer<typeof commentSchema>;
+type PostCommentInput = z.infer<typeof commentSchema>;
 
 /** The edit-comment payload (`PATCH /api/comments/{commentId}`) — the same whole-replace shape. */
-export type EditCommentInput = z.infer<typeof commentSchema>;
+type EditCommentInput = z.infer<typeof commentSchema>;

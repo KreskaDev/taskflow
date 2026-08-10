@@ -7,7 +7,7 @@ import { formatInTimeZone, fromZonedTime, toZonedTime } from "date-fns-tz";
  * boundaries, recurrence, NL date resolution) is evaluated against this zone,
  * identically on client and server. Per-user timezones are out of scope.
  */
-export const REFERENCE_TIME_ZONE = "Europe/Warsaw";
+const REFERENCE_TIME_ZONE = "Europe/Warsaw";
 
 /** Converts a UTC instant to the wall-clock time in the reference zone. */
 export function toReferenceZone(utc: Date): Date {

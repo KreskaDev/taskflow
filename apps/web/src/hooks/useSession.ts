@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 
-export interface SessionUser {
+interface SessionUser {
   id: string;
   email: string;
   displayName: string;

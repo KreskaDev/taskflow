@@ -1,12 +1,13 @@
 "use client";
 
-import { type CSSProperties, type ReactNode, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
 import { Pencil } from "lucide-react";
 
 import { LabelChips } from "@/components/labels/LabelChips";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { IconButton } from "@/components/ui/IconButton";
 import { Menu, type MenuItemSpec } from "@/components/ui/Menu";
+import { Tooltip } from "@/components/ui/Tooltip";
 import type { TaskResponse } from "@/hooks/useTasks";
 import { formatInReferenceZone } from "@/lib/timezone";
 import { taskTitleSchema } from "@/lib/validation/task";
@@ -173,21 +174,8 @@ export function TaskRow({
 
       {isRenaming ? (
         <RenameInput initialTitle={task.title} onCommit={onCommitRename} onCancel={onCancelRename} />
-      ) : actions?.onOpenDetails ? (
-        // The title is the drawer trigger (UIT-036: a real button, never hover-only).
-        <button
-          type="button"
-          className={styles.titleButton}
-          onClick={(event) => {
-            event.stopPropagation();
-            onSelect?.();
-            actions.onOpenDetails?.();
-          }}
-        >
-          <span className={styles.title}>{task.title}</span>
-        </button>
       ) : (
-        <span className={styles.title}>{task.title}</span>
+        <RowTitle task={task} onSelect={onSelect} onOpenDetails={actions?.onOpenDetails} />
       )}
 
       {!isRenaming && projected && projectName ? (
@@ -245,6 +233,69 @@ export function TaskRow({
         </span>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * The row title — the drawer trigger when details are wired (UIT-036: a real button,
+ * never hover-only), a plain span otherwise. When the rendered title is actually
+ * TRUNCATED (measured), the full value becomes focus-reachable via the catalog
+ * {@link Tooltip} (S5.4, FR-046) — the button variant rides the child's own focus
+ * (no extra tab stop), the span variant makes the otherwise-unreachable value focusable.
+ */
+function RowTitle({
+  task,
+  onSelect,
+  onOpenDetails,
+}: {
+  task: TaskResponse;
+  onSelect?: () => void;
+  onOpenDetails?: () => void;
+}) {
+  const titleRef = useRef<HTMLSpanElement>(null);
+  const [truncated, setTruncated] = useState(false);
+
+  useEffect(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    setTruncated(el.scrollWidth > el.clientWidth);
+  }, [task.title]);
+
+  const text = (
+    <span ref={titleRef} className={styles.title}>
+      {task.title}
+    </span>
+  );
+
+  if (onOpenDetails) {
+    const button = (
+      <button
+        type="button"
+        className={styles.titleButton}
+        onClick={(event) => {
+          event.stopPropagation();
+          onSelect?.();
+          onOpenDetails();
+        }}
+      >
+        {text}
+      </button>
+    );
+    return truncated ? (
+      <Tooltip label={task.title} focusableChild className={styles.titleTooltip}>
+        {button}
+      </Tooltip>
+    ) : (
+      button
+    );
+  }
+
+  return truncated ? (
+    <Tooltip label={task.title} className={styles.titleTooltip}>
+      {text}
+    </Tooltip>
+  ) : (
+    text
   );
 }
 

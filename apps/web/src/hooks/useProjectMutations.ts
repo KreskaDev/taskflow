@@ -368,9 +368,9 @@ export function deleteProjectMutationOptions(queryClient: QueryClient): DeletePr
 /* ─────────────────── Client-side one-level-nesting prevention (R15) ─────────────────── */
 
 /** The FR-049 recoverable messages for the two one-level-nesting failure shapes (AS-03/AS-09). */
-export const PARENT_IS_CHILD_MESSAGE =
+const PARENT_IS_CHILD_MESSAGE =
   "That project is already nested. Projects can be nested only one level deep.";
-export const PROJECT_HAS_CHILDREN_MESSAGE =
+const PROJECT_HAS_CHILDREN_MESSAGE =
   "This project has sub-projects, so it can't become a sub-project itself (one level of nesting only).";
 
 /**

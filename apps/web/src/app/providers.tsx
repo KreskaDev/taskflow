@@ -1,9 +1,10 @@
 "use client";
 
-import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 
 import { ToastProvider, useToast } from "@/components/ui/Toast";
+import { logError } from "@/lib/logError";
 
 /**
  * App-wide client providers. TanStack Query backs optimistic mutations and cached
@@ -47,8 +48,26 @@ function QueryProvider({ children }: { children: ReactNode }) {
     () =>
       new QueryClient({
         mutationCache: new MutationCache({
-          onError: (error) => {
+          onError: (error, _variables, _context, mutation) => {
+            // FR-050 (T062): one structured diagnostic record per surfaced failure —
+            // the announcement below stays the human-facing FR-049 half.
+            logError({
+              severity: "error",
+              operation: mutation.options.mutationKey?.join(".") ?? "mutation",
+              error,
+            });
             push(error.message, { variant: "error" });
+          },
+        }),
+        queryCache: new QueryCache({
+          // Diagnostics ONLY — read failures render their own inline alert + retry
+          // (announcing here too would double-announce; see the header comment).
+          onError: (error, query) => {
+            logError({
+              severity: "warning",
+              operation: `${query.queryKey.join(".")}.fetch`,
+              error,
+            });
           },
         }),
       }),

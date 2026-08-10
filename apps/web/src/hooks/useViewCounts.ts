@@ -12,7 +12,7 @@ export type ViewCountsResponse = components["schemas"]["ViewCountsResponse"];
  * mutations already reconcile the view caches (their `onSettled`) — counts track
  * optimistic flows without new plumbing (data-model.md).
  */
-export const VIEW_COUNTS_QUERY_KEY = ["views", "counts"] as const;
+const VIEW_COUNTS_QUERY_KEY = ["views", "counts"] as const;
 
 /** Invalidate helper the mutation factories call from their `onSettled`. */
 export async function invalidateViewCounts(queryClient: QueryClient): Promise<void> {
