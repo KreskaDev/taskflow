@@ -36,7 +36,7 @@ function task(overrides: Partial<TaskResponse> & Pick<TaskResponse, "id">): Task
   };
 }
 
-describe("Today membership + assembly", () => {
+describe("Today membership + assembly [INV-051] [INV-052] [INV-053]", () => {
   it("includes due-today and overdue (flagged), excludes done/cancelled/no-due/tomorrow", () => {
     const tasks = [
       task({ id: "a", dueDate: "2026-06-27T10:00:00Z", dueHasTime: true, priority: "P1" }),

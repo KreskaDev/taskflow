@@ -27,7 +27,7 @@ function dueToday(): string {
 }
 
 test.describe("US-13 Task Assignment (AS-01..AS-04)", () => {
-  test("AS-01/AS-02/AS-03: assign a member via the picker; it appears; the member sees it in Assigned", async ({ browser }) => {
+  test("AS-01/AS-02/AS-03: assign a member via the picker; it appears; the member sees it in Assigned [INV-060] [INV-062]", async ({ browser }) => {
     // The editor-member must exist before the owner invites them by email.
     const editor = await ensureUser({ sub: "google-sub-ta-ed", email: "ta-ed@taskflow.test", name: "Edith Editor", picture: "https://avatars.test/e.png" });
     const { page, context, userId: ownerId } = await signedInPage(browser, "ta-owner");
@@ -71,7 +71,7 @@ test.describe("US-13 Task Assignment (AS-01..AS-04)", () => {
     await editorContext.close();
   });
 
-  test("AS-04: a personal (Inbox) task offers no assignment picker", async ({ browser }) => {
+  test("AS-04: a personal (Inbox) task offers no assignment picker [INV-061]", async ({ browser }) => {
     const { page, context, userId } = await signedInPage(browser, "ta-personal");
     await apiAs(userId).createTask({ title: "Personal errand", position: "a0" });
 

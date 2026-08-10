@@ -18,7 +18,7 @@ async function cspFor(nodeEnv: string): Promise<string> {
   return csp!;
 }
 
-describe("BFF security headers (next.config)", () => {
+describe("BFF security headers (next.config) [INV-134]", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
   });

@@ -12,7 +12,7 @@ import {
  * Mirrors the server FluentValidation rule: a title is trimmed, must be non-empty,
  * and may be at most 500 characters long.
  */
-describe("task title validation", () => {
+describe("task title validation [INV-058]", () => {
   it("rejects a title that is empty after trimming", () => {
     expect(taskTitleSchema.safeParse("   ").success).toBe(false);
   });

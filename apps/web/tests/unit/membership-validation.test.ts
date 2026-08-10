@@ -11,7 +11,7 @@ import {
  * Membership validation (slice 007, T038, RED → drives T039; research R2/R4). Pins the writable role
  * vocabulary (`editor | viewer`, `owner` REJECTED) and the three payload shapes.
  */
-describe("membershipRoleSchema — the writable role vocabulary (R2)", () => {
+describe("membershipRoleSchema — the writable role vocabulary (R2) [INV-086]", () => {
   it("accepts editor and viewer", () => {
     expect(membershipRoleSchema.parse("editor")).toBe("editor");
     expect(membershipRoleSchema.parse("viewer")).toBe("viewer");

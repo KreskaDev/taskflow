@@ -37,7 +37,7 @@ function ids(nodes: ProjectTreeNode[]): string[] {
   return nodes.map((n) => n.project.id);
 }
 
-describe("buildProjectTree — one-level tree assembly from the flat list (R16)", () => {
+describe("buildProjectTree — one-level tree assembly from the flat list (R16) [INV-013]", () => {
   it("groups children under their parent by parentId", () => {
     const flat = [
       makeProject({ id: PARENT, name: "Parent", parentId: null }),

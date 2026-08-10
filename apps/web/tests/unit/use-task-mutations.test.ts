@@ -146,7 +146,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("createTaskMutationOptions — optimistic create recipe", () => {
+describe("createTaskMutationOptions — optimistic create recipe [INV-035] [INV-039] [INV-130]", () => {
   it("onMutate cancels in-flight ['tasks'] queries before touching the cache", async () => {
     const seed = seedTasks();
     const queryClient = primedClient(seed);

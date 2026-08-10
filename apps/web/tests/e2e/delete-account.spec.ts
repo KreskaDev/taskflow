@@ -14,7 +14,7 @@ import {
  */
 
 test.describe("Account deletion roundtrip (FR-049 / SC-017)", () => {
-  test("delete + confirm ends the session and hard-deletes the row; re-sign-in is a fresh account", async ({
+  test("delete + confirm ends the session and hard-deletes the row; re-sign-in is a fresh account [INV-007] [INV-008]", async ({
     browser,
   }) => {
     const sub = "google-delete-roundtrip";

@@ -46,7 +46,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("shareProject — PATCH /share, invalidates roster + project lists on settle", () => {
+describe("shareProject — PATCH /share, invalidates roster + project lists on settle [INV-092] [INV-093]", () => {
   it("mutationFn PATCHes /share with the version body", async () => {
     patchSpy.mockResolvedValue({ data: { id: PID, visibility: "shared" }, error: undefined });
     await shareProjectMutationOptions(new QueryClient()).mutationFn({ id: PID, version: 2 });

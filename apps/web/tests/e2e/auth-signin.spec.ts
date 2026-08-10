@@ -13,7 +13,7 @@ import { setNextIdentity, userExistsByGoogleSub } from "./helpers/seed";
 const ADMITTED_EMAIL = (process.env.ADMISSION_EMAILS as string).split(",")[0]!.trim();
 
 test.describe("US1 sign-in via OAuth (AS-01)", () => {
-  test("AS-01: an admitted, email-verified account signs in → account created, lands in workspace", async ({
+  test("AS-01: an admitted, email-verified account signs in → account created, lands in workspace [INV-002]", async ({
     browser,
   }) => {
     const sub = "google-as01-admitted";
@@ -44,7 +44,7 @@ test.describe("US1 sign-in via OAuth (AS-01)", () => {
     await context.close();
   });
 
-  test("AS-01: a non-admitted account is rejected with a recoverable message and NO account", async ({
+  test("AS-01: a non-admitted account is rejected with a recoverable message and NO account [INV-003]", async ({
     browser,
   }) => {
     const sub = "google-as01-nonadmitted";
@@ -68,7 +68,7 @@ test.describe("US1 sign-in via OAuth (AS-01)", () => {
     await context.close();
   });
 
-  test("AS-01: an unverified email is rejected even when the address is on the allowlist (no account)", async ({
+  test("AS-01: an unverified email is rejected even when the address is on the allowlist (no account) [INV-004]", async ({
     browser,
   }) => {
     const sub = "google-as01-unverified";

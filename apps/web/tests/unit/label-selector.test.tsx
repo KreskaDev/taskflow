@@ -37,7 +37,7 @@ function renderSelector(current: string[], onSubmit: (ids: string[]) => void): v
   render(tree);
 }
 
-describe("LabelSelector", () => {
+describe("LabelSelector [INV-101] [INV-102]", () => {
   it("lists the caller's labels by name as keyboard-operable checkboxes", () => {
     renderSelector([], vi.fn());
 

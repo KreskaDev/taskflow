@@ -69,7 +69,7 @@ afterEach(() => {
   membersMock.mockReset();
 });
 
-describe("RoleBadge — text + icon, never color alone (FR-044)", () => {
+describe("RoleBadge — text + icon, never color alone (FR-044) [INV-087] [INV-088]", () => {
   it("renders the role word for each role", () => {
     render(createElement(RoleBadge, { role: "owner" }));
     expect(screen.getByText("Owner")).toBeTruthy();

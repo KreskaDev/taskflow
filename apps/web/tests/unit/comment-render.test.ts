@@ -30,7 +30,7 @@ afterEach(() => {
   delete window.__xssProbe;
 });
 
-describe("SafeMarkdown — the render-boundary sanitizer", () => {
+describe("SafeMarkdown — the render-boundary sanitizer [INV-117]", () => {
   it("renders the safe markdown subset (emphasis, list, inline code)", () => {
     const { container } = renderBody("This is **bold**, a `code span`, and:\n\n- item one\n- item two");
     expect(container.querySelector("strong")?.textContent).toBe("bold");

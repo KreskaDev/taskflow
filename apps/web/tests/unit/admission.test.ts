@@ -7,7 +7,7 @@ import { assertAdmissionConfigured, isAdmitted } from "@/lib/auth/admission";
  * allowlist match or a Workspace `hd` match. An unverified email is never admitted, even on an
  * allowlist match. If neither allowlist nor hd is configured, the BFF must fail fast at startup.
  */
-describe("admission gate", () => {
+describe("admission gate [INV-003] [INV-004]", () => {
   const original = { emails: process.env.ADMISSION_EMAILS, hd: process.env.ADMISSION_HD };
 
   beforeEach(() => {

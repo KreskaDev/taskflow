@@ -42,7 +42,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("createLabel — PUT /api/labels/{id}, optimistic roster insert", () => {
+describe("createLabel — PUT /api/labels/{id}, optimistic roster insert [INV-104]", () => {
   it("mutationFn PUTs the client id with the {name, color} body", async () => {
     putSpy.mockResolvedValue({ data: { id: LABEL_ID, name: "Urgent", color: "red" }, error: undefined });
     await createLabelMutationOptions(new QueryClient()).mutationFn({ id: LABEL_ID, name: "Urgent", color: "red" });
