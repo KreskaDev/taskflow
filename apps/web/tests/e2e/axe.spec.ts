@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { ensureUser, insertSession } from "./helpers/seed";
+import { apiAs, ensureUser, insertSession } from "./helpers/seed";
 
 /**
  * Per-palette accessibility suite (T028, slice 019 — UIT-010, SC-008, D12).
@@ -74,6 +74,47 @@ for (const screen of STATIC_SCREENS) {
     }
   });
 }
+
+/**
+ * Slice 010 (T021): the project BOARD view joins the per-palette walk — seeded columns
+ * with cards (chips + an empty column) audited in all four palettes [INV-142].
+ */
+test.describe("axe AA — project board (slice 010)", () => {
+  for (const palette of PALETTES) {
+    test(`board in ${palette}: zero WCAG 2.1 AA violations [INV-142]`, async ({ browser }) => {
+      const profile = await ensureUser({
+        sub: `google-sub-axe-board-${palette}`,
+        email: `axe-board-${palette}@taskflow.test`,
+        name: "Axe Walker",
+      });
+      const api = apiAs(profile.id);
+      const project = await api.createProject({ name: "Tablica AA", color: "blue", icon: "folder" });
+      const seeded = await api.createTask({ title: "Karta na tablicy", position: "a0" });
+      await api.moveTask(seeded.id, project.id, seeded.version);
+      const moved = await api.request("PATCH", `/api/tasks/${seeded.id}/status`, {
+        status: "in_progress",
+        version: seeded.version + 1,
+      });
+      if (!moved.ok) throw new Error(`status seed failed (${String(moved.status)})`);
+
+      const sessionId = await insertSession(profile.id);
+      const context = await browser.newContext();
+      await context.addCookies([
+        { name: "taskflow_session", value: sessionId, url: "http://localhost:3000" },
+      ]);
+      // Force the board projection before load (per-project localStorage — D8).
+      await context.addInitScript((id) => {
+        window.localStorage.setItem(`taskflow.project-view.${id}`, "board");
+      }, project.id);
+      const page = await context.newPage();
+      await page.goto(`/projects/${project.id}`);
+      await page.waitForLoadState("networkidle");
+      await setPalette(page, palette);
+      await auditCurrentPage(page, `board × ${palette}`);
+      await context.close();
+    });
+  }
+});
 
 test.describe("axe AA — sign-in (anonymous)", () => {
   for (const palette of PALETTES) {

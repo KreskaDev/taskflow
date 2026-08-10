@@ -12,7 +12,7 @@ import { listboxKeyDown } from "@/lib/listboxKeys";
 import styles from "./BoardColumn.module.css";
 
 /** Polish plural for the column count: 1 zadanie · 2–4 zadania · 5+ zadań. */
-export function taskCountLabel(count: number): string {
+function taskCountLabel(count: number): string {
   if (count === 1) return "1 zadanie";
   const tens = count % 100;
   const ones = count % 10;
