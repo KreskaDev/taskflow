@@ -118,12 +118,21 @@
   display: flex;
   align-items: center;
   min-width: 0;
+  position: relative;
 }
 
+/* Overlay cluster: opacity-hidden actions must not CONSUME row width (the project name
+   would be squeezed out) — they float over the row's trailing edge when revealed, still
+   tab-reachable while idle (never display:none). */
 .projectActions {
   display: flex;
   align-items: center;
   flex: none;
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--color-bg-deep);
   opacity: 0;
   transition: opacity var(--motion-fast) var(--motion-ease);
 }
