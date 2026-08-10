@@ -361,7 +361,7 @@ comment on a shared task) using only visible controls; a visual audit confirms t
 **Acceptance Scenarios**:
 
 1. **Given** any view where tasks can exist, **When** the user looks at it, **Then** a visible "add task" affordance is present (global "+ New task" in the app bar AND an inline add within the list) and creates a task in that context.
-2. **Given** a task row, **When** the user points at or focuses it, **Then** quick actions (complete, edit, overflow "⋯") are visible, and the "⋯" menu exposes every operation available on that task (edit, priority, due date, labels, move, assign, comments, delete) — with keyboard-focus equivalents (FR-046).
+2. **Given** a task row, **When** the user points at or focuses it, **Then** quick actions (complete, edit, overflow "⋯") are visible, and the "⋯" menu exposes every operation available on that task (edit, priority, due date, labels, move, assign, duplicate, comments, delete) — with keyboard-focus equivalents (FR-046).
 3. **Given** a task, **When** the user opens it, **Then** a right-side detail panel (drawer) presents all fields for direct editing plus the comment thread (shared projects).
 4. **Given** the sidebar, **When** the user reads it, **Then** all primary views (Inbox, Today, Upcoming, Assigned, projects) are clickable entries with icons and item counts, and the sidebar is collapsible.
 5. **Given** any empty list, **When** it renders, **Then** it shows a short hint plus the relevant action button (no onboarding wizards — Principle IV).
@@ -369,7 +369,7 @@ comment on a shared task) using only visible controls; a visual audit confirms t
 
 ---
 
-## 3. Functional Requirements (FR-001..FR-111)
+## 3. Functional Requirements (FR-001..FR-112)
 
 > **UI-first reinterpretation clause (constitution v5.0.0)**: wherever an FR or acceptance
 > scenario in this document names a keyboard shortcut as the TRIGGER of an operation, the
@@ -441,6 +441,7 @@ comment on a shared task) using only visible controls; a visual audit confirms t
 - **FR-109**: The sidebar MUST present all primary views (Inbox, Today, Upcoming, Assigned, projects) as clickable entries with icons and item counts, and MUST be collapsible.
 - **FR-110**: Every empty list state MUST present a short explanatory hint plus the relevant action button; onboarding wizards and first-run modal tours remain prohibited (Principle IV).
 - **FR-111**: The existing single-key shortcut system (global/list/navigation bindings and the shortcuts help overlay) MUST be removed from the application as part of realizing US-18; standard editing keys (FR-030) and WCAG operability (FR-042..047, FR-101) MUST remain intact.
+- **FR-112**: The row "⋯" menu MUST offer "Duplikuj", creating a new task in the same context (same list/project) copying the user-editable fields — title, description, priority, due date, labels, and assignees where the caller's membership still permits assignment — but NOT completion state and NOT comments. The duplicate appears optimistically (Principle III) and is subject to the same authorization scoping as task creation (FR-065/FR-068). *(Allocated 2026-08-09 by owner decision during slice-019 clarification, confirming the approved mockup; owned by slice 019.)*
 
 ### Data Management
 - **FR-035**: System MUST support full data export in JSON format (lossless, all entities and fields), scoped to the data the caller owns or can access (not other users' private data).
@@ -657,7 +658,7 @@ High-level mapping (slice → coverage):
 - 007 project-sharing-membership
 - 008 task-assignment
 - 009 comments-mentions
-- 019 ui-design-system — US-18: the dark Linear-inspired design system + full UI operability (FR-103..111), shortcut-system removal (executes BEFORE 010)
+- 019 ui-design-system — US-18: the KreskaDev design system + full UI operability (FR-103..112, incl. task duplication FR-112), shortcut-system removal (executes BEFORE 010)
 - 010 project-board-kanban — project Kanban board with status columns, groupable project list
 - 011 cycles — 2-week cycles, assignment, metrics, rollover, deletion guards
 - 012 recurring-tasks — recurrence rules and next-instance generation
