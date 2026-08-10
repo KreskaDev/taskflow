@@ -54,9 +54,9 @@ internal sealed class TaskFlowDocumentTransformer : IOpenApiDocumentTransformer
         SetOperation(document, "/api/tasks/{id}", OperationType.Put, "createTask", 404, 422);
         SetOperation(document, "/api/tasks", OperationType.Get, "listTasks");
         SetOperation(document, "/api/tasks/{id}/title", OperationType.Patch, "renameTask", 404, 409, 422);
-        // setTaskDone is membership-aware as of slice 005 (the BLOCKER-resolved deviation): a viewer member
-        // mutating a shared task → 403, so it now carries the 403 like the new editor commands.
-        SetOperation(document, "/api/tasks/{id}/status", OperationType.Patch, "setTaskDone", 403, 404, 409, 422);
+        // setTaskStatus (slice 010 D1: renamed from setTaskDone, widened to the full FR-003 enum) is
+        // membership-aware: a viewer member mutating a shared task → 403; same 404/409/422 family.
+        SetOperation(document, "/api/tasks/{id}/status", OperationType.Patch, "setTaskStatus", 403, 404, 409, 422);
         SetOperation(document, "/api/tasks/{id}/position", OperationType.Patch, "reorderTask", 404, 409, 422);
         SetOperation(document, "/api/tasks/{id}", OperationType.Delete, "deleteTask", 404);
 

@@ -7,10 +7,11 @@ using ProjectId = TaskFlow.Domain.TaskManagement.ProjectId;
 namespace TaskFlow.Application.TaskManagement.Queries;
 
 /// <summary>
-/// Lists a project's tasks (contracts/openapi.yaml <c>listProjectTasks</c>, research R6) — owner + project
-/// scoped: <c>WHERE created_by = caller AND deleted_at IS NULL AND project_id = {id} ORDER BY position,
-/// id</c>. The owner is resolved from <see cref="ICurrentUser"/>, never a wire field (R13). A
-/// foreign/absent project → 404 (existence not disclosed), enforced in the handler.
+/// Lists a project's tasks (contracts/openapi.yaml <c>listProjectTasks</c>) — PROJECT-scoped
+/// (slice 010 D4/FR-066): <c>WHERE project_id = {id} AND deleted_at IS NULL ORDER BY position, id</c>,
+/// regardless of which member authored each task. The caller is resolved from
+/// <see cref="ICurrentUser"/>, never a wire field (R13). A foreign/absent project → 404
+/// (existence not disclosed), enforced in the handler.
 /// </summary>
 public sealed record GetProjectTasks
 {
@@ -71,11 +72,12 @@ public static class GetProjectTasksHandler
             authorization.RequireRole(project, memberships, EffectiveRole.Viewer);
         }
 
-        // A shared project's tasks belong to the PROJECT — scope by the owner (this slice, members cannot yet
-        // author tasks; slice 008 introduces multi-author task listing). For a personal project the owner is
-        // the caller, so this matches the slice-004 owner-scoped list exactly.
+        // A shared project's tasks belong to the PROJECT (FR-066) — the listing is project-scoped
+        // (slice 010 D4): member-authored tasks are visible to every current member; createdBy is
+        // provenance, not a visibility filter. For a personal project the author can only be the
+        // owner, so the personal arm is unchanged.
         var projectTasks = await tasks
-            .ListByProjectAsync(query.ProjectId, project.OwnerId, cancellationToken)
+            .ListByProjectAsync(query.ProjectId, cancellationToken)
             .ConfigureAwait(false);
 
         // Caller-scoped labels (slice 006, R6): the CALLER's own labels on these tasks (owner = the caller,

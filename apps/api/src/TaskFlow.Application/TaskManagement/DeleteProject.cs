@@ -128,8 +128,10 @@ public static class DeleteProjectHandler
         DateTime utcNow,
         CancellationToken cancellationToken)
     {
+        // Project-scoped (slice 010 D4): the disposition guard and every disposition below must see
+        // MEMBER-authored tasks too, else deleting a shared project would orphan them (integrity bug).
         var taskCount = await tasks
-            .CountByProjectAsync(command.Id, owner, cancellationToken)
+            .CountByProjectAsync(command.Id, cancellationToken)
             .ConfigureAwait(false);
         if (taskCount == 0)
         {
@@ -149,8 +151,8 @@ public static class DeleteProjectHandler
         switch (command.TaskDisposition)
         {
             case ProjectDispositions.CascadeTasks:
-                var owned = await tasks.ListByProjectAsync(command.Id, owner, cancellationToken).ConfigureAwait(false);
-                foreach (var task in owned)
+                var projectTasks = await tasks.ListByProjectAsync(command.Id, cancellationToken).ConfigureAwait(false);
+                foreach (var task in projectTasks)
                 {
                     task.SoftDelete(utcNow);
                 }
@@ -162,8 +164,10 @@ public static class DeleteProjectHandler
                 // Inbox makes the tasks personal (FR-069: no assignees), and the bulk ExecuteUpdate below
                 // bypasses Task.MoveToProject (the aggregate clear), so it must be done here. Clear first,
                 // while the tasks still carry this project_id (the clear joins task_assignees by project).
+                // Project-scoped (D4): member-authored tasks move too — each keeps its createdBy, so
+                // it lands in its AUTHOR's Inbox (the task's personal context), never the owner's.
                 await tasks.ClearAssigneesForProjectAsync(command.Id, cancellationToken).ConfigureAwait(false);
-                await projects.MoveProjectTasksToInboxAsync(command.Id, owner, cancellationToken).ConfigureAwait(false);
+                await projects.MoveProjectTasksToInboxAsync(command.Id, cancellationToken).ConfigureAwait(false);
                 break;
 
             case ProjectDispositions.ArchiveWithTasks:

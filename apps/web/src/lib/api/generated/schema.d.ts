@@ -517,7 +517,7 @@ export interface paths {
          * PATCH_api_tasks_id_status
          * @description PATCH_api_tasks_id_status
          */
-        patch: operations["setTaskDone"];
+        patch: operations["setTaskStatus"];
         trace?: never;
     };
     "/api/tasks/{id}/position": {
@@ -2714,7 +2714,7 @@ export interface operations {
             };
         };
     };
-    setTaskDone: {
+    setTaskStatus: {
         parameters: {
             query?: never;
             header?: never;

@@ -71,19 +71,20 @@ public interface ITaskRepository
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// Lists the NON-deleted tasks of <paramref name="projectId"/> owned by <paramref name="owner"/>
-    /// (owner-scoped + <c>deleted_at IS NULL AND project_id = {id}</c>), ordered by <c>position</c> then
-    /// <c>id</c> — the project's task list (slice 004, R6) and the source for the delete <c>cascade</c> task
-    /// disposition (R5: each loaded task is soft-deleted via the domain method, version-bumping).
+    /// Lists ALL NON-deleted tasks of <paramref name="projectId"/> (<c>project_id = {id} AND deleted_at IS
+    /// NULL</c> — PROJECT-scoped, no <c>created_by</c> filter; slice 010 D4/FR-066), ordered by
+    /// <c>position</c> then <c>id</c> — the project's task list and the source for the delete <c>cascade</c>
+    /// task disposition (R5: each loaded task is soft-deleted via the domain method, version-bumping).
+    /// Member-authored tasks on shared projects are included; authorization stays in the handlers.
     /// </summary>
-    Task<IReadOnlyList<TaskEntity>> ListByProjectAsync(ProjectId projectId, UserId owner, CancellationToken cancellationToken);
+    Task<IReadOnlyList<TaskEntity>> ListByProjectAsync(ProjectId projectId, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Counts the NON-deleted tasks of <paramref name="projectId"/> owned by <paramref name="owner"/> — the
-    /// cross-row fact that makes <c>taskDisposition</c> REQUIRED on delete (FR-014/EC-03: a project WITH tasks
-    /// must carry a disposition). Owner-scoped + <c>deleted_at IS NULL</c>.
+    /// Counts ALL NON-deleted tasks of <paramref name="projectId"/> (PROJECT-scoped, D4) — the cross-row
+    /// fact that makes <c>taskDisposition</c> REQUIRED on delete (FR-014/EC-03: a project WITH tasks —
+    /// whoever authored them — must carry a disposition).
     /// </summary>
-    Task<int> CountByProjectAsync(ProjectId projectId, UserId owner, CancellationToken cancellationToken);
+    Task<int> CountByProjectAsync(ProjectId projectId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Lists the caller's non-deleted, non-done/cancelled tasks where the caller is an ASSIGNEE (slice 008,

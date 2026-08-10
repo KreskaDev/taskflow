@@ -121,17 +121,18 @@ public static class TaskEndpoints
     }
 
     /// <summary>
-    /// Set the caller's own task to a DESIRED status (<c>done</c>|<c>backlog</c>) under the
-    /// optimistic-concurrency <c>version</c> guard (FR-003, R3/R4) — idempotent, not a blind flip. The
-    /// owner is resolved from <c>ICurrentUser</c> in the handler. Foreign/absent/soft-deleted id → 404;
-    /// a stale <c>version</c> → 409; an out-of-range target → 422.
+    /// Set a task to a DESIRED status over the full FR-003 enum
+    /// (<c>backlog | todo | in_progress | done | cancelled</c>) under the optimistic-concurrency
+    /// <c>version</c> guard (slice 010 D1–D3) — idempotent, not a blind flip. The caller is resolved
+    /// from <c>ICurrentUser</c> in the handler. Foreign/absent/soft-deleted id or non-member → 404;
+    /// shared viewer → 403; a stale <c>version</c> → 409; an out-of-range target → 422.
     /// </summary>
     [WolverinePatch("/api/tasks/{id}/status")]
     public static Task<TaskResponse> SetStatus(Guid id, SetTaskStatusRequest request, IMessageBus bus)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(bus);
-        return bus.InvokeAsync<TaskResponse>(new SetTaskDone
+        return bus.InvokeAsync<TaskResponse>(new SetTaskStatus
         {
             Id = TaskId.From(id),
             Status = request.Status,

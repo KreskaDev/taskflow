@@ -78,13 +78,14 @@ public interface IProjectRepository
     Task<int> OrphanChildrenAsync(ProjectId parentId, UserId owner, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Moves every NON-deleted task of <paramref name="projectId"/> owned by <paramref name="owner"/> to the
-    /// Inbox by nulling its <c>project_id</c> (the <c>move_to_inbox</c> task disposition, FR-014/EC-03). An
-    /// owner-scoped set update at the persistence seam (the Task <c>project_id</c> setter is private and its
-    /// move behavior — <c>MoveToProject</c> — is slice-004 US2, outside this vertical), so the reconciliation
-    /// is an EF <c>ExecuteUpdate</c>. Returns the number of tasks moved. Runs inside the handler's transaction.
+    /// Moves EVERY NON-deleted task of <paramref name="projectId"/> to the Inbox by nulling its
+    /// <c>project_id</c> (the <c>move_to_inbox</c> task disposition, FR-014/EC-03; PROJECT-scoped after
+    /// slice 010 D4 — member-authored tasks move too, each keeping its <c>created_by</c> so it lands in
+    /// its author's Inbox). A set update at the persistence seam (the Task <c>project_id</c> setter is
+    /// private), so the reconciliation is an EF <c>ExecuteUpdate</c>. Returns the number of tasks moved.
+    /// Runs inside the handler's transaction.
     /// </summary>
-    Task<int> MoveProjectTasksToInboxAsync(ProjectId projectId, UserId owner, CancellationToken cancellationToken);
+    Task<int> MoveProjectTasksToInboxAsync(ProjectId projectId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Lists the ids of the caller's NON-deleted, <c>shared</c> projects they OWN (slice 008, R6). The

@@ -8,9 +8,10 @@ namespace TaskFlow.UnitTests.Domain.TaskManagement;
 
 /// <summary>
 /// Aggregate invariants for <see cref="Task"/> (ENT-01, T008): title is trimmed-non-empty and
-/// ≤ 500; status defaults to <c>Backlog</c>; the done ↔ backlog toggle stamps/clears
-/// <c>CompletedAt</c>; <c>CreatedBy</c> is immutable; every mutator bumps <c>Version</c> and
-/// stamps <c>UpdatedAt</c>; soft-delete is idempotent (data-model.md ENT-01).
+/// ≤ 500; status defaults to <c>Backlog</c>; the <c>SetStatus</c> transition stamps/clears
+/// <c>CompletedAt</c> per the slice-010 transition table (set iff done; same-status = no-op);
+/// <c>CreatedBy</c> is immutable; every mutator bumps <c>Version</c> and stamps
+/// <c>UpdatedAt</c>; soft-delete is idempotent (data-model.md ENT-01).
 /// </summary>
 public sealed class TaskTests
 {
@@ -149,31 +150,88 @@ public sealed class TaskTests
         act.Should().Throw<ArgumentException>();
     }
 
-    [Fact]
-    public void MarkDone_sets_status_done_and_stamps_completed_at_and_bumps_version_and_updated_at()
+    // ── slice 010: the SetStatus transition (D2 — data-model.md transition table) ──────────
+    // Replaces the MarkDone/MarkBacklog pair with ONE table-driven transition preserving the
+    // invariant: CompletedAt is set iff Status == Done; same-status is an idempotent no-op.
+
+    [Theory]
+    [InlineData(TaskStatus.Backlog)]
+    [InlineData(TaskStatus.Todo)]
+    [InlineData(TaskStatus.InProgress)]
+    [InlineData(TaskStatus.Cancelled)]
+    public void SetStatus_entering_done_stamps_completed_at_and_bumps_version_and_updated_at(TaskStatus from)
     {
         var task = NewTask();
+        task.SetStatus(from, MutateInstant); // Backlog→Backlog is a no-op; the rest seed the source status
+        var versionBefore = task.Version;
 
-        task.MarkDone(MutateInstant);
+        task.SetStatus(TaskStatus.Done, LaterInstant);
 
         task.Status.Should().Be(TaskStatus.Done);
-        task.CompletedAt.Should().Be(MutateInstant);
-        task.Version.Should().Be(1);
-        task.UpdatedAt.Should().Be(MutateInstant);
+        task.CompletedAt.Should().Be(LaterInstant, "entering done stamps completedAt (set iff done)");
+        task.Version.Should().Be(versionBefore + 1);
+        task.UpdatedAt.Should().Be(LaterInstant);
     }
 
-    [Fact]
-    public void MarkBacklog_sets_status_backlog_and_clears_completed_at_and_bumps_version_and_updated_at()
+    [Theory]
+    [InlineData(TaskStatus.Backlog)]
+    [InlineData(TaskStatus.Todo)]
+    [InlineData(TaskStatus.InProgress)]
+    [InlineData(TaskStatus.Cancelled)]
+    public void SetStatus_leaving_done_clears_completed_at_and_bumps_version_and_updated_at(TaskStatus target)
     {
         var task = NewTask();
-        task.MarkDone(MutateInstant);
+        task.SetStatus(TaskStatus.Done, MutateInstant);
+        var versionBefore = task.Version;
 
-        task.MarkBacklog(LaterInstant);
+        task.SetStatus(target, LaterInstant);
 
-        task.Status.Should().Be(TaskStatus.Backlog);
-        task.CompletedAt.Should().BeNull();
-        task.Version.Should().Be(2);
+        task.Status.Should().Be(target);
+        task.CompletedAt.Should().BeNull("leaving done clears completedAt (set iff done)");
+        task.Version.Should().Be(versionBefore + 1);
         task.UpdatedAt.Should().Be(LaterInstant);
+    }
+
+    [Theory]
+    [InlineData(TaskStatus.Backlog, TaskStatus.Todo)]
+    [InlineData(TaskStatus.Todo, TaskStatus.InProgress)]
+    [InlineData(TaskStatus.InProgress, TaskStatus.Backlog)]
+    [InlineData(TaskStatus.Todo, TaskStatus.Cancelled)]
+    [InlineData(TaskStatus.Cancelled, TaskStatus.InProgress)]
+    public void SetStatus_between_non_done_statuses_leaves_completed_at_null(TaskStatus from, TaskStatus target)
+    {
+        var task = NewTask();
+        task.SetStatus(from, MutateInstant);
+        var versionBefore = task.Version;
+
+        task.SetStatus(target, LaterInstant);
+
+        task.Status.Should().Be(target);
+        task.CompletedAt.Should().BeNull("a move between non-done statuses never touches completedAt");
+        task.Version.Should().Be(versionBefore + 1, "a real transition is a mutation");
+        task.UpdatedAt.Should().Be(LaterInstant);
+    }
+
+    [Theory]
+    [InlineData(TaskStatus.Backlog)]
+    [InlineData(TaskStatus.Todo)]
+    [InlineData(TaskStatus.InProgress)]
+    [InlineData(TaskStatus.Done)]
+    [InlineData(TaskStatus.Cancelled)]
+    public void SetStatus_same_status_is_an_idempotent_no_op(TaskStatus status)
+    {
+        var task = NewTask();
+        task.SetStatus(status, MutateInstant); // Backlog→Backlog already exercises the no-op
+        var versionBefore = task.Version;
+        var updatedBefore = task.UpdatedAt;
+        var completedBefore = task.CompletedAt;
+
+        task.SetStatus(status, LaterInstant);
+
+        task.Status.Should().Be(status);
+        task.Version.Should().Be(versionBefore, "a same-status request does not Touch()");
+        task.UpdatedAt.Should().Be(updatedBefore, "the no-op does not re-stamp updated_at");
+        task.CompletedAt.Should().Be(completedBefore, "done→done keeps its original completedAt");
     }
 
     [Fact]
@@ -220,8 +278,8 @@ public sealed class TaskTests
         var task = Task.Create(TaskId.From(Guid.NewGuid()), createdBy, "Write the spec", "a0", CreatedInstant);
 
         task.Rename("New title", MutateInstant);
-        task.MarkDone(MutateInstant);
-        task.MarkBacklog(MutateInstant);
+        task.SetStatus(TaskStatus.Done, MutateInstant);
+        task.SetStatus(TaskStatus.Backlog, MutateInstant);
         task.Reorder("a5", MutateInstant);
         task.MoveToProject(ProjectId.From(Guid.NewGuid()), MutateInstant);
         task.SoftDelete(MutateInstant);

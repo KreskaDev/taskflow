@@ -173,9 +173,9 @@ public static class DuplicateTaskHandler
             IReadOnlyList<TaskEntity> context;
             if (source.ProjectId is { } pid)
             {
-                var project = await projects.FindReadableAsync(pid, caller, cancellationToken).ConfigureAwait(false)
-                    ?? throw new NotFoundException();
-                context = await tasks.ListByProjectAsync(pid, project.OwnerId, cancellationToken).ConfigureAwait(false);
+                // Project-scoped (D4): the successor search must see MEMBER-authored rows, else the
+                // duplicate can land on/past a member task instead of directly after its source.
+                context = await tasks.ListByProjectAsync(pid, cancellationToken).ConfigureAwait(false);
             }
             else
             {

@@ -82,11 +82,13 @@ public sealed class ProjectRepository(AppDbContext db) : IProjectRepository
             .Where(p => p.ParentId == parentId && p.OwnerId == owner && p.DeletedAt == null && p.ArchivedAt == null)
             .ExecuteUpdateAsync(setters => setters.SetProperty(p => p.ParentId, (ProjectId?)null), cancellationToken);
 
-    public Task<int> MoveProjectTasksToInboxAsync(ProjectId projectId, UserId owner, CancellationToken cancellationToken) =>
-        // Owner-scoped set-null of tasks.project_id (the move_to_inbox task disposition, FR-014/EC-03). Same
-        // table as TaskRepository (shared AppDbContext); ExecuteUpdate writes the raw nullable Guid.
+    public Task<int> MoveProjectTasksToInboxAsync(ProjectId projectId, CancellationToken cancellationToken) =>
+        // PROJECT-scoped set-null of tasks.project_id (the move_to_inbox task disposition, FR-014/EC-03;
+        // slice 010 D4: member-authored tasks move too — createdBy is untouched, so each task lands in
+        // its AUTHOR's Inbox). Same table as TaskRepository (shared AppDbContext); ExecuteUpdate writes
+        // the raw nullable Guid.
         db.Tasks
-            .Where(t => t.ProjectId == projectId && t.CreatedBy == owner && t.DeletedAt == null)
+            .Where(t => t.ProjectId == projectId && t.DeletedAt == null)
             .ExecuteUpdateAsync(setters => setters.SetProperty(t => t.ProjectId, (ProjectId?)null), cancellationToken);
 
     public async Task<IReadOnlyList<ProjectId>> ListOwnedSharedProjectIdsAsync(UserId owner, CancellationToken cancellationToken) =>
