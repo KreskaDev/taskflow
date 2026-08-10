@@ -31,9 +31,9 @@ No new projects; no EF migration this slice.
 
 **Purpose**: New dependencies and dev tooling (research.md dependency summary)
 
-- [ ] T001 Add runtime deps to apps/web/package.json via `pnpm --dir apps/web add lucide-react @dnd-kit/core @dnd-kit/sortable` (D4, D9)
-- [ ] T002 Add dev deps via `pnpm --dir apps/web add -D @axe-core/playwright knip` (D12, D14 — sequential with T001/T003: all three mutate apps/web/package.json)
-- [ ] T003 Configure knip for the web UI layer in apps/web/knip.json (entry: app routes, tests; ignore generated apps/web/src/lib/api/generated/) and add `"audit:dead": "knip"` script to apps/web/package.json (§J3.7; CI wiring deferred to T065 so the gate lands once it can pass)
+- [X] T001 Add runtime deps to apps/web/package.json via `pnpm --dir apps/web add lucide-react @dnd-kit/core @dnd-kit/sortable` (D4, D9)
+- [X] T002 Add dev deps via `pnpm --dir apps/web add -D @axe-core/playwright knip` (D12, D14 — sequential with T001/T003: all three mutate apps/web/package.json)
+- [X] T003 Configure knip for the web UI layer in apps/web/knip.json (entry: app routes, tests; ignore generated apps/web/src/lib/api/generated/) and add `"audit:dead": "knip"` script to apps/web/package.json (§J3.7; CI wiring deferred to T065 so the gate lands once it can pass)
 
 ---
 
