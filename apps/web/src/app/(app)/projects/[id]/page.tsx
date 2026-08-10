@@ -5,29 +5,38 @@ import { useRouter } from "next/navigation";
 
 import { LabelSelector } from "@/components/labels/LabelSelector";
 import { ProjectSelector } from "@/components/projects/ProjectSelector";
+import { BoardView } from "@/components/tasks/BoardView";
+import { GroupByControl, GroupedTaskList } from "@/components/tasks/GroupedTaskList";
 import { PriorityPicker } from "@/components/tasks/PriorityPicker";
 import { RescheduleInput } from "@/components/tasks/RescheduleInput";
 import { TaskCapture } from "@/components/tasks/TaskCapture";
 import { TaskList } from "@/components/tasks/TaskList";
 import type { TaskRowActions } from "@/components/tasks/TaskRow";
+import { ViewModeSwitch } from "@/components/tasks/ViewModeSwitch";
 import { AssigneePicker } from "@/components/tasks/AssigneePicker";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useDuplicateTask } from "@/hooks/useDuplicateTask";
+import { usePersistedProjectView } from "@/hooks/usePersistedProjectView";
+import { useProjectMembers } from "@/hooks/useProjectMembers";
 import { useProjects } from "@/hooks/useProjects";
 import { useProjectTasks } from "@/hooks/useProjectTasks";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
 import type { TaskResponse } from "@/hooks/useTasks";
+import { buildProjectGroups } from "@/lib/board";
+import styles from "./project.module.css";
 
 const CAPTURE_INPUT_ID = "project-capture";
 
 /**
- * The project-tasks view (rebuilt in slice 019 — T054/T056, S5.1): full row surface
- * (quick actions + complete "⋯" menu incl. Przypisz/Duplikuj), inline quick-add creating
- * IN THIS PROJECT (FR-107), and the task drawer via `?task=` (T052) replacing the old
- * comments modal (TaskDetailPanel — deleted, §J3.7). Viewer-role affordance gaps stay
- * behaviorally unchanged (server-side denial authoritative — INV-017/S5.1).
+ * The project-tasks view (rebuilt in slice 019 — T054/T056; slice 010 adds the two
+ * projections of US-03): a visible „Lista” | „Tablica” mode switch in the header
+ * (per-project last-used mode, default Lista — D8), the groupable List (FR-024, D9:
+ * „Grupuj: Brak | Status | Priorytet”) and the Kanban {@link BoardView} (cancelled hidden —
+ * EC-11; viewer read-only). Full row/card surface via the shared action architecture (D7);
+ * inline quick-add creating IN THIS PROJECT (FR-107); the task drawer via `?task=` (T052).
+ * Skeletons render only on the initial project load — never masking a move (Principle III).
  */
 export default function ProjectView({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -35,6 +44,7 @@ export default function ProjectView({ params }: { params: Promise<{ id: string }
   const { data: projects } = useProjects();
   const project = (projects ?? []).find((p) => p.id === id);
   const { data: tasks, isPending, isError, refetch } = useProjectTasks(id);
+  const { mode, setMode, groupBy, setGroupBy } = usePersistedProjectView(id);
   const {
     renameTask,
     setTaskDone,
@@ -46,6 +56,14 @@ export default function ProjectView({ params }: { params: Promise<{ id: string }
     setTaskAssignees,
   } = useTaskMutations();
   const { duplicateTask } = useDuplicateTask();
+
+  // The card avatars resolve names from the members roster — shared projects only
+  // (a personal-project members read would 404; the roster is lazy behind `enabled`).
+  const isShared = project?.visibility === "shared";
+  const isViewer = project?.role === "viewer";
+  const { data: members } = useProjectMembers(id, mode === "board" && isShared);
+  const assigneeName = (userId: string): string | null =>
+    members?.members.find((m) => m.userId === userId)?.displayName ?? null;
 
   const rows = tasks ?? [];
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -79,6 +97,12 @@ export default function ProjectView({ params }: { params: Promise<{ id: string }
     onDelete: () => deleteTask(task.id),
   });
 
+  /** The card menu's standard set (D7): the List's actions minus the inline rename (row-only). */
+  const cardBaseActions = (task: TaskResponse): TaskRowActions => {
+    const { onEdit: _onEdit, ...rest } = rowActions(task, -1);
+    return rest;
+  };
+
   const commitRename = (title: string) => {
     if (renamingId !== null) renameTask(renamingId, title);
     setRenamingId(null);
@@ -86,9 +110,54 @@ export default function ProjectView({ params }: { params: Promise<{ id: string }
 
   const selectedTask = rows[selectedIndex];
 
+  const addTaskAction = (
+    <Button onClick={() => document.getElementById(CAPTURE_INPUT_ID)?.focus()}>
+      Dodaj zadanie
+    </Button>
+  );
+
+  const groupedList = (
+    <GroupedTaskList
+      groups={buildProjectGroups(rows, groupBy)}
+      selectedIndex={selectedIndex}
+      onSelectedIndexChange={setSelectedIndex}
+      renamingId={renamingId}
+      onCommitRename={commitRename}
+      onCancelRename={() => setRenamingId(null)}
+      onToggleSelected={
+        selectedTask ? () => setTaskDone(selectedTask.id, selectedTask.status !== "done") : undefined
+      }
+      onActivateSelected={
+        selectedTask ? () => router.push(`/projects/${id}?task=${selectedTask.id}`) : undefined
+      }
+      rowActions={rowActions}
+    />
+  );
+
+  const flatList = (
+    <TaskList
+      tasks={rows}
+      selectedIndex={selectedIndex}
+      onSelectedIndexChange={setSelectedIndex}
+      renamingId={renamingId}
+      onCommitRename={commitRename}
+      onCancelRename={() => setRenamingId(null)}
+      onToggleSelected={
+        selectedTask ? () => setTaskDone(selectedTask.id, selectedTask.status !== "done") : undefined
+      }
+      onActivateSelected={
+        selectedTask ? () => router.push(`/projects/${id}?task=${selectedTask.id}`) : undefined
+      }
+      rowActions={rowActions}
+    />
+  );
+
   return (
     <section aria-labelledby="project-heading">
-      <h1 id="project-heading">{project?.name ?? "Projekt"}</h1>
+      <div className={styles.header}>
+        <h1 id="project-heading">{project?.name ?? "Projekt"}</h1>
+        <ViewModeSwitch mode={mode} onChange={setMode} />
+      </div>
 
       <TaskCapture contextProjectId={id} errorId="project-capture-error" inputId={CAPTURE_INPUT_ID} />
 
@@ -101,31 +170,23 @@ export default function ProjectView({ params }: { params: Promise<{ id: string }
         </div>
       ) : isPending ? (
         <Skeleton variant="row" count={4} />
-      ) : rows.length === 0 ? (
-        <EmptyState
-          hint="Ten projekt nie ma jeszcze zadań."
-          action={
-            <Button onClick={() => document.getElementById(CAPTURE_INPUT_ID)?.focus()}>
-              Dodaj zadanie
-            </Button>
-          }
-        />
-      ) : (
-        <TaskList
+      ) : mode === "board" ? (
+        <BoardView
           tasks={rows}
-          selectedIndex={selectedIndex}
-          onSelectedIndexChange={setSelectedIndex}
-          renamingId={renamingId}
-          onCommitRename={commitRename}
-          onCancelRename={() => setRenamingId(null)}
-          onToggleSelected={
-            selectedTask ? () => setTaskDone(selectedTask.id, selectedTask.status !== "done") : undefined
-          }
-          onActivateSelected={
-            selectedTask ? () => router.push(`/projects/${id}?task=${selectedTask.id}`) : undefined
-          }
-          rowActions={rowActions}
+          readOnly={isViewer}
+          baseActions={cardBaseActions}
+          assigneeName={isShared ? assigneeName : undefined}
+          emptyAction={addTaskAction}
         />
+      ) : rows.length === 0 ? (
+        <EmptyState hint="Ten projekt nie ma jeszcze zadań." action={addTaskAction} />
+      ) : (
+        <>
+          <div className={styles.toolbar}>
+            <GroupByControl value={groupBy} onChange={setGroupBy} />
+          </div>
+          {groupBy === "none" ? flatList : groupedList}
+        </>
       )}
 
       <ProjectSelector

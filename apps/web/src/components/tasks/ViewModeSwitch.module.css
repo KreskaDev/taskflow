@@ -1,0 +1,33 @@
+/* ViewModeSwitch (slice 010, T019) — the visible „Lista | Tablica” segmented switch. */
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-bg-secondary);
+}
+
+.option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.option:hover {
+  background: var(--color-bg-hover);
+}
+
+.option[aria-pressed="true"] {
+  color: var(--color-text-primary);
+  background: var(--color-bg-primary);
+}

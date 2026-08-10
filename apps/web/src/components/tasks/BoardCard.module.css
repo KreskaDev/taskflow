@@ -1,0 +1,85 @@
+/* BoardCard (slice 010, T016) — a column option on catalog components, tokens-only. */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-surface);
+  cursor: default;
+}
+
+.card:hover {
+  background: var(--color-bg-hover);
+}
+
+.card.selected {
+  border-color: var(--color-accent);
+}
+
+.card.done .title {
+  color: var(--color-text-tertiary);
+  text-decoration: line-through;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+/* Quick-action zone: revealed on hover AND focus-within (opacity, never display:none —
+   the buttons stay Tab-reachable; FR-046). */
+.actionZone {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.card:hover .actionZone,
+.card:focus-within .actionZone {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .actionZone {
+    transition: none;
+  }
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.due,
+.assigneeCount {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.priority {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heading);
+  color: var(--color-text-secondary);
+}
+
+.avatars {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}

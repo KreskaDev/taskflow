@@ -22,9 +22,10 @@ export function taskOptionId(taskId: string): string {
  * Formats a stored due-date UTC instant for display in the reference zone (R9). The instant
  * is interpreted in Europe/Warsaw by {@link formatInReferenceZone} — a date-only `due_date`
  * (midnight-Warsaw → UTC) recovers the correct calendar day. `dd.MM.yyyy HH:mm` when
- * `dueHasTime`, `dd.MM.yyyy` otherwise.
+ * `dueHasTime`, `dd.MM.yyyy` otherwise. Exported so the Board card's due chip renders
+ * EXACTLY as the List does (slice 010 — no second date-formatting path).
  */
-function formatDueDate(dueDate: string, dueHasTime: boolean | null | undefined): string {
+export function formatDueDate(dueDate: string, dueHasTime: boolean | null | undefined): string {
   const instant = new Date(dueDate);
   return formatInReferenceZone(instant, dueHasTime ? "dd.MM.yyyy HH:mm" : "dd.MM.yyyy");
 }

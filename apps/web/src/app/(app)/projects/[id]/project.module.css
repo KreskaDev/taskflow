@@ -1,0 +1,16 @@
+/* Project view (slice 010, T019) — header with the mode switch + the List toolbar. */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-block: var(--space-2);
+}
