@@ -1,0 +1,19 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "src/app/**/{page,layout,template,not-found,error,global-error,loading,route,default}.tsx",
+    "src/app/**/{page,layout,template,not-found,error,global-error,loading,route,default}.ts",
+    "src/middleware.ts",
+    "src/instrumentation.ts",
+    "src/instrumentation-node.ts",
+    "tests/unit/**/*.{ts,tsx}",
+    "tests/e2e/**/*.ts",
+    "playwright.config.ts",
+    "vitest.config.ts",
+    "next.config.ts",
+    "dev-run.mjs"
+  ],
+  "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
+  "ignore": ["src/lib/api/generated/**"],
+  "ignoreDependencies": ["eslint", "eslint-config-next", "prettier"]
+}
