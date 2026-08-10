@@ -60,24 +60,24 @@ test.describe("US-12 Project Sharing — wired UI", () => {
     await expect(sidebarTree(owner.page).getByText("Team Space", { exact: true })).toBeVisible();
 
     const shared = owner.page.waitForResponse((r) => r.request().method() === "PATCH" && /\/share$/.test(r.url()) && r.ok());
-    await projectMenuAction(owner.page, "Team Space", "Share");
-    await owner.page.getByRole("dialog", { name: "Share project" }).getByRole("button", { name: "Share project" }).click();
+    await projectMenuAction(owner.page, "Team Space", "Udostępnij");
+    await owner.page.getByRole("dialog", { name: "Udostępnij projekt" }).getByRole("button", { name: "Udostępnij projekt" }).click();
     await shared;
 
     // The shared indicator now renders; the menu entry point becomes "Members".
     await expect(owner.page.getByTestId("shared-indicator").first()).toBeVisible();
-    await projectMenuAction(owner.page, "Team Space", "Members");
+    await projectMenuAction(owner.page, "Team Space", "Członkowie");
 
-    const dialog = owner.page.getByRole("dialog", { name: "Members of Team Space" });
+    const dialog = owner.page.getByRole("dialog", { name: "Członkowie: Team Space" });
     await expect(dialog).toBeVisible();
     // The owner sees the manage surface; the owner NEVER sees Leave (last-owner safeguard, R7).
-    await expect(dialog.getByRole("button", { name: "Unshare project" })).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "Leave project" })).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: "Cofnij udostępnianie" })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Opuść projekt" })).toHaveCount(0);
 
     // Invite the member by email at the editor role (the wired form).
     const invited = owner.page.waitForResponse((r) => r.request().method() === "POST" && /\/members$/.test(r.url()) && r.ok());
     await dialog.locator('input[name="invite-email"]').fill(member.email);
-    await dialog.getByRole("button", { name: "Invite" }).click();
+    await dialog.getByRole("button", { name: "Zaproś" }).click();
     await invited;
     await expect(dialog.getByText("Eddie Editor", { exact: true })).toBeVisible();
 
@@ -85,12 +85,12 @@ test.describe("US-12 Project Sharing — wired UI", () => {
     await member.page.goto("/");
     await expect(sidebarTree(member.page).getByText("Team Space", { exact: true })).toBeVisible();
     await expect(member.page.getByTestId("shared-indicator").first()).toBeVisible();
-    await projectMenuAction(member.page, "Team Space", "Members");
-    const memberDialog = member.page.getByRole("dialog", { name: "Members of Team Space" });
+    await projectMenuAction(member.page, "Team Space", "Członkowie");
+    const memberDialog = member.page.getByRole("dialog", { name: "Członkowie: Team Space" });
     await expect(memberDialog).toBeVisible();
-    await expect(memberDialog.getByRole("button", { name: "Leave project" })).toBeVisible();
+    await expect(memberDialog.getByRole("button", { name: "Opuść projekt" })).toBeVisible();
     await expect(memberDialog.locator('input[name="invite-email"]')).toHaveCount(0);
-    await expect(memberDialog.getByRole("button", { name: "Unshare project" })).toHaveCount(0);
+    await expect(memberDialog.getByRole("button", { name: "Cofnij udostępnianie" })).toHaveCount(0);
 
     await owner.context.close();
     await member.context.close();
@@ -113,11 +113,11 @@ test.describe("US-12 Project Sharing — wired UI", () => {
 
     // The owner removes the member through the wired roster.
     await owner.page.goto("/");
-    await projectMenuAction(owner.page, "Shared Plan", "Members");
-    const dialog = owner.page.getByRole("dialog", { name: "Members of Shared Plan" });
+    await projectMenuAction(owner.page, "Shared Plan", "Członkowie");
+    const dialog = owner.page.getByRole("dialog", { name: "Członkowie: Shared Plan" });
     const removed = owner.page.waitForResponse((r) => r.request().method() === "DELETE" && /\/members\//.test(r.url()) && r.ok());
-    await dialog.getByRole("button", { name: "Remove Mia Member" }).click();
-    await owner.page.getByRole("dialog", { name: "Remove member" }).getByRole("button", { name: "Remove member" }).click();
+    await dialog.getByRole("button", { name: "Usuń Mia Member" }).click();
+    await owner.page.getByRole("dialog", { name: "Usuń członka" }).getByRole("button", { name: "Usuń członka" }).click();
     await removed;
 
     // The removed member loses ALL access — the project is gone from their sidebar (R10).
@@ -126,8 +126,8 @@ test.describe("US-12 Project Sharing — wired UI", () => {
 
     // The owner unshares from the still-open members dialog — the project round-trips back to personal.
     const unshared = owner.page.waitForResponse((r) => r.request().method() === "PATCH" && /\/unshare$/.test(r.url()) && r.ok());
-    await dialog.getByRole("button", { name: "Unshare project" }).click();
-    await owner.page.getByRole("dialog", { name: "Unshare project" }).getByRole("button", { name: "Unshare project" }).click();
+    await dialog.getByRole("button", { name: "Cofnij udostępnianie" }).click();
+    await owner.page.getByRole("dialog", { name: "Cofnij udostępnianie" }).getByRole("button", { name: "Cofnij udostępnianie" }).click();
     await unshared;
     // Close the (now-stale) members dialog and confirm the row menu offers "Share" again
     // (the project round-tripped to personal).
@@ -136,10 +136,100 @@ test.describe("US-12 Project Sharing — wired UI", () => {
     await expect(
       owner.page
         .getByRole("menu", { name: "Akcje projektu Shared Plan" })
-        .getByRole("menuitem", { name: "Share", exact: true }),
+        .getByRole("menuitem", { name: "Udostępnij", exact: true }),
     ).toBeVisible();
 
     await owner.context.close();
     await member.context.close();
+  });
+
+  test("a non-owner MEMBER's project menu carries the same management affordances (server denial stays authoritative) [INV-017]", async ({
+    browser,
+  }) => {
+    const owner = await signedInPage(browser, "a3-owner", "Olivia Owner");
+    const member = await signedInPage(browser, "a3-member", "Vera Viewer");
+
+    const project = await owner.api.createProject({ name: "Wspólny Kąt", color: COLOR, icon: ICON });
+    const shared = await owner.api.shareProject(project.id, project.version);
+    await owner.api.inviteMember(project.id, member.email, "viewer", shared.version);
+
+    // Recorded as-is from the pre-redesign app (INV-017): the sidebar menu offers the SAME
+    // management items to every member — role gating is server-side, not affordance-side.
+    await member.page.goto("/");
+    await member.page.getByRole("button", { name: "Akcje projektu Wspólny Kąt" }).click();
+    const menu = member.page.getByRole("menu", { name: "Akcje projektu Wspólny Kąt" });
+    for (const item of ["Członkowie", "Edytuj", "Archiwizuj", "Usuń"]) {
+      await expect(menu.getByRole("menuitem", { name: item, exact: true })).toBeVisible();
+    }
+
+    await owner.context.close();
+    await member.context.close();
+  });
+
+  test("role semantics server-side: a VIEWER's task writes are denied; assignment cleanup follows membership loss [INV-091] [INV-094]", async ({
+    browser,
+  }) => {
+    const owner = await signedInPage(browser, "a4-owner", "Olivia Owner");
+    const viewer = await signedInPage(browser, "a4-viewer", "Vera Viewer");
+
+    const project = await owner.api.createProject({ name: "Strefa Ról", color: COLOR, icon: ICON });
+    const shared = await owner.api.shareProject(project.id, project.version);
+    const invited = await owner.api.inviteMember(project.id, viewer.email, "viewer", shared.version);
+    const task = await owner.api.createTask({ title: "Chronione zadanie", position: "a0" });
+    await owner.api.moveTask(task.id, project.id, task.version);
+
+    // The move bumped the task's version — read the FRESH row before any versioned write.
+    const fresh = await owner.api.request("GET", `/api/projects/${project.id}/tasks`);
+    const freshTask = ((await fresh.json()) as { id: string; version: number }[]).find((t) => t.id === task.id)!;
+
+    // INV-091: the viewer READS the shared task…
+    const read = await viewer.api.request("GET", `/api/projects/${project.id}/tasks`);
+    expect(read.status).toBe(200);
+    // …but a WRITE (correct version — the denial is authorization, not concurrency) is
+    // denied server-side regardless of any affordance (deny-by-default).
+    const denied = await viewer.api.request("PATCH", `/api/tasks/${task.id}/title`, {
+      title: "Viewer nadpisuje",
+      version: freshTask.version,
+    });
+    expect([403, 404]).toContain(denied.status);
+
+    // INV-094: assign the (editor-promoted) member, then remove them — the assignment is
+    // cleaned up server-side.
+    const roster = await owner.api.request("GET", `/api/projects/${project.id}/members`);
+    const rosterBody = (await roster.json()) as { version: number };
+    const promoted = await owner.api.request("PATCH", `/api/projects/${project.id}/members/${invited.userId}`, {
+      role: "editor",
+      version: rosterBody.version,
+    });
+    expect(promoted.status).toBe(200);
+    const assigned = await owner.api.request("PATCH", `/api/tasks/${task.id}/assignees`, {
+      assigneeIds: [invited.userId],
+      version: freshTask.version,
+    });
+    expect(assigned.status).toBe(200);
+
+    const roster2 = await owner.api.request("GET", `/api/projects/${project.id}/members`);
+    const roster2Body = (await roster2.json()) as { version: number };
+    const removed = await owner.api.request(
+      "DELETE",
+      `/api/projects/${project.id}/members/${invited.userId}?version=${roster2Body.version}`,
+    );
+    expect([200, 204]).toContain(removed.status);
+
+    // The cleanup rides the MemberRemoved domain event (async side effect) — poll until
+    // the read model reflects it rather than racing the event handler.
+    await expect
+      .poll(
+        async () => {
+          const after = await owner.api.request("GET", `/api/projects/${project.id}/tasks`);
+          const rows = (await after.json()) as { id: string; assignees: string[] }[];
+          return rows.find((t) => t.id === task.id)?.assignees ?? null;
+        },
+        { timeout: 10_000 },
+      )
+      .toEqual([]);
+
+    await owner.context.close();
+    await viewer.context.close();
   });
 });

@@ -52,9 +52,9 @@ export function MembersDialog({ open, onClose, project }: MembersDialogProps) {
   return (
     <>
       <Dialog open={open} onClose={onClose} titleId={TITLE_ID}>
-        <DialogTitle id={TITLE_ID}>Members of {project.name}</DialogTitle>
+        <DialogTitle id={TITLE_ID}>Członkowie: {project.name}</DialogTitle>
 
-        {isPending ? <p className={dialogStyles.muted}>Loading members…</p> : null}
+        {isPending ? <p className={dialogStyles.muted}>Wczytywanie członków…</p> : null}
         {error ? (
           <p className={dialogStyles.dialogError} role="alert">
             {error.message}
@@ -62,7 +62,7 @@ export function MembersDialog({ open, onClose, project }: MembersDialogProps) {
         ) : null}
 
         {roster ? (
-          <ul className={styles.list} aria-label="Project members">
+          <ul className={styles.list} aria-label="Członkowie projektu">
             {members.map((member) => (
               <li key={member.userId} className={styles.row}>
                 <Avatar userId={member.userId} displayName={member.displayName} size="md" />
@@ -71,19 +71,19 @@ export function MembersDialog({ open, onClose, project }: MembersDialogProps) {
                 {isOwner && !member.isOwner ? (
                   <span className={styles.rowActions}>
                     <select
-                      aria-label={`Role for ${member.displayName}`}
+                      aria-label={`Rola: ${member.displayName}`}
                       value={member.role}
                       onChange={(e) => changeMemberRole(project.id, member.userId, e.target.value as MembershipRole, version)}
                     >
-                      <option value="editor">Editor</option>
-                      <option value="viewer">Viewer</option>
+                      <option value="editor">Edytor</option>
+                      <option value="viewer">Podgląd</option>
                     </select>
                     <Button
                       variant="secondary"
-                      aria-label={`Remove ${member.displayName}`}
+                      aria-label={`Usuń ${member.displayName}`}
                       onClick={() => setRemoving(member)}
                     >
-                      Remove
+                      Usuń
                     </Button>
                   </span>
                 ) : null}
@@ -97,24 +97,24 @@ export function MembersDialog({ open, onClose, project }: MembersDialogProps) {
             <InviteMemberForm projectId={project.id} version={version} />
             <div className={styles.ownerActions}>
               <Button variant="secondary" onClick={() => setTransferring(true)} disabled={nonOwnerMembers.length === 0}>
-                Transfer ownership
+                Przekaż własność
               </Button>
               <Button variant="danger" onClick={() => setUnsharing(true)}>
-                Unshare project
+                Cofnij udostępnianie
               </Button>
             </div>
           </>
         ) : (
           <div className={styles.ownerActions}>
             <Button variant="danger" onClick={() => setLeaving(true)}>
-              Leave project
+              Opuść projekt
             </Button>
           </div>
         )}
 
         <DialogActions>
           <Button variant="secondary" onClick={onClose}>
-            Close
+            Zamknij
           </Button>
         </DialogActions>
       </Dialog>

@@ -27,7 +27,7 @@ async function signedInPage(
 }
 
 async function createTask(page: Page, title: string): Promise<string> {
-  const input = page.getByLabel("Task title");
+  const input = page.getByRole("textbox", { name: "Nowy task" });
   await input.fill(title);
   const settled = page.waitForResponse(
     (r) => r.request().method() === "PUT" && /\/api\/tasks\//.test(r.url()) && r.ok(),
@@ -170,8 +170,13 @@ test.describe("Task drawer (FR-106, S4.2/S4.3)", () => {
     await page.goto("/?task=00000000-0000-7000-8000-000000000000");
     const drawer = page.getByRole("complementary");
     await expect(drawer.getByRole("alert")).toContainText("Nie znaleziono zadania");
-    await drawer.getByRole("button", { name: "Wróć do listy" }).click();
-    await expect(page.getByRole("complementary")).toHaveCount(0);
+    // Click-with-retry: a dev-mode hydration recovery can regenerate the tree right after
+    // load, momentarily detaching the freshly-clicked button's handler — retry the gesture
+    // until the recovery (URL param cleared → drawer unmounts) actually lands.
+    await expect(async () => {
+      await drawer.getByRole("button", { name: "Wróć do listy" }).click({ timeout: 2_000 });
+      await expect(page.getByRole("complementary")).toHaveCount(0, { timeout: 2_000 });
+    }).toPass({ timeout: 15_000 });
 
     await context.close();
   });

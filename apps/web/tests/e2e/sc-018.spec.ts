@@ -31,7 +31,7 @@ test("SC-018: full daily workflow via visible UI only [INV-020] [INV-021]", asyn
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
   await page.getByRole("button", { name: "Nowy task" }).click();
-  const globalInput = page.getByRole("dialog").getByLabel("Task title");
+  const globalInput = page.getByRole("dialog").getByRole("textbox", { name: "Nowy task" });
   await expect(globalInput).toBeFocused();
   const created1 = page.waitForResponse(
     (r) => r.request().method() === "PUT" && /\/api\/tasks\//.test(r.url()) && r.ok(),
@@ -41,7 +41,7 @@ test("SC-018: full daily workflow via visible UI only [INV-020] [INV-021]", asyn
   await created1;
 
   // ── 2. Create via the INLINE quick-add ──────────────────────────────────────────
-  const inline = page.getByLabel("Task title");
+  const inline = page.getByRole("textbox", { name: "Nowy task" });
   const created2 = page.waitForResponse(
     (r) => r.request().method() === "PUT" && /\/api\/tasks\//.test(r.url()) && r.ok(),
   );
@@ -52,7 +52,7 @@ test("SC-018: full daily workflow via visible UI only [INV-020] [INV-021]", asyn
 
   // ── 3. Edit (inline rename via the visible row action) ──────────────────────────
   await page.getByRole("button", { name: "Edytuj „Kupić kawę”" }).click();
-  const rename = page.getByRole("textbox", { name: "Rename task" });
+  const rename = page.getByRole("textbox", { name: "Zmień nazwę zadania" });
   const renamed = page.waitForResponse(
     (r) => r.request().method() === "PATCH" && r.url().includes("/title") && r.ok(),
   );
@@ -103,13 +103,13 @@ test("SC-018: full daily workflow via visible UI only [INV-020] [INV-021]", asyn
   );
 
   // ── 7. Create a SHARED project (sidebar) and move the task into it ──────────────
-  await page.getByRole("button", { name: "New project" }).click();
-  const projectDialog = page.getByRole("dialog", { name: "New project" });
-  await projectDialog.getByRole("textbox", { name: "Project name" }).fill("Wspólny plan");
+  await page.getByRole("button", { name: "Nowy projekt" }).click();
+  const projectDialog = page.getByRole("dialog", { name: "Nowy projekt" });
+  await projectDialog.getByRole("textbox", { name: "Nazwa projektu" }).fill("Wspólny plan");
   const projectCreated = page.waitForResponse(
     (r) => r.request().method() === "PUT" && /\/api\/projects\//.test(r.url()) && r.ok(),
   );
-  await projectDialog.getByRole("button", { name: /Create|Save/ }).click();
+  await projectDialog.getByRole("button", { name: /Utwórz|Zapisz/ }).click();
   await projectCreated;
 
   await page.getByRole("button", { name: "Więcej akcji: Kupić kawę ziarnistą" }).click();
@@ -117,7 +117,7 @@ test("SC-018: full daily workflow via visible UI only [INV-020] [INV-021]", asyn
   const moved = page.waitForResponse(
     (r) => r.request().method() === "PATCH" && r.url().includes("/project") && r.ok(),
   );
-  await page.getByRole("dialog", { name: /Move/ }).getByRole("button", { name: "Wspólny plan" }).click();
+  await page.getByRole("dialog", { name: /Przenieś/ }).getByRole("button", { name: "Wspólny plan" }).click();
   await moved;
   await expect(page.getByRole("option").filter({ hasText: "Kupić kawę ziarnistą" })).toHaveCount(0);
 
@@ -126,25 +126,25 @@ test("SC-018: full daily workflow via visible UI only [INV-020] [INV-021]", asyn
   await page.getByRole("button", { name: "Akcje projektu Wspólny plan" }).click();
   await page
     .getByRole("menu", { name: "Akcje projektu Wspólny plan" })
-    .getByRole("menuitem", { name: "Share", exact: true })
+    .getByRole("menuitem", { name: "Udostępnij", exact: true })
     .click();
   const shared = page.waitForResponse(
     (r) => r.request().method() === "PATCH" && r.url().includes("/share") && r.ok(),
   );
-  await page.getByRole("dialog").getByRole("button", { name: "Share project" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Udostępnij projekt" }).click();
   await shared;
   await page.getByRole("button", { name: "Akcje projektu Wspólny plan" }).click();
   await page
     .getByRole("menu", { name: "Akcje projektu Wspólny plan" })
-    .getByRole("menuitem", { name: "Members", exact: true })
+    .getByRole("menuitem", { name: "Członkowie", exact: true })
     .click();
   const invited = page.waitForResponse(
     (r) => r.request().method() === "POST" && r.url().includes("/members") && r.ok(),
   );
   await page.locator('input[name="invite-email"]').fill("sc018-member@taskflow.test");
-  await page.getByRole("button", { name: "Invite" }).click();
+  await page.getByRole("button", { name: "Zaproś" }).click();
   await invited;
-  await page.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("button", { name: "Zamknij" }).click();
 
   // ── 8. Complete the OTHER task via the row checkbox ─────────────────────────────
   const done = page.waitForResponse(

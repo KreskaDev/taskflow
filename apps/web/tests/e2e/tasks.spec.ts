@@ -42,13 +42,13 @@ function emptyHint(page: Page) {
 }
 
 /**
- * Fills the INLINE quick-add capture ("Task title", FR-107), presses Enter, and waits for the
+ * Fills the INLINE quick-add capture ("Nowy task", FR-107), presses Enter, and waits for the
  * optimistic create's REAL server write (the idempotent PUT) to land. The `waitForResponse`
  * promise is ARMED before Enter so it can never miss a fast-resolving PUT (the matcher's `PUT`
  * method discriminates it from the `GET /api/tasks` refetch).
  */
 async function createTask(page: Page, title: string): Promise<void> {
-  const input = page.getByLabel("Task title");
+  const input = page.getByRole("textbox", { name: "Nowy task" });
   await input.fill(title);
   const settled = page.waitForResponse(
     (r) => r.request().method() === "PUT" && /\/api\/tasks\//.test(r.url()) && r.ok(),
@@ -75,6 +75,52 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
     await context.close();
   });
 
+  test("row anatomy: a labelled listbox of option rows with status, title, priority text, label name, due date; done is distinguished beyond color [INV-031]", async ({
+    browser,
+  }) => {
+    const { page, context } = await signedInPage(browser, "tasks-anatomy");
+    await page.goto("/");
+    await createTask(page, "Anatomia jutro"); // trailing "jutro" → a due date on the row
+
+    const row = page.getByRole("option").first();
+    await expect(page.getByRole("listbox", { name: "Zadania" })).toBeVisible();
+
+    // Priority via the row menu (text badge, FR-044).
+    await page.getByRole("button", { name: "Więcej akcji: Anatomia" }).click();
+    await page.getByRole("menuitem", { name: "Priorytet…" }).click();
+    const prioritized = page.waitForResponse((r) => r.request().method() === "PATCH" && r.url().includes("/priority") && r.ok());
+    await page.getByRole("dialog", { name: "Priorytet" }).getByRole("button", { name: "P2", exact: true }).click();
+    await prioritized;
+
+    // A label via the row menu (the chip carries the NAME text).
+    await page.getByRole("button", { name: "Więcej akcji: Anatomia" }).click();
+    await page.getByRole("menuitem", { name: "Etykiety…" }).click();
+    const labelDialog = page.getByRole("dialog", { name: "Etykiety" });
+    const created = page.waitForResponse((r) => r.request().method() === "PUT" && /\/api\/labels\//.test(r.url()) && r.ok());
+    await labelDialog.getByPlaceholder(/Nowa etykieta/).fill("dom");
+    await labelDialog.getByPlaceholder(/Nowa etykieta/).press("Enter");
+    await created;
+    const applied = page.waitForResponse((r) => r.request().method() === "PATCH" && /\/labels$/.test(r.url()) && r.ok());
+    await labelDialog.getByRole("button", { name: /Zapisz/ }).click();
+    await applied;
+
+    // The full row anatomy (INV-031): status control, title, priority badge text, label
+    // NAME chip, due date — all present on the option.
+    await expect(row.getByRole("checkbox")).toBeVisible();
+    await expect(row).toContainText("Anatomia");
+    await expect(row.getByText("P2")).toBeVisible();
+    await expect(row.getByText("dom")).toBeVisible();
+    await expect(row).toContainText(/\d{2}\.\d{2}\.\d{4}/); // dd.MM.yyyy due date
+
+    // Done is distinguished beyond color alone: the machine-readable data-status flips.
+    const toggled = page.waitForResponse((r) => r.request().method() === "PATCH" && r.url().includes("/status") && r.ok());
+    await row.getByRole("checkbox").click();
+    await toggled;
+    await expect(row).toHaveAttribute("data-status", "done");
+
+    await context.close();
+  });
+
   test("AS-01: the inline capture is ready on the Inbox and 'Nowy task' opens the global capture with the title input focused [INV-020]", async ({
     browser,
   }) => {
@@ -84,7 +130,7 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
 
     // The INLINE quick-add (FR-107) is the always-present Inbox capture surface — visible
     // and focusable without any shortcut.
-    const inline = page.getByLabel("Task title");
+    const inline = page.getByRole("textbox", { name: "Nowy task" });
     await expect(inline).toBeVisible();
     await inline.focus();
     await expect(inline).toBeFocused();
@@ -94,7 +140,7 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
     await page.getByRole("button", { name: "Nowy task" }).click();
     const dialog = page.getByRole("dialog", { name: "Nowy task" });
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole("textbox", { name: "Task title" })).toBeFocused();
+    await expect(dialog.getByRole("textbox", { name: "Nowy task" })).toBeFocused();
 
     await context.close();
   });
@@ -108,7 +154,7 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
 
     // First task. The inline capture clears for the next entry; the optimistic row paints.
     await createTask(page, "First task");
-    await expect(page.getByLabel("Task title")).toHaveValue("");
+    await expect(page.getByRole("textbox", { name: "Nowy task" })).toHaveValue("");
     await expect(page.getByRole("option")).toHaveCount(1);
     await expect(page.getByRole("option").first()).toHaveText(/First task/);
 
@@ -144,7 +190,7 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
     await invoker.click();
     const dialog = page.getByRole("dialog", { name: "Nowy task" });
     await expect(dialog).toBeVisible();
-    await dialog.getByRole("textbox", { name: "Task title" }).fill("Discarded draft");
+    await dialog.getByRole("textbox", { name: "Nowy task" }).fill("Discarded draft");
     await page.keyboard.press("Escape");
 
     // No task created (count unchanged) and focus restored to the invoking button.
@@ -162,7 +208,7 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
     await page.goto("/");
     await expect(emptyHint(page)).toBeVisible();
 
-    const input = page.getByLabel("Task title");
+    const input = page.getByRole("textbox", { name: "Nowy task" });
     await input.click();
     await expect(input).toBeFocused();
 
@@ -251,7 +297,7 @@ test.describe("US1 Natural-Language Dates (AS-02..05 capture-with-date, EC-02, v
     await page.goto("/");
     await expect(emptyHint(page)).toBeVisible();
 
-    const input = page.getByLabel("Task title");
+    const input = page.getByRole("textbox", { name: "Nowy task" });
     await input.click();
     await expect(input).toBeFocused();
     await input.fill("Spotkanie 30.02");
@@ -347,7 +393,7 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
     // Newest-first ⇒ render order top→bottom is Gamma, Beta, Alpha.
     await seedTasks(page, ["Alpha", "Beta", "Gamma"]);
 
-    const listbox = page.getByRole("listbox", { name: "Tasks" });
+    const listbox = page.getByRole("listbox", { name: "Zadania" });
     const options = page.getByRole("option");
 
     // selectedIndex defaults to 0, so the TOP row is already the active option on load.
@@ -385,7 +431,7 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
     // Focus the inline capture input. With the shortcut system removed (FR-111) there are no
     // document-level single-key listeners left: C/E/Space typed into a focused text input land
     // as literal characters — none may be interpreted as a command.
-    const input = page.getByLabel("Task title");
+    const input = page.getByRole("textbox", { name: "Nowy task" });
     await input.click();
     await expect(input).toBeFocused();
 
@@ -411,7 +457,7 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
 
     // Space is a composite-widget key: it toggles the SELECTED row and must be sent to the
     // FOCUSED listbox (container-level handler, not document-level).
-    const listbox = page.getByRole("listbox", { name: "Tasks" });
+    const listbox = page.getByRole("listbox", { name: "Zadania" });
     await listbox.focus();
 
     // Space → done (assert the data-status hook the styling reads).
@@ -451,7 +497,7 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
     // The row's "Edytuj" quick action → inline rename input, autofocused and seeded with the
     // current title (the old `E` shortcut's affordance replacement, FR-108).
     await row.getByRole("button", { name: "Edytuj „Original title”" }).click();
-    const renameInput = page.getByRole("textbox", { name: "Rename task" });
+    const renameInput = page.getByRole("textbox", { name: "Zmień nazwę zadania" });
     await expect(renameInput).toBeFocused();
     await expect(renameInput).toHaveValue("Original title");
 
@@ -472,11 +518,11 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
       .first()
       .getByRole("button", { name: "Edytuj „Renamed title”" })
       .click();
-    const reopened = page.getByRole("textbox", { name: "Rename task" });
+    const reopened = page.getByRole("textbox", { name: "Zmień nazwę zadania" });
     await expect(reopened).toBeFocused();
     await reopened.fill("Discarded edit");
     await page.keyboard.press("Escape");
-    await expect(page.getByRole("textbox", { name: "Rename task" })).toHaveCount(0);
+    await expect(page.getByRole("textbox", { name: "Zmień nazwę zadania" })).toHaveCount(0);
     await expect(page.getByRole("option").first()).toHaveText(/Renamed title/);
 
     await context.close();
@@ -527,7 +573,7 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
 
     // Selection still tracks arrow-nav on the focused listbox (kept from the pre-019 spec —
     // the delete itself is row-scoped via the menu, independent of selection).
-    const listbox = page.getByRole("listbox", { name: "Tasks" });
+    const listbox = page.getByRole("listbox", { name: "Zadania" });
     await listbox.focus();
     await page.keyboard.press("ArrowDown"); // select index 1 (Middle)
     await expect(options.nth(1)).toHaveAttribute("aria-selected", "true");
@@ -622,7 +668,7 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
     const titles = Array.from({ length: 60 }, (_, i) => `Bulk task ${String(i + 1).padStart(2, "0")}`);
     await seedTasks(page, titles);
 
-    const listbox = page.getByRole("listbox", { name: "Tasks" });
+    const listbox = page.getByRole("listbox", { name: "Zadania" });
     await listbox.focus();
 
     // The top row (index 0) is selected. Capture its option id from aria-activedescendant.

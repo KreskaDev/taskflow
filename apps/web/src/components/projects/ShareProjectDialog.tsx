@@ -39,25 +39,25 @@ export function ShareProjectDialog({ open, onClose, project, memberCount = 0 }: 
 
   return (
     <Dialog open={open} onClose={onClose} titleId={TITLE_ID} descriptionId={DESC_ID}>
-      <DialogTitle id={TITLE_ID}>{isShared ? "Unshare project" : "Share project"}</DialogTitle>
+      <DialogTitle id={TITLE_ID}>{isShared ? "Cofnij udostępnianie" : "Udostępnij projekt"}</DialogTitle>
       {isShared ? (
         <p id={DESC_ID}>
-          Unsharing <strong>{project.name}</strong> makes it personal again. {memberCount}{" "}
-          {memberCount === 1 ? "member" : "members"} will lose all access immediately. Its tasks are kept.
+          Cofnięcie udostępniania projektu <strong>{project.name}</strong> czyni go znowu osobistym.{" "}
+          {memberCount === 1 ? `1 członek natychmiast traci` : `${memberCount} członków natychmiast traci`} wszelki dostęp. Zadania projektu zostają.
         </p>
       ) : (
         <p id={DESC_ID}>
-          Sharing <strong>{project.name}</strong> lets you invite members by email at an editor or viewer
-          role. You stay the owner. You can make it personal again at any time.
+          Udostępnienie projektu <strong>{project.name}</strong> pozwala zapraszać członków przez e-mail
+          w roli edytora lub podglądu. Pozostajesz właścicielem i możesz to cofnąć w każdej chwili.
         </p>
       )}
 
       <DialogActions>
         <Button variant="secondary" onClick={onClose}>
-          Cancel
+          Anuluj
         </Button>
         <Button variant={isShared ? "danger" : "primary"} onClick={confirm}>
-          {isShared ? "Unshare project" : "Share project"}
+          {isShared ? "Cofnij udostępnianie" : "Udostępnij projekt"}
         </Button>
       </DialogActions>
     </Dialog>

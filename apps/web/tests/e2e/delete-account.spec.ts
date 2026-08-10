@@ -32,7 +32,7 @@ test.describe("Account deletion roundtrip (FR-049 / SC-017)", () => {
     // Sign in (OAuth) and land in the workspace.
     await setNextIdentity(identity);
     await page.goto("/signin");
-    await page.getByRole("link", { name: /sign in with google/i }).click();
+    await page.getByRole("link", { name: /zaloguj się przez google/i }).click();
     await page.waitForURL("http://localhost:3000/");
 
     const id1 = await getUserIdByGoogleSub(sub);
@@ -40,8 +40,8 @@ test.describe("Account deletion roundtrip (FR-049 / SC-017)", () => {
 
     // Open the delete dialog and confirm.
     await page.goto("/settings");
-    await page.getByRole("button", { name: "Delete account" }).click();
-    await page.getByRole("button", { name: "Permanently delete account" }).click();
+    await page.getByRole("button", { name: "Usuń konto" }).click();
+    await page.getByRole("button", { name: "Trwale usuń konto" }).click();
 
     // Session ends → redirected to sign-in.
     await page.waitForURL("**/signin");
@@ -56,7 +56,7 @@ test.describe("Account deletion roundtrip (FR-049 / SC-017)", () => {
     // Re-sign-in with the SAME Google identity yields a BRAND-NEW empty account.
     await setNextIdentity(identity);
     await page.goto("/signin");
-    await page.getByRole("link", { name: /sign in with google/i }).click();
+    await page.getByRole("link", { name: /zaloguj się przez google/i }).click();
     await page.waitForURL("http://localhost:3000/");
 
     const id2 = await getUserIdByGoogleSub(sub);

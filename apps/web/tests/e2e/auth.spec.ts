@@ -29,7 +29,7 @@ test.describe("US1 seeded-session (AS-02/03/04)", () => {
     const page = await context.newPage();
     await page.goto("/settings");
 
-    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Ustawienia" })).toBeVisible();
     // The identity fields render as a definition list inside the main content (T060).
     await expect(page.getByRole("main")).toContainText("Ada Lovelace");
     await expect(page.getByRole("main")).toContainText(profileEmail);
@@ -53,7 +53,7 @@ test.describe("US1 seeded-session (AS-02/03/04)", () => {
 
     await page.waitForURL("**/signin");
     await expect(page.getByRole("heading", { name: "TaskFlow" })).toBeVisible();
-    await expect(page.getByRole("link", { name: /sign in with google/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /zaloguj się przez google/i })).toBeVisible();
 
     await context.close();
   });
@@ -66,7 +66,7 @@ test.describe("US1 seeded-session (AS-02/03/04)", () => {
     expect(body.errorCode).toBe("unauthenticated");
   });
 
-  test("AS-02: sign-out ends the session and protected views become inaccessible [INV-005]", async ({
+  test("AS-02: sign-out ends the session and protected views become inaccessible; the chrome carries brand + nav + sign-out [INV-005] [INV-010]", async ({
     browser,
   }) => {
     const profile = await ensureUser({
@@ -89,9 +89,17 @@ test.describe("US1 seeded-session (AS-02/03/04)", () => {
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
 
+    // INV-010 — the signed-in chrome: the TaskFlow brand links home, the sidebar nav is a
+    // labelled landmark, and the topbar identity links to Settings (where sign-out lives).
+    await expect(page.getByRole("link", { name: "TaskFlow" })).toHaveAttribute("href", "/");
+    await expect(page.getByRole("navigation", { name: "Projekty" })).toBeVisible();
+    const identity = page.getByRole("link", { name: /Konto: Grace Hopper/ });
+    await expect(identity).toHaveAttribute("href", "/settings");
+
     // The sign-out affordance lives on the Settings screen since the slice-019 shell
     // rebuild (reached via the topbar identity → Settings); still a plain form POST.
-    await page.goto("/settings");
+    await identity.click();
+    await page.waitForURL("**/settings");
     await page.getByRole("button", { name: "Wyloguj" }).click();
     await page.waitForURL("**/signin");
 

@@ -41,13 +41,13 @@ export function ArchiveProjectDialog({ open, onClose, project, childCount }: Arc
 
   return (
     <Dialog open={open} onClose={onClose} titleId={TITLE_ID} descriptionId={DESC_ID}>
-      <DialogTitle id={TITLE_ID}>Archive project</DialogTitle>
+      <DialogTitle id={TITLE_ID}>Archiwizuj projekt</DialogTitle>
       <p id={DESC_ID}>
-        Archiving <strong>{project.name}</strong> hides it and affects {childCount}{" "}
-        {childCount === 1 ? "sub-project" : "sub-projects"}. Choose what happens to them.
+        Archiwizacja projektu <strong>{project.name}</strong> ukrywa go i dotyczy {childCount}{" "}
+        {childCount === 1 ? "podprojektu" : "podprojektów"}. Wybierz, co ma się z nimi stać.
       </p>
 
-      <DialogChoices legend={`Its ${childCount} ${childCount === 1 ? "sub-project" : "sub-projects"}`}>
+      <DialogChoices legend={`Podprojekty (${childCount})`}>
         <label>
           <input
             type="radio"
@@ -56,7 +56,7 @@ export function ArchiveProjectDialog({ open, onClose, project, childCount }: Arc
             checked={childDisposition === "orphan_to_top"}
             onChange={() => setChildDisposition("orphan_to_top")}
           />
-          Promote them to top-level
+          Przenieś na najwyższy poziom
         </label>
         <label>
           <input
@@ -66,15 +66,15 @@ export function ArchiveProjectDialog({ open, onClose, project, childCount }: Arc
             checked={childDisposition === "cascade"}
             onChange={() => setChildDisposition("cascade")}
           />
-          Archive them too
+          Archiwizuj je również
         </label>
       </DialogChoices>
 
       <DialogActions>
         <Button variant="secondary" onClick={onClose}>
-          Cancel
+          Anuluj
         </Button>
-        <Button onClick={confirm}>Archive project</Button>
+        <Button onClick={confirm}>Archiwizuj projekt</Button>
       </DialogActions>
     </Dialog>
   );

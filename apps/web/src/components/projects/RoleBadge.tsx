@@ -8,9 +8,9 @@ import styles from "./RoleBadge.module.css";
  * project icons only); the visible role word is the meaning.
  */
 const ROLE_LABEL: Record<string, string> = {
-  owner: "Owner",
-  editor: "Editor",
-  viewer: "Viewer",
+  owner: "Właściciel",
+  editor: "Edytor",
+  viewer: "Podgląd",
 };
 
 function RoleGlyph({ role }: { role: string }) {

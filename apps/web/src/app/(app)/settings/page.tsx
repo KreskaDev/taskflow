@@ -26,18 +26,18 @@ export default function SettingsPage() {
   return (
     <section aria-labelledby="settings-heading" className={styles.settings}>
       <h1 id="settings-heading" className={styles.heading}>
-        Settings
+        Ustawienia
       </h1>
 
       {deleteFailed ? (
         <p className={styles.error} role="alert">
-          Account deletion failed. Please try again.
+          Usunięcie konta nie powiodło się. Spróbuj ponownie.
         </p>
       ) : null}
 
       {isLoading ? (
         <p className={styles.status} role="status">
-          Loading your profile…
+          Wczytywanie profilu…
         </p>
       ) : data?.authenticated && data.user ? (
         <div className={styles.profile}>
@@ -48,9 +48,9 @@ export default function SettingsPage() {
             size="lg"
           />
           <dl className={styles.fields}>
-            <dt>Name</dt>
+            <dt>Imię i nazwisko</dt>
             <dd>{data.user.displayName}</dd>
-            <dt>Email</dt>
+            <dt>E-mail</dt>
             <dd>{data.user.email}</dd>
           </dl>
           {/* Sign-out (INV-005; re-homed here from the pre-019 header during the shell
@@ -65,7 +65,7 @@ export default function SettingsPage() {
         </div>
       ) : (
         <p className={styles.status} role="status">
-          You are not signed in.
+          Nie jesteś zalogowany(-a).
         </p>
       )}
     </section>

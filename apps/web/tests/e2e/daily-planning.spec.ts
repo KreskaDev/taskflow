@@ -124,6 +124,31 @@ test.describe("US-02 Daily Planning Session (AS-01..AS-08)", () => {
     await context.close();
   });
 
+  test("AS-05 rejection: an unrecognized phrase shows the FR-006 error, keeps the value, writes nothing [INV-056]", async ({ browser }) => {
+    const { page, context, userId } = await signedInPage(browser, "dp-resched-reject");
+    await apiAs(userId).createTask({ title: "Stay put", position: "a0", dueDate: dueToday() });
+
+    await page.goto("/today");
+    await pickRowMenuItem(page, "Stay put", "Termin…");
+    const input = page.getByRole("textbox", { name: /termin/i });
+    await input.fill("blablanic");
+
+    let patched = false;
+    page.on("request", (r) => {
+      if (r.method() === "PATCH" && /\/due-date/.test(r.url())) patched = true;
+    });
+    await page.keyboard.press("Enter");
+
+    // FR-006: visible error, the input RETAINS the typed value, the dialog stays open,
+    // and no reschedule write was sent.
+    await expect(page.getByRole("alert").filter({ hasText: "Nie rozpoznano daty" })).toBeVisible();
+    await expect(input).toHaveValue("blablanic");
+    await expect(page.getByRole("dialog", { name: "Zmień termin" })).toBeVisible();
+    expect(patched).toBe(false);
+
+    await context.close();
+  });
+
   test("AS-06/AS-07: the row's edit action opens the editor (title focused); Ctrl+Enter saves [INV-057]", async ({ browser }) => {
     const { page, context, userId } = await signedInPage(browser, "dp-edit-save");
     await apiAs(userId).createTask({ title: "Edit me", position: "a0", dueDate: dueToday() });

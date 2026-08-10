@@ -28,7 +28,7 @@ test.describe("US1 sign-in via OAuth (AS-01)", () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto("/signin");
-    await page.getByRole("link", { name: /sign in with google/i }).click();
+    await page.getByRole("link", { name: /zaloguj się przez google/i }).click();
 
     // Through the IdP and back to the callback, landing in the workspace (the Inbox view
     // since the slice-019 shell rebuild).
@@ -59,10 +59,10 @@ test.describe("US1 sign-in via OAuth (AS-01)", () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto("/signin");
-    await page.getByRole("link", { name: /sign in with google/i }).click();
+    await page.getByRole("link", { name: /zaloguj się przez google/i }).click();
 
     await page.waitForURL(/\/signin\?error=not_admitted/);
-    await expect(page.getByRole("alert")).toContainText(/not authorized/i);
+    await expect(page.getByRole("alert")).toContainText(/nie ma dostępu/i);
 
     expect(await userExistsByGoogleSub(sub)).toBe(false);
 
@@ -84,10 +84,10 @@ test.describe("US1 sign-in via OAuth (AS-01)", () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto("/signin");
-    await page.getByRole("link", { name: /sign in with google/i }).click();
+    await page.getByRole("link", { name: /zaloguj się przez google/i }).click();
 
     await page.waitForURL(/\/signin\?error=not_admitted/);
-    await expect(page.getByRole("alert")).toContainText(/not authorized/i);
+    await expect(page.getByRole("alert")).toContainText(/nie ma dostępu/i);
 
     // Admission runs BEFORE ensure, so no account is bootstrapped for this subject.
     expect(await userExistsByGoogleSub(sub)).toBe(false);

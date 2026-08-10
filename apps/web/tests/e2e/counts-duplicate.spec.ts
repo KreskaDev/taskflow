@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { ensureUser, insertSession } from "./helpers/seed";
+import { apiAs, ensureUser, insertSession } from "./helpers/seed";
 
 /**
  * New-capability E2E (slice 019, T049): sidebar counts (FR-109/UIT-024), "Duplikuj"
@@ -27,7 +27,7 @@ async function signedInPage(
 }
 
 async function createTask(page: Page, title: string): Promise<void> {
-  const input = page.getByLabel("Task title");
+  const input = page.getByRole("textbox", { name: "Nowy task" });
   await input.fill(title);
   const settled = page.waitForResponse(
     (r) => r.request().method() === "PUT" && /\/api\/tasks\//.test(r.url()) && r.ok(),
@@ -59,6 +59,35 @@ test.describe("Sidebar counts (FR-109)", () => {
     await page.getByRole("checkbox", { name: "Oznacz „Licznikowy” jako zrobione" }).click();
     await toggled;
     await expect(page.getByRole("link", { name: /^Inbox/ })).not.toContainText("1");
+
+    await context.close();
+  });
+});
+
+test.describe("Sidebar entries (FR-109)", () => {
+  test("all primary views + active projects render as clickable entries; a project entry navigates to its view [INV-011]", async ({
+    browser,
+  }) => {
+    const { page, context } = await signedInPage(browser, "sidebar-entries");
+    // Same sub/email as signedInPage minted — ensureUser is idempotent, so this resolves
+    // the SAME user id for API seeding.
+    const profile = await ensureUser({
+      sub: "google-sub-sidebar-entries",
+      email: "sidebar-entries@taskflow.test",
+      name: "Nowe Możliwości",
+    });
+    const project = await apiAs(profile.id).createProject({ name: "Nawigowalny", color: "blue", icon: "folder" });
+
+    await page.goto("/");
+    const nav = page.getByRole("navigation", { name: "Projekty" });
+    // Every primary view is a clickable entry (the pre-redesign gap closed by FR-109).
+    for (const name of ["Inbox", "Dziś", "Nadchodzące", "Przypisane"]) {
+      await expect(nav.getByRole("link", { name })).toBeVisible();
+    }
+    // The caller's ACTIVE project renders as an entry; clicking navigates to its task view.
+    await nav.getByRole("link", { name: /Nawigowalny/ }).click();
+    await page.waitForURL(`**/projects/${project.id}`);
+    await expect(page.getByRole("heading", { name: "Nawigowalny" })).toBeVisible();
 
     await context.close();
   });

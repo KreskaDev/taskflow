@@ -105,7 +105,7 @@ export function TaskCapture({
         id={inputId}
         type="text"
         className={styles.input}
-        aria-label="Task title"
+        aria-label="Nowy task"
         aria-describedby={errorId}
         placeholder="Nowy task… (np. „Raport jutro”)"
         maxLength={500}

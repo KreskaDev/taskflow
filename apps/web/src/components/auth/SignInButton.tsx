@@ -8,7 +8,7 @@ import styles from "./SignInButton.module.css";
 export function SignInButton() {
   return (
     <a className={styles.button} href="/api/auth/signin">
-      Sign in with Google
+      Zaloguj się przez Google
     </a>
   );
 }

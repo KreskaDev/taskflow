@@ -31,18 +31,18 @@ export function LeaveProjectDialog({ open, onClose, projectId, projectName, vers
 
   return (
     <Dialog open={open} onClose={onClose} titleId={TITLE_ID} descriptionId={DESC_ID}>
-      <DialogTitle id={TITLE_ID}>Leave project</DialogTitle>
+      <DialogTitle id={TITLE_ID}>Opuść projekt</DialogTitle>
       <p id={DESC_ID}>
-        Leaving <strong>{projectName}</strong> removes all your access immediately and unassigns you from its
-        tasks. You&apos;d need the owner to invite you again to return.
+        Opuszczenie projektu <strong>{projectName}</strong> natychmiast odbiera Ci wszelki dostęp i cofa Twoje
+        przypisania do jego zadań. Aby wrócić, właściciel musiałby zaprosić Cię ponownie.
       </p>
 
       <DialogActions>
         <Button variant="secondary" onClick={onClose}>
-          Cancel
+          Anuluj
         </Button>
         <Button variant="danger" onClick={confirm}>
-          Leave project
+          Opuść projekt
         </Button>
       </DialogActions>
     </Dialog>
