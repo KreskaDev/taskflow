@@ -110,6 +110,7 @@ html.dark-cool {
   --color-warning: #c9b850;
   --color-selection: rgba(82, 144, 189, 0.3);
   --color-fg-disabled: #8a857c;
+  --color-scrim: rgba(0, 0, 0, 0.5);
 
   color-scheme: dark;
 }
@@ -144,6 +145,7 @@ html.dark-warm {
   --color-warning: #c9b850;
   --color-selection: rgba(201, 126, 135, 0.3);
   --color-fg-disabled: #8a857c;
+  --color-scrim: rgba(0, 0, 0, 0.5);
 
   color-scheme: dark;
 }
@@ -178,6 +180,7 @@ html.light-cool {
   --color-warning: #8f7f36;
   --color-selection: #e5eff6;
   --color-fg-disabled: #807b72;
+  --color-scrim: rgba(0, 0, 0, 0.45);
 
   color-scheme: light;
 }
@@ -212,6 +215,7 @@ html.light-warm {
   --color-warning: #8f7f36;
   --color-selection: #f1e3e5;
   --color-fg-disabled: #807b72;
+  --color-scrim: rgba(0, 0, 0, 0.45);
 
   color-scheme: light;
 }

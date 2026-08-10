@@ -8,6 +8,10 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     include: ["tests/unit/**/*.test.{ts,tsx}"],
+    setupFiles: ["tests/unit/setup.ts"],
+    // CSS Modules resolve to their local class names so component specs can assert
+    // classList membership without hashed scoping ([C] catalog suite, slice 019).
+    css: { modules: { classNameStrategy: "non-scoped" } },
   },
   resolve: {
     alias: {

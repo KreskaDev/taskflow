@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes } from "react";
+import styles from "./Button.module.css";
 
 export type ButtonVariant = "primary" | "secondary" | "danger";
 
@@ -7,11 +8,12 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 /**
- * Accessible button primitive. Defaults `type="button"` (so it never submits a form
- * unexpectedly), inherits the global visible-focus indicator (FR-042), and meets the
- * ≥4.5:1 contrast baseline (FR-044) via the variant classes.
+ * Catalog button (T007). Defaults `type="button"` (never submits a form unexpectedly),
+ * inherits the global visible-focus indicator (FR-042). Primary sits on `accent-strong`
+ * (hover DARKER via `accent-strong-hover` — never `accent-hover`, the design-brief trap);
+ * destructive on `danger-strong`; semantic tokens only (FR-104).
  */
 export function Button({ variant = "primary", className, type, ...rest }: ButtonProps) {
-  const classes = ["tf-button", `tf-button--${variant}`, className].filter(Boolean).join(" ");
+  const classes = [styles.button, styles[variant], className].filter(Boolean).join(" ");
   return <button type={type ?? "button"} className={classes} {...rest} />;
 }

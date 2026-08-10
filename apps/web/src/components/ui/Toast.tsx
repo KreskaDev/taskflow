@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { LiveRegion } from "@/components/ui/LiveRegion";
+import styles from "./Toast.module.css";
 
 type ToastVariant = "info" | "error" | "success";
 
@@ -38,11 +39,14 @@ interface ToastProps {
  * provider owns its own region — never feed two regions, that is the footgun.)
  */
 export function Toast({ message, variant = "info", onDismiss }: ToastProps) {
+  const classes = [styles.toast, variant !== "info" ? styles[variant] : null]
+    .filter(Boolean)
+    .join(" ");
   return (
-    <div className={`tf-toast tf-toast--${variant}`} aria-hidden="true">
+    <div className={classes} aria-hidden="true">
       <span>{message}</span>
       {onDismiss ? (
-        <button type="button" className="tf-toast__dismiss" aria-label="Dismiss notification" onClick={onDismiss}>
+        <button type="button" className={styles.dismiss} aria-label="Zamknij powiadomienie" onClick={onDismiss}>
           {"×"}
         </button>
       ) : null}
@@ -52,8 +56,9 @@ export function Toast({ message, variant = "info", onDismiss }: ToastProps) {
 
 // ── Queue + auto-dismiss + coalescing layer ─────────────────────────────────────
 
-/** How long a toast stays visible before it auto-dismisses (ms). */
-const AUTO_DISMISS_MS = 5000;
+/** Informational auto-dismiss window (ms) — spec tolerance 3–5 s (D11: 4 s). The
+ * undo-capable variant passes `durationMs: null` and persists with explicit close. */
+const AUTO_DISMISS_MS = 4000;
 
 interface ToastOptions {
   variant?: ToastVariant;
@@ -162,7 +167,7 @@ function ToastViewport({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: 
   const announced = latest ? (latest.count > 1 ? `${latest.message} (${latest.count})` : latest.message) : "";
 
   return (
-    <div className="tf-toast-viewport">
+    <div className={styles.viewport}>
       {toasts.map((toast) => (
         <AutoDismiss key={toast.id} toast={toast} onDismiss={onDismiss}>
           <Toast

@@ -1,0 +1,76 @@
+/* Chip (T011) — label + assignee variants, dense 12px, truncation with ellipsis. */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  height: 20px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-elevated);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--color-text-tertiary);
+}
+
+/* Label-color tokens (frozen preset set, slice 006) — decorative tint only; the NAME
+   carries the meaning (FR-044). */
+.dot[data-color="red"],
+.dot[data-color="rose"] {
+  background: var(--color-danger);
+}
+
+.dot[data-color="orange"],
+.dot[data-color="amber"] {
+  background: var(--color-warning);
+}
+
+.dot[data-color="green"],
+.dot[data-color="teal"] {
+  background: var(--color-green);
+}
+
+.dot[data-color="blue"],
+.dot[data-color="indigo"] {
+  background: var(--color-accent);
+}
+
+.dot[data-color="violet"],
+.dot[data-color="pink"] {
+  background: var(--color-accent-hover);
+}
+
+.text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-right: -2px;
+  border-radius: 50%;
+  color: var(--color-text-tertiary);
+  flex: none;
+}
+
+.remove:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-hover);
+}

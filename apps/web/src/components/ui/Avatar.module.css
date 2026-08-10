@@ -1,0 +1,32 @@
+/* Avatar (T017) — photo or initials-in-circle; white initials on the AA-safe tokens. */
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  flex: none;
+  object-fit: cover;
+  color: var(--color-on-accent);
+  font-weight: var(--weight-heading);
+  line-height: 1;
+  user-select: none;
+}
+
+.sm {
+  width: 20px;
+  height: 20px;
+  font-size: 9px;
+}
+
+.md {
+  width: 26px;
+  height: 26px;
+  font-size: 11px;
+}
+
+.lg {
+  width: 32px;
+  height: 32px;
+  font-size: 12px;
+}

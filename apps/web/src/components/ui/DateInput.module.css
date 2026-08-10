@@ -1,0 +1,27 @@
+/* DateInput (T009) — NL date field; error presentation per FR-006. */
+
+.dateInput {
+  width: 100%;
+  height: var(--hit-target);
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-control);
+}
+
+.dateInput::placeholder {
+  color: var(--color-text-secondary);
+}
+
+.invalid {
+  border-color: var(--color-danger);
+}
+
+.error {
+  margin: var(--space-1) 0 0;
+  color: var(--color-danger);
+  font-size: var(--text-xs);
+}
