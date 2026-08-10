@@ -1,0 +1,68 @@
+/* Menu (T012) — elevated popover at token z-layer 60 (menu over drawer, under modal). */
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--hit-target);
+  min-height: var(--hit-target);
+  border-radius: var(--radius-control);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.trigger:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.trigger[aria-expanded="true"] {
+  background: var(--color-bg-active);
+  color: var(--color-text-primary);
+}
+
+.menu {
+  position: fixed;
+  z-index: var(--z-menu);
+  min-width: 180px;
+  padding: var(--space-1);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-surface);
+  box-shadow: 0 8px 24px var(--color-scrim);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 28px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-control);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.item:hover:not([aria-disabled="true"]),
+.item:focus-visible {
+  background: var(--color-bg-hover);
+}
+
+.destructive {
+  color: var(--color-danger);
+}
+
+.destructive:hover:not([aria-disabled="true"]),
+.destructive:focus-visible {
+  color: var(--color-danger-hover);
+}
+
+.item[aria-disabled="true"] {
+  color: var(--color-fg-disabled);
+  cursor: not-allowed;
+}

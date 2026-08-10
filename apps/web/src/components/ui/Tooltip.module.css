@@ -1,0 +1,26 @@
+/* Tooltip (T018) — focus-triggered reveal above the trigger; menu/popover z-layer. */
+
+.trigger {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.tooltip {
+  position: absolute;
+  bottom: calc(100% + var(--space-1));
+  left: 0;
+  z-index: var(--z-menu);
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  font-size: var(--text-xs);
+  line-height: var(--leading-tight);
+  white-space: normal;
+  max-width: 320px;
+  width: max-content;
+  box-shadow: 0 4px 16px var(--color-scrim);
+}

@@ -1,0 +1,80 @@
+/* Checkbox (T010) — 32px padded hit area; outline on fg-disabled (WCAG 1.4.11 trap:
+   border-strong is ~2:1 and MUST NOT be the control boundary). */
+
+.hitArea {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit-target);
+  height: var(--hit-target);
+  flex: none;
+  cursor: pointer;
+  position: relative;
+}
+
+/* The native input stays real (keyboard/AT semantics) but visually defers to .box. */
+.input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.input:disabled {
+  cursor: not-allowed;
+}
+
+.box {
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--color-fg-disabled);
+  border-radius: 4px;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease);
+}
+
+.hitArea:hover .input:not(:disabled) + .box {
+  border-color: var(--color-text-secondary);
+  background: var(--color-bg-hover);
+}
+
+.input:checked + .box {
+  background: var(--color-accent-strong);
+  border-color: var(--color-accent-strong);
+}
+
+.input:checked + .box::after {
+  content: "";
+  width: 9px;
+  height: 5px;
+  border-left: 2px solid var(--color-on-accent);
+  border-bottom: 2px solid var(--color-on-accent);
+  transform: translateY(-1px) rotate(-45deg);
+}
+
+.input:indeterminate + .box {
+  background: var(--color-accent-strong);
+  border-color: var(--color-accent-strong);
+}
+
+.input:indeterminate + .box::after {
+  content: "";
+  width: 8px;
+  height: 0;
+  border-bottom: 2px solid var(--color-on-accent);
+}
+
+.input:focus-visible + .box {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.input:disabled + .box {
+  opacity: 0.5;
+}

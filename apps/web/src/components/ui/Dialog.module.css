@@ -1,0 +1,27 @@
+/* Dialog (T013) — modal at token z-layer 100; scrim 40–60% black + 4px blur
+   (design-brief, like the blog's ::backdrop). */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-scrim);
+  backdrop-filter: blur(4px);
+  padding: var(--space-4);
+  z-index: var(--z-modal);
+}
+
+.dialog {
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-surface);
+  padding: var(--space-5);
+  max-width: 28rem;
+  width: 100%;
+  max-height: calc(100vh - var(--space-8));
+  overflow-y: auto;
+  box-shadow: 0 12px 32px var(--color-scrim);
+}
