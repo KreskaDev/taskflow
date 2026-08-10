@@ -380,6 +380,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tasks/{id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * POST_api_tasks_id_duplicate
+         * @description POST_api_tasks_id_duplicate
+         */
+        post: operations["duplicateTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tasks": {
         parameters: {
             query?: never;
@@ -684,6 +704,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/views/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GET_api_views_counts
+         * @description GET_api_views_counts
+         */
+        get: operations["getViewCounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -710,7 +750,7 @@ export interface components {
              * @description Stable machine-readable error code.
              * @enum {string}
              */
-            errorCode: "validation_failed" | "unauthenticated" | "not_admitted" | "forbidden" | "not_found" | "conflict_lww" | "last_owner" | "internal_error" | "version_conflict";
+            errorCode: "validation_failed" | "unauthenticated" | "not_admitted" | "forbidden" | "not_found" | "conflict_lww" | "last_owner" | "internal_error" | "version_conflict" | "duplicate_id";
             /** @description Field-level validation errors (field path -> messages). */
             errors?: {
                 [key: string]: string[];
@@ -777,6 +817,10 @@ export interface components {
             /** Format: date-time */
             dueDate?: string | null;
             dueHasTime?: boolean | null;
+        };
+        DuplicateTaskRequest: {
+            /** Format: uuid */
+            newTaskId: string;
         };
         EditCommentRequest: {
             body: string;
@@ -845,6 +889,12 @@ export interface components {
         PostCommentRequest: {
             body: string;
             mentionedUserIds?: string[] | null;
+        };
+        ProjectCountResponse: {
+            /** Format: uuid */
+            projectId: string;
+            /** Format: int32 */
+            count: number;
         };
         ProjectResponse: {
             /** Format: uuid */
@@ -986,6 +1036,17 @@ export interface components {
         VersionOnlyRequest: {
             /** Format: int32 */
             version: number;
+        };
+        ViewCountsResponse: {
+            /** Format: int32 */
+            inbox: number;
+            /** Format: int32 */
+            today: number;
+            /** Format: int32 */
+            upcoming: number;
+            /** Format: int32 */
+            assigned: number;
+            projects: components["schemas"]["ProjectCountResponse"][];
         };
     };
     responses: never;
@@ -2377,6 +2438,68 @@ export interface operations {
             };
         };
     };
+    duplicateTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DuplicateTaskRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The caller is a member but lacks the required role for this operation (errorCode = forbidden). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The resource does not exist, is soft-deleted, or the caller is not permitted to observe it (errorCode = not_found). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description A state conflict: a stale version (errorCode = version_conflict) or the last-owner guard (errorCode = last_owner). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     listTasks: {
         parameters: {
             query?: never;
@@ -3237,6 +3360,44 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    getViewCounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ViewCountsResponse"];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

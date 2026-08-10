@@ -40,6 +40,24 @@ public static class TaskEndpoints
         });
     }
 
+    /// <summary>
+    /// Duplicate a task into its own context (slice 019, FR-112): copies the user-editable fields
+    /// (assignees re-validated against CURRENT membership), NOT completion state or comments; lands
+    /// directly after the source. The client-generated <c>newTaskId</c> makes the command idempotent
+    /// (replay → the existing duplicate; a taken id → 409 <c>duplicate_id</c>).
+    /// </summary>
+    [WolverinePost("/api/tasks/{id}/duplicate")]
+    public static Task<TaskResponse> Duplicate(Guid id, DuplicateTaskRequest request, IMessageBus bus)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(bus);
+        return bus.InvokeAsync<TaskResponse>(new DuplicateTask
+        {
+            SourceId = TaskId.From(id),
+            NewTaskId = TaskId.From(request.NewTaskId),
+        });
+    }
+
     /// <summary>Return the current caller's own non-deleted tasks, ordered by position then id (FR-007).</summary>
     [WolverineGet("/api/tasks")]
     public static Task<IReadOnlyList<TaskResponse>> List(IMessageBus bus)

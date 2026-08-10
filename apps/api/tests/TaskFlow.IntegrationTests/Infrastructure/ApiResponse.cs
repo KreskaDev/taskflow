@@ -37,6 +37,12 @@ public sealed record TaskBody(
 /// <summary>The <c>LabelResponse</c> read model (slice 006): id + name + optional preset color. No ownerId.</summary>
 public sealed record LabelBody(Guid Id, string Name, string? Color = null);
 
+/// <summary>The <c>ViewCountsResponse</c> read model (slice 019, FR-109): per-view incomplete counts.</summary>
+public sealed record ProjectCountBody(Guid ProjectId, int Count);
+
+/// <summary>The <c>ViewCountsResponse</c> envelope (slice 019, contracts/view-counts.md).</summary>
+public sealed record CountsBody(int Inbox, int Today, int Upcoming, int Assigned, IReadOnlyList<ProjectCountBody> Projects);
+
 /// <summary>An "Assigned to me" group (slice 008): a shared project and the caller's assigned tasks in it.</summary>
 public sealed record AssignedGroupBody(Guid ProjectId, IReadOnlyList<TaskBody> Tasks);
 
@@ -211,6 +217,13 @@ public static class ApiResponse
         ArgumentNullException.ThrowIfNull(response);
         return (await response.Content.ReadFromJsonAsync<ProblemBody>(Web))
             ?? throw new InvalidOperationException("Expected a ProblemDetails body but the response was empty.");
+    }
+
+    public static async Task<CountsBody> ReadCountsAsync(this HttpResponseMessage response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        return (await response.Content.ReadFromJsonAsync<CountsBody>(Web))
+            ?? throw new InvalidOperationException("Expected a ViewCountsResponse body but the response was empty.");
     }
 
     /// <summary>The media type of the response body (e.g. <c>application/problem+json</c>), independent of charset.</summary>

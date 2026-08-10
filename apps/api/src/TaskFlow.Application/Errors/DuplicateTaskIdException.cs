@@ -8,10 +8,11 @@ namespace TaskFlow.Application.Errors;
 /// <c>ITaskRepository</c> abstraction keeps persistence technology out of handlers).
 /// </summary>
 /// <remarks>
-/// This is NOT a public API error: the <c>CreateTask</c> handler ALWAYS catches it and re-resolves
-/// through its find-then-decide path, so it never reaches <c>ProblemDetailsMiddleware</c> and therefore
-/// has NO HTTP/errorCode mapping. The re-resolve collapses the race to an idempotent replay (own live
-/// row → 200) or to <c>not_found</c> (own tombstone, or a foreign id holding the PK → 404).
+/// The <c>CreateTask</c> handler ALWAYS catches it and re-resolves through its find-then-decide path
+/// (idempotent replay → 200; own tombstone / foreign id → 404), so it never escapes that path. Since
+/// slice 019 it is ALSO the public conflict signal of <c>DuplicateTask</c>: a <c>newTaskId</c> taken by
+/// an unrelated row escapes to <c>ProblemDetailsMiddleware</c> as <c>409 duplicate_id</c>
+/// (contracts/task-duplicate.md).
 /// </remarks>
 public sealed class DuplicateTaskIdException : Exception
 {

@@ -28,7 +28,7 @@ internal sealed class TaskFlowDocumentTransformer : IOpenApiDocumentTransformer
     [
         "validation_failed", "unauthenticated", "not_admitted", "forbidden",
         "not_found", "conflict_lww", "last_owner", "internal_error",
-        "version_conflict",
+        "version_conflict", "duplicate_id",
     ];
 
     public Task TransformAsync(
@@ -76,6 +76,15 @@ internal sealed class TaskFlowDocumentTransformer : IOpenApiDocumentTransformer
         // errorCode — the ErrorCodes enum is UNCHANGED (R8).
         SetOperation(document, "/api/tasks/assigned", OperationType.Get, "getAssignedToMe");
         SetOperation(document, "/api/tasks/{id}/assignees", OperationType.Patch, "setTaskAssignees", 403, 404, 409, 422);
+
+        // Slice-019 UI-operability surface (contracts/view-counts.md, contracts/task-duplicate.md).
+        // getViewCounts is a caller-scoped read (only the deny-by-default 401 — zero data is zeros,
+        // not an error). duplicateTask dispatches by the SOURCE context's create scoping (shared
+        // viewer → 403, non-member / foreign personal → 404) and 409s on a taken newTaskId — the
+        // FIRST USE of the NEW `duplicate_id` errorCode (missing/malformed newTaskId is a 400 at
+        // JSON binding, which carries no ProblemDetails errorCode).
+        SetOperation(document, "/api/views/counts", OperationType.Get, "getViewCounts");
+        SetOperation(document, "/api/tasks/{id}/duplicate", OperationType.Post, "duplicateTask", 403, 404, 409);
 
         // Labels surface (slice 006, contracts/openapi.yaml). listLabels is a caller-scoped read (only the
         // deny-by-default 401). createLabel is an idempotent PUT-upsert (no 409; dup name → 422). update/delete
