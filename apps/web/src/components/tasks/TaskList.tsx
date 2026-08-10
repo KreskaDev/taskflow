@@ -58,9 +58,9 @@ interface TaskListViewProps extends TaskListProps {
  * document-level listeners. Selection stays `aria-activedescendant`-based (the only
  * pattern that survives virtualization × keyboard-nav × screen-reader).
  */
-export function TaskList(props: TaskListProps) {
+export function TaskList({ tasks, ...props }: TaskListProps & { tasks?: TaskResponse[] }) {
   const { data } = useTasks();
-  return <TaskListView {...props} tasks={data ?? []} />;
+  return <TaskListView {...props} tasks={tasks ?? data ?? []} />;
 }
 
 /** Presentational shell, split out so the virtualizer always has a concrete array. */

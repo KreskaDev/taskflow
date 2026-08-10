@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { LabelSelector } from "@/components/labels/LabelSelector";
 import { ProjectSelector } from "@/components/projects/ProjectSelector";
@@ -29,6 +30,7 @@ const CAPTURE_INPUT_ID = "inbox-capture";
  * loading falls through to the list (shared, deduped `['tasks']` query).
  */
 export default function WorkspaceHome() {
+  const router = useRouter();
   const { data, isPending, isError, error, refetch } = useTasks();
   const tasks = useMemo(() => data ?? [], [data]);
   const isEmpty = !isPending && !isError && tasks.length === 0;
@@ -87,6 +89,7 @@ export default function WorkspaceHome() {
     onOpenLabels: () => setLabelingId(task.id),
     onOpenMove: () => setMovingId(task.id),
     onDuplicate: () => duplicateTask(task),
+    onOpenDetails: () => router.push(`/?task=${task.id}`),
     onMoveUp: index > 0 ? () => moveRowUp(index) : undefined,
     onMoveDown: index < tasks.length - 1 ? () => moveRowDown(index) : undefined,
     onDelete: () => deleteTask(task.id),
