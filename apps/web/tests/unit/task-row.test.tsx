@@ -3,7 +3,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { TaskRow } from "@/components/tasks/TaskRow";
+import { buildMenuItems, TaskRow } from "@/components/tasks/TaskRow";
 import type { TaskResponse } from "@/hooks/useTasks";
 
 /**
@@ -113,5 +113,66 @@ describe("TaskRow due-date label [INV-027]", () => {
     );
     const due = screen.getByText(/22\.06\.2026/);
     expect(due.textContent).not.toMatch(/\d{2}:\d{2}/);
+  });
+});
+
+describe("buildMenuItems — the shared „⋯” action architecture gains column moves (slice 010, D7) [INV-145]", () => {
+  const noop = () => {};
+  /** The full pre-010 standard action set, all wired. */
+  function allStandardActions() {
+    return {
+      onToggleDone: noop,
+      onEdit: noop,
+      onOpenPriority: noop,
+      onOpenReschedule: noop,
+      onOpenLabels: noop,
+      onOpenMove: noop,
+      onOpenAssign: noop,
+      onDuplicate: noop,
+      onOpenDetails: noop,
+      onMoveUp: noop,
+      onMoveDown: noop,
+      onDelete: noop,
+    };
+  }
+
+  it("renders „Przenieś w lewo” / „Przenieś w prawo” when both move callbacks are wired", () => {
+    const items = buildMenuItems(makeTask(), { ...allStandardActions(), onMoveLeft: noop, onMoveRight: noop });
+
+    const ids = items.map((i) => i.id);
+    expect(ids).toContain("move-left");
+    expect(ids).toContain("move-right");
+  });
+
+  it("OMITS (never disables) the boundary move — Zrobione has no right item, Backlog no left (AS-05)", () => {
+    // The caller maps presence via adjacentStatus: at a boundary the callback is simply absent.
+    const rightOnly = buildMenuItems(makeTask({ status: "backlog" }), { ...allStandardActions(), onMoveRight: noop });
+    expect(rightOnly.map((i) => i.id)).not.toContain("move-left");
+    expect(rightOnly.map((i) => i.id)).toContain("move-right");
+    expect(rightOnly.every((i) => i.disabled !== true)).toBe(true);
+
+    const leftOnly = buildMenuItems(makeTask({ status: "done" }), { ...allStandardActions(), onMoveLeft: noop });
+    expect(leftOnly.map((i) => i.id)).not.toContain("move-right");
+    expect(leftOnly.map((i) => i.id)).toContain("move-left");
+  });
+
+  it("keeps the FULL standard action set intact alongside the move items (FR-108)", () => {
+    const items = buildMenuItems(makeTask(), { ...allStandardActions(), onMoveLeft: noop, onMoveRight: noop });
+
+    const ids = items.map((i) => i.id);
+    for (const id of [
+      "toggle", "edit", "priority", "due", "labels", "move", "assign",
+      "duplicate", "details", "move-up", "move-down", "delete",
+    ]) {
+      expect(ids).toContain(id);
+    }
+  });
+
+  it("renders no move items when neither callback is wired (viewer read-only board posture)", () => {
+    const items = buildMenuItems(makeTask(), allStandardActions());
+
+    const ids = items.map((i) => i.id);
+    expect(ids).not.toContain("move-left");
+    expect(ids).not.toContain("move-right");
   });
 });

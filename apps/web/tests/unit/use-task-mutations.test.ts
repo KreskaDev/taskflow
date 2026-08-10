@@ -953,3 +953,161 @@ describe("moveTaskToProjectMutationOptions — optimistic cross-cache move recip
     expect(invalidatedKeys).not.toContain(JSON.stringify(["projects"]));
   });
 });
+
+/* ── slice 010 (T014): the toggle recipe GENERALIZED to the widened setTaskStatus over the
+   project list cache (contracts/task-status.md, D6). The Board issues ONE status PATCH; the
+   optimistic paint, rollback, once-only 409 reapply and settle must all cover the
+   `['projects', <id>, 'tasks']` cache the Board renders from — not just the Inbox key. ── */
+
+describe("toggleDoneMutationOptions — widened setTaskStatus over the project list cache (slice 010)", () => {
+  /** Seeds three PROJECT tasks into `['projects', <id>, 'tasks']` (the Board's cache). */
+  function seedProjectTasks(): TaskResponse[] {
+    return seedThree().map((t, i) => ({
+      ...t,
+      projectId: PROJECT_A,
+      status: (["todo", "in_progress", "backlog"] as const)[i]!,
+    }));
+  }
+
+  function primedProjectClient(seed: TaskResponse[]): QueryClient {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(listKeyFor(PROJECT_A), seed);
+    return queryClient;
+  }
+
+  it("mutationFn PATCHes /api/tasks/{id}/status with a widened value (in_progress)", async () => {
+    const seed = seedProjectTasks();
+    const queryClient = primedProjectClient(seed);
+    const variables: ToggleDoneVariables = {
+      id: seed[0]!.id,
+      status: "in_progress",
+      version: seed[0]!.version,
+      projectId: PROJECT_A,
+    };
+    patchSpy.mockResolvedValue({
+      data: makeTask({ ...seed[0]!, status: "in_progress", version: seed[0]!.version + 1 }),
+      error: undefined,
+    });
+
+    const options = toggleDoneMutationOptions(queryClient);
+    await options.mutationFn(variables);
+
+    expect(patchSpy).toHaveBeenCalledTimes(1);
+    const [path, init] = patchSpy.mock.calls[0]!;
+    expect(path).toBe("/api/tasks/{id}/status");
+    expect((init as { body: { status: string; version: number } }).body).toEqual({
+      status: "in_progress",
+      version: seed[0]!.version,
+    });
+  });
+
+  it("onMutate paints the column move optimistically in the PROJECT cache and leaves completedAt null [INV-144]", async () => {
+    const seed = seedProjectTasks();
+    const queryClient = primedProjectClient(seed);
+    const variables: ToggleDoneVariables = {
+      id: seed[0]!.id,
+      status: "in_progress",
+      version: seed[0]!.version,
+      projectId: PROJECT_A,
+    };
+
+    const options = toggleDoneMutationOptions(queryClient);
+    await options.onMutate?.(variables);
+
+    const next = queryClient.getQueryData<TaskResponse[]>(listKeyFor(PROJECT_A));
+    const moved = next?.find((t) => t.id === seed[0]!.id);
+    expect(moved?.status).toBe("in_progress");
+    expect(moved?.completedAt).toBeNull();
+    // Position untouched (D6): a column move changes ONLY status.
+    expect(moved?.position).toBe(seed[0]!.position);
+  });
+
+  it("onMutate entering done stamps completedAt; leaving done clears it (the invariant mirror)", async () => {
+    const seed = seedProjectTasks();
+    // Plain spread (not makeTask, which strips projectId): the row must stay PROJECTED.
+    const doneRow: TaskResponse = { ...seed[1]!, status: "done", completedAt: "2026-08-09T10:00:00.000Z" };
+    const queryClient = primedProjectClient([seed[0]!, doneRow, seed[2]!]);
+
+    const options = toggleDoneMutationOptions(queryClient);
+    await options.onMutate?.({ id: doneRow.id, status: "todo", version: doneRow.version, projectId: PROJECT_A });
+
+    const next = queryClient.getQueryData<TaskResponse[]>(listKeyFor(PROJECT_A));
+    expect(next?.find((t) => t.id === doneRow.id)?.completedAt).toBeNull();
+  });
+
+  it("onError rolls the PROJECT cache back on a non-conflict failure — the card returns to its column [INV-150]", async () => {
+    const seed = seedProjectTasks();
+    const queryClient = primedProjectClient(seed);
+    const variables: ToggleDoneVariables = {
+      id: seed[0]!.id,
+      status: "done",
+      version: seed[0]!.version,
+      projectId: PROJECT_A,
+    };
+
+    const options = toggleDoneMutationOptions(queryClient);
+    const context = (await options.onMutate?.(variables)) as ToggleDoneContext;
+    // Sanity: the optimistic move painted.
+    expect(
+      queryClient.getQueryData<TaskResponse[]>(listKeyFor(PROJECT_A))?.find((t) => t.id === seed[0]!.id)?.status,
+    ).toBe("done");
+
+    await options.onError?.(networkError(), variables, context);
+
+    expect(queryClient.getQueryData<TaskResponse[]>(listKeyFor(PROJECT_A))).toEqual(seed);
+    expect(patchSpy).not.toHaveBeenCalled();
+  });
+
+  it("onError on 409 refetches the PROJECT list and re-issues ONCE with the fresh version", async () => {
+    const seed = seedProjectTasks();
+    const queryClient = primedProjectClient(seed);
+    const variables: ToggleDoneVariables = {
+      id: seed[0]!.id,
+      status: "done",
+      version: seed[0]!.version,
+      projectId: PROJECT_A,
+    };
+
+    // Server truth after refetch: still not done, version moved to 42 — the intent is unmet.
+    vi.spyOn(queryClient, "refetchQueries").mockImplementation(async () => {
+      queryClient.setQueryData<TaskResponse[]>(
+        listKeyFor(PROJECT_A),
+        seed.map((t) => (t.id === seed[0]!.id ? makeTask({ ...t, status: "todo", version: 42 }) : t)),
+      );
+    });
+    patchSpy.mockResolvedValue({ data: makeTask({ ...seed[0]!, status: "done", version: 43 }), error: undefined });
+
+    const options = toggleDoneMutationOptions(queryClient);
+    const context = (await options.onMutate?.(variables)) as ToggleDoneContext;
+    await options.onError?.(versionConflict(), variables, context);
+
+    expect(patchSpy).toHaveBeenCalledTimes(1);
+    const [path, init] = patchSpy.mock.calls[0]!;
+    expect(path).toBe("/api/tasks/{id}/status");
+    expect((init as { body: { status: string; version: number } }).body).toEqual({ status: "done", version: 42 });
+  });
+
+  it("onSettled invalidates the PROJECT list key and the view counts", async () => {
+    const seed = seedProjectTasks();
+    const queryClient = primedProjectClient(seed);
+    const variables: ToggleDoneVariables = {
+      id: seed[0]!.id,
+      status: "in_progress",
+      version: seed[0]!.version,
+      projectId: PROJECT_A,
+    };
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const options = toggleDoneMutationOptions(queryClient);
+    const context = (await options.onMutate?.(variables)) as ToggleDoneContext;
+    await options.onSettled?.(
+      makeTask({ ...seed[0]!, status: "in_progress", version: seed[0]!.version + 1 }),
+      null,
+      variables,
+      context,
+    );
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: listKeyFor(PROJECT_A) });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["views", "counts"] });
+  });
+});

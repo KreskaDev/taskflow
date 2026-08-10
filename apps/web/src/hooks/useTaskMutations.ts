@@ -29,6 +29,10 @@ interface ViewCachesSnapshot {
   previousUpcoming: UpcomingResponse | undefined;
   /** The "Assigned to me" cache (slice 008) — captured only by the set-assignees recipe that paints it. */
   previousAssigned?: AssignedResponse | undefined;
+  /** A project task-list cache (slice 010) — captured by the status recipe when the row is projected, so a failed Board column move rolls the card back to its source column (INV-150). */
+  previousProjectTasks?: TaskResponse[] | undefined;
+  /** The key {@link previousProjectTasks} was captured under (`['projects', <id>, 'tasks']`). */
+  projectTasksKey?: readonly unknown[];
 }
 
 /** Snapshots the Inbox + Today + Upcoming caches (for rollback). */
@@ -103,6 +107,9 @@ function rollbackViewCaches(queryClient: QueryClient, snapshot: ViewCachesSnapsh
   queryClient.setQueryData<UpcomingResponse | undefined>(UPCOMING_QUERY_KEY, snapshot.previousUpcoming);
   if (snapshot.previousAssigned !== undefined) {
     queryClient.setQueryData<AssignedResponse | undefined>(ASSIGNED_QUERY_KEY, snapshot.previousAssigned);
+  }
+  if (snapshot.projectTasksKey !== undefined) {
+    queryClient.setQueryData<TaskResponse[] | undefined>(snapshot.projectTasksKey, snapshot.previousProjectTasks);
   }
 }
 
@@ -411,10 +418,19 @@ export function renameTaskMutationOptions(queryClient: QueryClient): RenameTaskO
 
 /* ──────────────────────────── TOGGLE (PATCH /status) ──────────────────────────── */
 
+/** The five FR-003 wire statuses (slice 010, D3) — the widened desired-state write. */
+export type TaskStatusValue = "backlog" | "todo" | "in_progress" | "done" | "cancelled";
+
 export interface ToggleDoneVariables {
   id: string;
   status: string;
   version: number;
+  /**
+   * The row's CURRENT project (slice 010) — `null`/absent for an Inbox task. Lets the recipe
+   * snapshot/rollback/reapply over the `['projects', <id>, 'tasks']` cache the Board renders
+   * from; the wrapper stamps it from the resolved row, never the caller.
+   */
+  projectId?: string | null;
 }
 
 interface ToggleDoneOptions {
@@ -441,10 +457,14 @@ function statusRequest(id: string, status: string, version: number) {
 }
 
 /**
- * Optimistic TOGGLE (setDone) recipe (T057; FR-097, research R10). Flips the target row's
- * status in place. On a `version_conflict` the recipe refetches and, if the server still
- * differs from the desired status, re-issues ONCE against the FRESH version; if the server
- * already reflects the desired state it NO-OPs (idempotent). Non-conflict → plain rollback.
+ * Optimistic STATUS recipe (T057; FR-097, research R10 — widened by slice 010 to the full
+ * FR-003 enum and the Board's project cache). Flips the target row's status in place across
+ * every cache it lives in, preserving the `completedAt`-iff-done invariant mirror. On a
+ * `version_conflict` the recipe refetches (the PROJECT list for a projected row, the Inbox
+ * otherwise) and, if the server still differs from the desired status, re-issues ONCE against
+ * the FRESH version; if the server already reflects the desired state it NO-OPs (idempotent).
+ * Non-conflict → plain rollback — a failed Board column move returns the card to its source
+ * column and surfaces the FR-049 toast + FR-050 structured log through the global announcer.
  */
 export function toggleDoneMutationOptions(queryClient: QueryClient): ToggleDoneOptions {
   return {
@@ -458,12 +478,20 @@ export function toggleDoneMutationOptions(queryClient: QueryClient): ToggleDoneO
     },
 
     onMutate: async (variables: ToggleDoneVariables): Promise<ToggleDoneContext> => {
-      // slice 005 (R7): toggle-done recomputes the Today/Upcoming caches too — a completed task leaves
-      // BOTH triage views — alongside the slice-002 Inbox patch. Snapshot all three for rollback.
+      // slice 005 (R7): the status write recomputes the Today/Upcoming caches too — a completed task
+      // leaves BOTH triage views — alongside the slice-002 Inbox patch. Snapshot all three for rollback;
+      // a projected row (slice 010) additionally snapshots its project list cache (the Board's source).
       await queryClient.cancelQueries({ queryKey: TASKS_QUERY_KEY });
       await queryClient.cancelQueries({ queryKey: TODAY_QUERY_KEY });
       await queryClient.cancelQueries({ queryKey: UPCOMING_QUERY_KEY });
       const snapshot = snapshotViewCaches(queryClient);
+
+      if (variables.projectId != null) {
+        const projectKey = projectTasksQueryKey(variables.projectId);
+        await queryClient.cancelQueries({ queryKey: projectKey });
+        snapshot.projectTasksKey = projectKey;
+        snapshot.previousProjectTasks = queryClient.getQueryData<TaskResponse[]>(projectKey);
+      }
 
       const row = findTaskInViewCaches(queryClient, variables.id);
       if (row) {
@@ -487,17 +515,26 @@ export function toggleDoneMutationOptions(queryClient: QueryClient): ToggleDoneO
         if (context) rollbackViewCaches(queryClient, context);
         return;
       }
-      const fresh = await refetchFreshRow(queryClient, variables.id);
-      if (!fresh) return; // row gone → drop the toggle.
+      // Once-only reapply against server truth. A projected row lives in its PROJECT list cache
+      // (slice 010 — the Board's key), not the Inbox `['tasks']` key, so refetch the right one.
+      let fresh: TaskResponse | undefined;
+      if (variables.projectId != null) {
+        const projectKey = projectTasksQueryKey(variables.projectId);
+        await queryClient.refetchQueries({ queryKey: projectKey });
+        fresh = queryClient.getQueryData<TaskResponse[]>(projectKey)?.find((t) => t.id === variables.id);
+      } else {
+        fresh = await refetchFreshRow(queryClient, variables.id);
+      }
+      if (!fresh) return; // row gone → drop the write.
       if (fresh.status === variables.status) return; // already in the desired state → idempotent no-op.
       await statusRequest(variables.id, variables.status, fresh.version);
     },
 
-    onSettled: async (data): Promise<void> => {
+    onSettled: async (data, _error, variables): Promise<void> => {
       // On success, write the server's returned row (with its FRESH bumped `version`) back into the
-      // caches synchronously, so a rapid SECOND toggle on the same row reads the current version instead
-      // of the stale optimistic one (research R10; fixes sequential same-row toggles). Then reconcile
-      // all three triage caches with server truth.
+      // caches synchronously, so a rapid SECOND status write on the same row reads the current version
+      // instead of the stale optimistic one (research R10; fixes sequential same-row writes). Then
+      // reconcile the triage caches — and the project list cache the Board renders from — with server truth.
       if (data) {
         queryClient.setQueryData<TaskResponse[]>(TASKS_QUERY_KEY, (old) =>
           (old ?? []).map((t) => (t.id === data.id ? data : t)),
@@ -505,6 +542,9 @@ export function toggleDoneMutationOptions(queryClient: QueryClient): ToggleDoneO
         applyTaskToViewCaches(queryClient, data, new Date());
       }
       await settleViewCaches(queryClient);
+      if (variables.projectId != null) {
+        await queryClient.invalidateQueries({ queryKey: projectTasksQueryKey(variables.projectId) });
+      }
     },
   };
 }
@@ -1218,11 +1258,21 @@ export function useTaskMutations() {
     renameMutation.mutate({ id, title: parsedTitle, version: row.version });
   };
 
-  const setTaskDone = (id: string, done: boolean): void => {
-    // Find the row across the Inbox + Today + Upcoming caches — toggle-done is exercised from all three.
+  /**
+   * Sets a task to a DESIRED status over the full FR-003 enum (slice 010, D1/D6 — the Board's
+   * ONE column-move write; `position` is never touched). Resolves the row across every listing
+   * cache (Inbox, Today/Upcoming, Assigned, project lists) and stamps its current `projectId`
+   * so the recipe covers the project cache the Board renders from.
+   */
+  const setTaskStatus = (id: string, status: TaskStatusValue): void => {
     const row = findTaskInViewCaches(queryClient, id);
     if (!row) return;
-    toggleMutation.mutate({ id, status: done ? "done" : "backlog", version: row.version });
+    toggleMutation.mutate({ id, status, version: row.version, projectId: row.projectId ?? null });
+  };
+
+  const setTaskDone = (id: string, done: boolean): void => {
+    // The pre-010 toggle surface (checkbox/Space) — a thin alias of the widened desired-state write.
+    setTaskStatus(id, done ? "done" : "backlog");
   };
 
   /** Sets (or clears) the selected task's priority — the `1`-`4` keys (slice 005, AS-04). */
@@ -1323,6 +1373,7 @@ export function useTaskMutations() {
     createTask,
     renameTask,
     setTaskDone,
+    setTaskStatus,
     reorderTask,
     deleteTask,
     moveTaskToProject,

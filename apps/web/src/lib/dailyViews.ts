@@ -37,8 +37,8 @@ export function isInUpcoming(task: TaskResponse, now: Date): boolean {
   return due >= startOfReferenceTomorrowUtc(now) && due < startOfReferenceDayPlusUtc(now, 8);
 }
 
-/** Priority sort rank; null (unprioritized) ranks LAST (R2/R5). */
-function priorityRank(priority: TaskResponse["priority"]): number {
+/** Priority sort rank; null (unprioritized) ranks LAST (R2/R5). Exported for the slice-010 priority grouping. */
+export function priorityRank(priority: TaskResponse["priority"]): number {
   switch (priority) {
     case "P0":
       return 0;
