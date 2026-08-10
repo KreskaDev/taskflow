@@ -172,6 +172,18 @@ export default function WorkspaceHome() {
             selectedTask ? () => setTaskDone(selectedTask.id, selectedTask.status !== "done") : undefined
           }
           rowActions={rowActions}
+          // Pointer drag-drop (T043): the dragged row lands at the target index; the
+          // fractional rank is recomputed from the FRESH neighbours inside reorderTask.
+          onReorder={(from, to) => {
+            const task = tasks[from];
+            if (!task || from === to) return;
+            if (to > from) {
+              reorderTask(task.id, tasks[to]?.id ?? null, tasks[to + 1]?.id ?? null);
+            } else {
+              reorderTask(task.id, tasks[to - 1]?.id ?? null, tasks[to]?.id ?? null);
+            }
+            setSelectedIndex(to);
+          }}
         />
       )}
     </section>
