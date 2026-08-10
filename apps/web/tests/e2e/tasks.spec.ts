@@ -3,10 +3,12 @@ import { ensureUser, insertSession } from "./helpers/seed";
 
 /**
  * US1 Daily Task Capture E2E (T041; US-01.AS-01/06/07, AS-09 precursor, EC-01). The real
- * end-to-end MVP proof: a fresh authenticated user drives the `C` capture surface through the
- * REAL BFF→proxy→API path against a migrated Postgres + .NET API (booted by global-setup) — no
- * API mocking. Auth is a seeded session (mirroring auth.spec.ts), so each test gets a pristine,
- * isolated account and never reinvents the OAuth dance.
+ * end-to-end MVP proof: a fresh authenticated user drives the INLINE quick-add capture
+ * (slice 019 removed the single-key shortcut system — FR-111; the old `C` dialog is gone,
+ * FR-107 replaced it with an always-present input at the top of the list) through the REAL
+ * BFF→proxy→API path against a migrated Postgres + .NET API (booted by global-setup) — no
+ * API mocking. Auth is a seeded session (mirroring auth.spec.ts), so each test gets a
+ * pristine, isolated account and never reinvents the OAuth dance.
  *
  * Each test mints its OWN Google sub + email: `ensureUser` reaches the real API which enforces
  * UNIQUE(email), and the Postgres container is shared for the whole run, so distinct identities
@@ -34,19 +36,24 @@ async function signedInPage(
   return { page, context };
 }
 
+/** The confirmed-empty Inbox hint (EmptyState) — the "query resolved with zero rows" sync point. */
+function emptyHint(page: Page) {
+  return page.getByText("Twój Inbox jest pusty.");
+}
+
 /**
- * Opens capture (`C`), types a title, presses Enter, and waits for the optimistic create's REAL
- * server write (the idempotent PUT) to land. The `waitForResponse` promise is ARMED before Enter
- * so it can never miss a fast-resolving PUT (the matcher's `PUT` method discriminates it from the
- * `GET /api/tasks` refetch).
+ * Fills the INLINE quick-add capture ("Task title", FR-107), presses Enter, and waits for the
+ * optimistic create's REAL server write (the idempotent PUT) to land. The `waitForResponse`
+ * promise is ARMED before Enter so it can never miss a fast-resolving PUT (the matcher's `PUT`
+ * method discriminates it from the `GET /api/tasks` refetch).
  */
 async function createTask(page: Page, title: string): Promise<void> {
-  await page.keyboard.press("c");
-  await page.getByRole("textbox", { name: "Task title" }).fill(title);
+  const input = page.getByLabel("Task title");
+  await input.fill(title);
   const settled = page.waitForResponse(
     (r) => r.request().method() === "PUT" && /\/api\/tasks\//.test(r.url()) && r.ok(),
   );
-  await page.keyboard.press("Enter");
+  await input.press("Enter");
   await settled;
 }
 
@@ -58,30 +65,36 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
     await page.goto("/");
 
     // The empty-Inbox hint asserts the query RESOLVED with zero rows (page.tsx swaps the
-    // listbox out for this <p> only once `isEmpty` is true). Asserting it first waits out the
-    // transient loading state where the listbox flashes with 0 options.
-    const hint = page.locator("p.tf-workspace__empty");
-    await expect(hint).toBeVisible();
-    await expect(hint).toContainText(/press/i);
-    await expect(hint.locator("kbd")).toHaveText("C"); // the <kbd>C</kbd> press hint
+    // listbox out for the EmptyState only once `isEmpty` is true). Asserting it first waits
+    // out the transient loading state where the listbox flashes with 0 options. The empty
+    // state carries a hint + a real action (FR-110) — no shortcut copy.
+    await expect(emptyHint(page)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Dodaj pierwszy task" })).toBeVisible();
     await expect(page.getByRole("option")).toHaveCount(0);
 
     await context.close();
   });
 
-  test("AS-01: pressing C opens the capture dialog with the title input focused [INV-020]", async ({
+  test("AS-01: the inline capture is ready on the Inbox and 'Nowy task' opens the global capture with the title input focused [INV-020]", async ({
     browser,
   }) => {
     const { page, context } = await signedInPage(browser, "tasks-focus");
     await page.goto("/");
-    await expect(page.getByText(/your inbox is empty/i)).toBeVisible();
+    await expect(emptyHint(page)).toBeVisible();
 
-    await page.keyboard.press("c");
+    // The INLINE quick-add (FR-107) is the always-present Inbox capture surface — visible
+    // and focusable without any shortcut.
+    const inline = page.getByLabel("Task title");
+    await expect(inline).toBeVisible();
+    await inline.focus();
+    await expect(inline).toBeFocused();
 
-    const dialog = page.getByRole("dialog", { name: "Create task" });
-    await expect(dialog).toBeVisible();
+    // The topbar's global "Nowy task" opens the modal capture host with its own title input.
     // SC-003 / AS-01: the single title input receives initial focus synchronously.
-    await expect(page.getByRole("textbox", { name: "Task title" })).toBeFocused();
+    await page.getByRole("button", { name: "Nowy task" }).click();
+    const dialog = page.getByRole("dialog", { name: "Nowy task" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("textbox", { name: "Task title" })).toBeFocused();
 
     await context.close();
   });
@@ -91,11 +104,11 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
   }) => {
     const { page, context } = await signedInPage(browser, "tasks-create");
     await page.goto("/");
-    await expect(page.getByText(/your inbox is empty/i)).toBeVisible();
+    await expect(emptyHint(page)).toBeVisible();
 
-    // First task. Dialog closes; the optimistic row paints in the listbox.
+    // First task. The inline capture clears for the next entry; the optimistic row paints.
     await createTask(page, "First task");
-    await expect(page.getByRole("dialog", { name: "Create task" })).toBeHidden();
+    await expect(page.getByLabel("Task title")).toHaveValue("");
     await expect(page.getByRole("option")).toHaveCount(1);
     await expect(page.getByRole("option").first()).toHaveText(/First task/);
 
@@ -114,51 +127,50 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
     await context.close();
   });
 
-  test("AS-07: Esc cancels — no task is created and focus returns to the invoker [INV-022]", async ({
+  test("AS-07: Esc cancels the global capture — no task is created and focus returns to the invoker [INV-022]", async ({
     browser,
   }) => {
     const { page, context } = await signedInPage(browser, "tasks-cancel");
     await page.goto("/");
-    await expect(page.getByText(/your inbox is empty/i)).toBeVisible();
+    await expect(emptyHint(page)).toBeVisible();
 
-    // Establish a deterministic invoker: create one task so the listbox exists, then focus it.
-    // Pressing `c` on the listbox (a div — not input/textarea/contenteditable) DOES open capture.
+    // One committed task so the count-unchanged assertion is meaningful.
     await createTask(page, "Keeper");
     await expect(page.getByRole("option")).toHaveCount(1);
 
-    const listbox = page.getByRole("listbox", { name: "Tasks" });
-    await listbox.focus();
-    await expect(listbox).toBeFocused();
-
-    await page.keyboard.press("c");
-    await expect(page.getByRole("dialog", { name: "Create task" })).toBeVisible();
-    await page.getByRole("textbox", { name: "Task title" }).fill("Discarded draft");
+    // The topbar "Nowy task" button is the deterministic invoker (the Dialog focus contract's
+    // return target). Esc inside the capture input cancels without creating (FR-030).
+    const invoker = page.getByRole("button", { name: "Nowy task" });
+    await invoker.click();
+    const dialog = page.getByRole("dialog", { name: "Nowy task" });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("textbox", { name: "Task title" }).fill("Discarded draft");
     await page.keyboard.press("Escape");
 
-    // No task created (count unchanged) and focus restored to the invoking listbox.
-    await expect(page.getByRole("dialog", { name: "Create task" })).toBeHidden();
+    // No task created (count unchanged) and focus restored to the invoking button.
+    await expect(page.getByRole("dialog", { name: "Nowy task" })).toBeHidden();
     await expect(page.getByRole("option")).toHaveCount(1);
-    await expect(listbox).toBeFocused();
+    await expect(invoker).toBeFocused();
 
     await context.close();
   });
 
-  test("AS-09 precursor: typing C inside the capture input inserts the character (no nested capture) [INV-023]", async ({
+  test("AS-09 precursor: typing C inside the capture input inserts the character (no capture hijack) [INV-023]", async ({
     browser,
   }) => {
     const { page, context } = await signedInPage(browser, "tasks-suppress");
     await page.goto("/");
-    await expect(page.getByText(/your inbox is empty/i)).toBeVisible();
+    await expect(emptyHint(page)).toBeVisible();
 
-    await page.keyboard.press("c");
-    const input = page.getByRole("textbox", { name: "Task title" });
+    const input = page.getByLabel("Task title");
+    await input.click();
     await expect(input).toBeFocused();
 
-    // The capture surface's document-level `C` listener must NOT hijack a `C` typed into the
-    // focused input (FR-031 / AS-09 precursor): the char lands in the field, no nested dialog.
+    // With the shortcut system removed (FR-111), a typed `C` is only ever a character: it
+    // lands in the field and no dialog of any kind spawns.
     await page.keyboard.type("Cabbage");
     await expect(input).toHaveValue("Cabbage");
-    await expect(page.getByRole("dialog", { name: "Create task" })).toHaveCount(1);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
 
     await context.close();
   });
@@ -166,27 +178,33 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
 
 /**
  * US1 Natural-Language Dates capture E2E (slice 003, T019; US-01.AS-02..AS-05 + EC-02 + the
- * "version number is not a date" guard). Drives the SAME `C` capture surface as the slice-002
- * specs through the REAL BFF→proxy→API write path on a seeded session — the slice-003 delta is
+ * "version number is not a date" guard). Drives the SAME inline quick-add capture as the specs
+ * above through the REAL BFF→proxy→API write path on a seeded session — the slice-003 delta is
  * purely client-side parsing (`lib/dates.ts`) feeding the create payload, so these prove the
  * end-to-end behaviour: a trailing Polish date phrase is stripped from the title and paints a
  * due-date label on the row; an impossible date attempt ("30.02") creates nothing and announces
  * "nie rozpoznano"; a non-date trailing token ("2.0") is left in the title with no error.
  *
  * CLOCK NOTE: the parser runs against the REAL system clock (no `now` injection on the live
- * `C`→Enter path — only the Vitest unit suite injects `now`). So these assertions are robust to
+ * Enter path — only the Vitest unit suite injects `now`). So these assertions are robust to
  * wall-clock time: they assert the TITLE is correctly stripped and that a due-date label is
  * VISIBLE for the resolved cases, but never assert an exact instant/time-of-day (the unit tests
- * own exact instants). The title node is asserted SPECIFICALLY (`.tf-task-row__title`) rather
- * than the whole row, because the row also contains the date label — a whole-row substring match
- * would wrongly pass even if "po 17" leaked into the title.
+ * own exact instants). The title is asserted via the row's title BUTTON matched by its EXACT
+ * accessible name rather than the whole row, because the row also contains the date label — a
+ * whole-row substring match would wrongly pass even if "po 17" leaked into the title.
  */
 test.describe("US1 Natural-Language Dates (AS-02..05 capture-with-date, EC-02, version guard)", () => {
-  /** The visible title text of the top (newest-first) row — the strip-correctness probe. */
-  const topTitle = (page: Page) =>
-    page.getByRole("option").first().locator(".tf-task-row__title");
-  /** The due-date label on the top row (FR-046 visible, non-hover affordance). */
-  const topDue = (page: Page) => page.getByRole("option").first().locator(".tf-task-row__due");
+  /** The top (newest-first) row. */
+  const topRow = (page: Page) => page.getByRole("option").first();
+  /**
+   * The top row's title BUTTON (the drawer trigger) matched by its EXACT accessible name —
+   * the strip-correctness probe: a leaked date phrase like "Kupic mleko po 17" fails the
+   * exact match, so this only resolves when the title equals the stripped prefix.
+   */
+  const topTitle = (page: Page, title: string) =>
+    topRow(page).getByRole("button", { name: title, exact: true });
+  /** The visible due-date label text on the top row (FR-046 visible, non-hover affordance). */
+  const topDue = (page: Page) => topRow(page).getByText(/\d{2}\.\d{2}\.\d{4}/);
 
   // AS-02..AS-05 + the date-only/explicit-time rows: typing the full raw input and Enter creates
   // a task whose title is the STRIPPED prefix and whose row shows a due-date label. `createTask`
@@ -209,14 +227,14 @@ test.describe("US1 Natural-Language Dates (AS-02..05 capture-with-date, EC-02, v
         `dates-${title.toLowerCase().replace(/\s+/g, "-")}`,
       );
       await page.goto("/");
-      await expect(page.getByText(/your inbox is empty/i)).toBeVisible();
+      await expect(emptyHint(page)).toBeVisible();
 
       await createTask(page, input);
 
-      // Exactly one row, and its TITLE is the stripped prefix (string match = exact equality, so
+      // Exactly one row, and its TITLE is the stripped prefix (exact accessible-name match, so
       // a leaked date phrase like "Kupic mleko po 17" would fail). This is the strip proof.
       await expect(page.getByRole("option")).toHaveCount(1);
-      await expect(topTitle(page)).toHaveText(title);
+      await expect(topTitle(page, title)).toBeVisible();
 
       // The resolved due date paints a visible label on the row (the end-to-end point — we do NOT
       // assert the exact instant; the unit suite owns that against an injected clock).
@@ -231,29 +249,28 @@ test.describe("US1 Natural-Language Dates (AS-02..05 capture-with-date, EC-02, v
   }) => {
     const { page, context } = await signedInPage(browser, "dates-ec02-impossible");
     await page.goto("/");
-    await expect(page.getByText(/your inbox is empty/i)).toBeVisible();
+    await expect(emptyHint(page)).toBeVisible();
 
-    await page.keyboard.press("c");
-    const input = page.getByRole("textbox", { name: "Task title" });
+    const input = page.getByLabel("Task title");
+    await input.click();
     await expect(input).toBeFocused();
     await input.fill("Spotkanie 30.02");
 
     // An impossible in-range date ("30.02") is a genuine trailing date ATTEMPT that fails to
     // resolve → NO mutation fires (so there is no PUT to wait on — waiting would hang). Enter
-    // surfaces the recoverable failure synchronously via the polite status node; that visibility
-    // is the synchronization point. Target the node by its stable id to dodge the other role=status
-    // nodes layout.tsx / the slice-002 LiveRegion mount (strict-mode ambiguity).
+    // surfaces the recoverable failure synchronously via the capture's persistent polite status
+    // node; that visibility is the synchronization point. Target the node by its stable id to
+    // dodge the other role=status nodes (strict-mode ambiguity).
     await page.keyboard.press("Enter");
 
-    const errorNode = page.locator("#task-capture-error");
+    const errorNode = page.locator("#inbox-capture-error");
     await expect(errorNode).toBeVisible();
     await expect(errorNode).toHaveText(/nie rozpoznano/i);
 
-    // No task was created (the inbox stays empty), and the dialog stays open with the field's value
-    // retained so the user can fix the phrase (EC-02 / FR-006).
+    // No task was created (the inbox stays empty), and the inline capture retains the field's
+    // value so the user can fix the phrase (EC-02 / FR-006).
     await expect(page.getByRole("option")).toHaveCount(0);
-    await expect(page.getByText(/your inbox is empty/i)).toBeVisible();
-    await expect(page.getByRole("dialog", { name: "Create task" })).toBeVisible();
+    await expect(emptyHint(page)).toBeVisible();
     await expect(input).toHaveValue("Spotkanie 30.02");
 
     await context.close();
@@ -264,33 +281,38 @@ test.describe("US1 Natural-Language Dates (AS-02..05 capture-with-date, EC-02, v
   }) => {
     const { page, context } = await signedInPage(browser, "dates-guard-version");
     await page.goto("/");
-    await expect(page.getByText(/your inbox is empty/i)).toBeVisible();
+    await expect(emptyHint(page)).toBeVisible();
 
     // "2.0" is NOT a date-shaped trailing token (out of clock/calendar range, R4) → the whole
     // string is the title, no due date, no error. `createTask` proves a real server write landed.
     await createTask(page, "Wersja 2.0");
 
     await expect(page.getByRole("option")).toHaveCount(1);
-    await expect(topTitle(page)).toHaveText("Wersja 2.0");
-    // No due-date label rendered, and the capture surface raised no recoverable-failure message.
-    await expect(topDue(page)).toHaveCount(0);
-    await expect(page.locator("#task-capture-error")).toHaveCount(0);
+    await expect(topTitle(page, "Wersja 2.0")).toBeVisible();
+    // No due-date label rendered (no "termin:" qualifier on the row), and the capture raised no
+    // recoverable-failure message — its persistent status node stays EMPTY (it is always
+    // mounted, fed "" when errorless).
+    await expect(topRow(page).getByText(/termin:/)).toHaveCount(0);
+    await expect(page.locator("#inbox-capture-error")).toHaveText("");
 
     await context.close();
   });
 });
 
 /**
- * US8 Keyboard Navigation & Operate E2E (T059; US-08.AS-03/07/09 + Space/E/Del/Alt+↑↓ operate +
- * virtualization-focus). Drives the REAL listbox keyboard surface (the page-owned global gate +
- * the controlled TaskList/TaskRow) through the same seeded-session auth and the REAL BFF→proxy→API
- * write path as the US1 specs. Reuses {@link signedInPage} (fresh isolated account per test, keyed
- * by a unique email/sub) and {@link createTask} (arms the optimistic PUT's waitForResponse before
- * Enter). Every mutating operate key arms its OWN waitForResponse (discriminated by HTTP method so
- * the onSettled GET refetch is never mistaken for the write) before any `reload()` so the
- * persistence assertions never race the server.
+ * US8 Keyboard Navigation & Row Operations E2E (T059; US-08.AS-03/09 + the Space toggle +
+ * rename/delete/reorder via the row affordances + virtualization-focus). Slice 019 removed the
+ * document-level shortcut system (FR-111): keyboard operability now lives INSIDE the listbox
+ * composite widget (↑/↓/Home/End/Space/Enter on the FOCUSED listbox — D5), and every other
+ * operation is a visible row affordance (the "Edytuj" quick action + the complete "⋯" menu,
+ * FR-108). Drives the REAL listbox surface through the same seeded-session auth and the REAL
+ * BFF→proxy→API write path as the US1 specs. Reuses {@link signedInPage} (fresh isolated account
+ * per test, keyed by a unique email/sub) and {@link createTask} (arms the optimistic PUT's
+ * waitForResponse before Enter). Every mutating operation arms its OWN waitForResponse
+ * (discriminated by HTTP method so the onSettled GET refetch is never mistaken for the write)
+ * before any `reload()` so the persistence assertions never race the server.
  */
-test.describe("US8 Keyboard Nav & Operate (AS-03/07/09, Space/E/Del/Alt+↑↓, virtualization)", () => {
+test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename/delete/reorder, virtualization)", () => {
   /** The browser talks to the BFF proxy, so write URLs are `/api/proxy/api/tasks/<id>/...`. */
   const statusWrite = (r: import("@playwright/test").Response) =>
     r.request().method() === "PATCH" && /\/api\/tasks\/.+\/status/.test(r.url()) && r.ok();
@@ -320,7 +342,7 @@ test.describe("US8 Keyboard Nav & Operate (AS-03/07/09, Space/E/Del/Alt+↑↓, 
   }) => {
     const { page, context } = await signedInPage(browser, "us8-nav");
     await page.goto("/");
-    await expect(page.getByText(/your inbox is empty/i)).toBeVisible();
+    await expect(emptyHint(page)).toBeVisible();
 
     // Newest-first ⇒ render order top→bottom is Gamma, Beta, Alpha.
     await seedTasks(page, ["Alpha", "Beta", "Gamma"]);
@@ -336,7 +358,8 @@ test.describe("US8 Keyboard Nav & Operate (AS-03/07/09, Space/E/Del/Alt+↑↓, 
     expect(topId).toBeTruthy();
     await expect(listbox).toHaveAttribute("aria-activedescendant", topId!);
 
-    // ArrowDown → selection moves to the second row; both signals follow it.
+    // ArrowDown → selection moves to the second row; both signals follow it. The arrow keys are
+    // container-level handlers on the composite widget, so the listbox must be FOCUSED first.
     await listbox.focus();
     await page.keyboard.press("ArrowDown");
     await expect(second).toHaveAttribute("aria-selected", "true");
@@ -352,48 +375,24 @@ test.describe("US8 Keyboard Nav & Operate (AS-03/07/09, Space/E/Del/Alt+↑↓, 
     await context.close();
   });
 
-  test("AS-07: '?' opens the shortcuts help; Esc closes it and returns focus to the listbox", async ({
-    browser,
-  }) => {
-    const { page, context } = await signedInPage(browser, "us8-help");
-    await page.goto("/");
-    await expect(page.getByText(/your inbox is empty/i)).toBeVisible();
-
-    // A row makes the listbox exist; focus it so it's the help dialog's invoker (focus-return target).
-    await createTask(page, "Anchor");
-    const listbox = page.getByRole("listbox", { name: "Tasks" });
-    await listbox.focus();
-    await expect(listbox).toBeFocused();
-
-    await page.keyboard.press("?");
-    const help = page.getByRole("dialog", { name: "Keyboard shortcuts" });
-    await expect(help).toBeVisible();
-
-    // Esc dismisses and the Dialog focus contract restores focus to the invoking listbox.
-    await page.keyboard.press("Escape");
-    await expect(help).toBeHidden();
-    await expect(listbox).toBeFocused();
-
-    await context.close();
-  });
-
   test("AS-09: single-key shortcuts are suppressed while a text input is focused [INV-124]", async ({
     browser,
   }) => {
     const { page, context } = await signedInPage(browser, "us8-suppress");
     await page.goto("/");
-    await expect(page.getByText(/your inbox is empty/i)).toBeVisible();
+    await expect(emptyHint(page)).toBeVisible();
 
-    // Open capture; the title input is focused. The global gate must let C/E/Space/`?` land as
-    // literal characters (FR-031/AS-09) — none may be interpreted as a command.
-    await page.keyboard.press("c");
-    const input = page.getByRole("textbox", { name: "Task title" });
+    // Focus the inline capture input. With the shortcut system removed (FR-111) there are no
+    // document-level single-key listeners left: C/E/Space typed into a focused text input land
+    // as literal characters — none may be interpreted as a command.
+    const input = page.getByLabel("Task title");
+    await input.click();
     await expect(input).toBeFocused();
 
     await page.keyboard.type("Ceb");
     await expect(input).toHaveValue("Ceb");
-    // No nested capture dialog spawned (still exactly the one), and no help overlay opened.
-    await expect(page.getByRole("dialog", { name: "Create task" })).toHaveCount(1);
+    // No capture dialog spawned, and no shortcuts-help overlay exists to open.
+    await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(page.getByRole("dialog", { name: "Keyboard shortcuts" })).toHaveCount(0);
 
     await context.close();
@@ -404,20 +403,21 @@ test.describe("US8 Keyboard Nav & Operate (AS-03/07/09, Space/E/Del/Alt+↑↓, 
   }) => {
     const { page, context } = await signedInPage(browser, "us8-toggle");
     await page.goto("/");
-    await expect(page.getByText(/your inbox is empty/i)).toBeVisible();
+    await expect(emptyHint(page)).toBeVisible();
 
     await createTask(page, "Toggle me");
     const row = page.getByRole("option").first();
     await expect(row).toHaveAttribute("data-status", "backlog");
 
+    // Space is a composite-widget key: it toggles the SELECTED row and must be sent to the
+    // FOCUSED listbox (container-level handler, not document-level).
     const listbox = page.getByRole("listbox", { name: "Tasks" });
     await listbox.focus();
 
-    // Space → done (the visible ✓ glyph is aria-hidden, so assert the data-status hook the CSS uses).
+    // Space → done (assert the data-status hook the styling reads).
     const doneWrite = page.waitForResponse(statusWrite);
     await page.keyboard.press(" ");
     await expect(row).toHaveAttribute("data-status", "done");
-    await expect(row).toHaveClass(/tf-task-row--done/);
     await doneWrite;
 
     // Space again → backlog.
@@ -438,20 +438,19 @@ test.describe("US8 Keyboard Nav & Operate (AS-03/07/09, Space/E/Del/Alt+↑↓, 
     await context.close();
   });
 
-  test("E renames the selected task inline (Enter commits + persists); Esc keeps the original [INV-034]", async ({
+  test("the row's Edytuj action renames inline (Enter commits + persists); Esc keeps the original [INV-034]", async ({
     browser,
   }) => {
     const { page, context } = await signedInPage(browser, "us8-rename");
     await page.goto("/");
-    await expect(page.getByText(/your inbox is empty/i)).toBeVisible();
+    await expect(emptyHint(page)).toBeVisible();
 
     await createTask(page, "Original title");
     const row = page.getByRole("option").first();
-    const listbox = page.getByRole("listbox", { name: "Tasks" });
-    await listbox.focus();
 
-    // E → inline rename input, autofocused and seeded with the current title.
-    await page.keyboard.press("e");
+    // The row's "Edytuj" quick action → inline rename input, autofocused and seeded with the
+    // current title (the old `E` shortcut's affordance replacement, FR-108).
+    await row.getByRole("button", { name: "Edytuj „Original title”" }).click();
     const renameInput = page.getByRole("textbox", { name: "Rename task" });
     await expect(renameInput).toBeFocused();
     await expect(renameInput).toHaveValue("Original title");
@@ -466,9 +465,13 @@ test.describe("US8 Keyboard Nav & Operate (AS-03/07/09, Space/E/Del/Alt+↑↓, 
     await page.reload();
     await expect(page.getByRole("option").first()).toHaveText(/Renamed title/);
 
-    // Esc path: open rename again, Esc, and the committed title stays intact (no write).
-    await page.getByRole("listbox", { name: "Tasks" }).focus();
-    await page.keyboard.press("e");
+    // Esc path: re-open via the (renamed) Edytuj button, Esc, and the committed title stays
+    // intact (no write).
+    await page
+      .getByRole("option")
+      .first()
+      .getByRole("button", { name: "Edytuj „Renamed title”" })
+      .click();
     const reopened = page.getByRole("textbox", { name: "Rename task" });
     await expect(reopened).toBeFocused();
     await reopened.fill("Discarded edit");
@@ -479,23 +482,23 @@ test.describe("US8 Keyboard Nav & Operate (AS-03/07/09, Space/E/Del/Alt+↑↓, 
     await context.close();
   });
 
-  test("Del soft-deletes the selected task and it stays gone across reload [INV-036]", async ({
+  test("the row menu's Usuń soft-deletes the task and it stays gone across reload [INV-036]", async ({
     browser,
   }) => {
     const { page, context } = await signedInPage(browser, "us8-delete");
     await page.goto("/");
-    await expect(page.getByText(/your inbox is empty/i)).toBeVisible();
+    await expect(emptyHint(page)).toBeVisible();
 
-    // Two rows so the listbox survives the delete; delete the top (selectedIndex 0).
+    // Two rows so the listbox survives the delete; delete the top one.
     await seedTasks(page, ["Keeper", "Doomed"]); // render order top→bottom: Doomed, Keeper
     const top = page.getByRole("option").first();
     await expect(top).toHaveText(/Doomed/);
 
-    const listbox = page.getByRole("listbox", { name: "Tasks" });
-    await listbox.focus();
-
+    // "Usuń" in the row's "⋯" menu is the delete affordance — IMMEDIATE, no confirm (the same
+    // contract as the old Delete key).
+    await top.getByRole("button", { name: "Więcej akcji: Doomed" }).click();
     const deleteSettled = page.waitForResponse(deleteWrite);
-    await page.keyboard.press("Delete");
+    await page.getByRole("menuitem", { name: "Usuń" }).click();
     await expect(page.getByRole("option")).toHaveCount(1);
     await expect(page.getByText(/Doomed/)).toHaveCount(0);
     await deleteSettled;
@@ -508,20 +511,22 @@ test.describe("US8 Keyboard Nav & Operate (AS-03/07/09, Space/E/Del/Alt+↑↓, 
     await context.close();
   });
 
-  test("Del rollback-in-place: a server 500 reappears the row in position + announces the failure (FR-049) [INV-037]", async ({
+  test("Usuń rollback-in-place: a server 500 reappears the row in position + announces the failure (FR-049) [INV-037]", async ({
     browser,
   }) => {
     const { page, context } = await signedInPage(browser, "us8-delete-rollback");
     await page.goto("/");
-    await expect(page.getByText(/your inbox is empty/i)).toBeVisible();
+    await expect(emptyHint(page)).toBeVisible();
 
-    // Three rows; select the MIDDLE so "reappears in original position" tests position, not presence.
+    // Three rows; delete the MIDDLE so "reappears in original position" tests position, not presence.
     await seedTasks(page, ["Bottom", "Middle", "Top"]); // render order top→bottom: Top, Middle, Bottom
     const options = page.getByRole("option");
     await expect(options.nth(0)).toHaveText(/Top/);
     await expect(options.nth(1)).toHaveText(/Middle/);
     await expect(options.nth(2)).toHaveText(/Bottom/);
 
+    // Selection still tracks arrow-nav on the focused listbox (kept from the pre-019 spec —
+    // the delete itself is row-scoped via the menu, independent of selection).
     const listbox = page.getByRole("listbox", { name: "Tasks" });
     await listbox.focus();
     await page.keyboard.press("ArrowDown"); // select index 1 (Middle)
@@ -548,7 +553,8 @@ test.describe("US8 Keyboard Nav & Operate (AS-03/07/09, Space/E/Del/Alt+↑↓, 
       await route.fallback();
     });
 
-    await page.keyboard.press("Delete");
+    await options.nth(1).getByRole("button", { name: "Więcej akcji: Middle" }).click();
+    await page.getByRole("menuitem", { name: "Usuń" }).click();
 
     // Optimistic remove then rollback: the row reappears AT ITS ORIGINAL INDEX (still 3 rows, Middle in the middle).
     await expect(options).toHaveCount(3);
@@ -568,29 +574,30 @@ test.describe("US8 Keyboard Nav & Operate (AS-03/07/09, Space/E/Del/Alt+↑↓, 
     await context.close();
   });
 
-  test("Alt+↓ reorders the selected task down; the new order persists and the URL is unchanged [INV-038]", async ({
+  test("the row menu's Przenieś niżej reorders the task down; the new order persists and the URL is unchanged [INV-038]", async ({
     browser,
   }) => {
     const { page, context } = await signedInPage(browser, "us8-reorder");
     await page.goto("/");
-    await expect(page.getByText(/your inbox is empty/i)).toBeVisible();
+    await expect(emptyHint(page)).toBeVisible();
 
     await seedTasks(page, ["Third", "Second", "First"]); // render order top→bottom: First, Second, Third
     const options = page.getByRole("option");
     await expect(options.nth(0)).toHaveText(/First/);
 
     const urlBefore = page.url();
-    const listbox = page.getByRole("listbox", { name: "Tasks" });
-    await listbox.focus();
 
-    // Top row is selected (index 0). Alt+↓ moves it down one rank: First should drop below Second.
+    // "Przenieś niżej" in the top row's "⋯" menu is the keyboard-reachable reorder (S3.7) —
+    // the same optimistic PATCH /position write the old Alt+↓ performed. The order assertions
+    // run against the OPTIMISTIC swap (armed before, awaited after).
+    await options.nth(0).getByRole("button", { name: "Więcej akcji: First" }).click();
     const reorderSettled = page.waitForResponse(positionWrite);
-    await page.keyboard.press("Alt+ArrowDown");
+    await page.getByRole("menuitem", { name: "Przenieś niżej" }).click();
     await expect(options.nth(0)).toHaveText(/Second/);
     await expect(options.nth(1)).toHaveText(/First/);
     await reorderSettled;
 
-    // Alt+Arrow is preventDefault'd, so it must not navigate/scroll the page URL.
+    // A menu action must not navigate/scroll the page URL.
     expect(page.url()).toBe(urlBefore);
 
     await page.reload();
@@ -605,7 +612,7 @@ test.describe("US8 Keyboard Nav & Operate (AS-03/07/09, Space/E/Del/Alt+↑↓, 
   }) => {
     const { page, context } = await signedInPage(browser, "us8-virtualize");
     await page.goto("/");
-    await expect(page.getByText(/your inbox is empty/i)).toBeVisible();
+    await expect(emptyHint(page)).toBeVisible();
 
     // NOTE: there is NO DB task-seed helper in the e2e harness — the only seeding path is the UI
     // `createTask` capture flow (one optimistic PUT each). Seeding ~60 rows this way is SLOW but is
@@ -633,7 +640,7 @@ test.describe("US8 Keyboard Nav & Operate (AS-03/07/09, Space/E/Del/Alt+↑↓, 
     // It remains the active descendant (the reference resolves to a present element).
     await expect(listbox).toHaveAttribute("aria-activedescendant", activeId!);
 
-    // ↑/↓ still move selection after the wheel scroll.
+    // ↑/↓ still move selection after the wheel scroll (keys on the focused listbox).
     await page.keyboard.press("ArrowDown");
     const afterDown = await listbox.getAttribute("aria-activedescendant");
     expect(afterDown).not.toBe(activeId);

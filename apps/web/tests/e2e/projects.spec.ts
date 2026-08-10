@@ -8,16 +8,17 @@ import { apiAs, ensureUser, insertSession } from "./helpers/seed";
  * global-setup — no API mocking. Each test mints its OWN Google sub + email so the per-user
  * owner-scoping keeps one test's projects/tasks out of another's lists.
  *
- * ─────────────────────────── STATUS: fully wired (T041 + T049–T052) ───────────────────────────
- * Every scenario is a live test. The app-shell orchestration is complete:
- *   - `app/(app)/page.tsx` binds the `M` shortcut (`onMove`) and mounts `ProjectSelector` (T041).
+ * ─────────────────────────── STATUS: fully wired (slice 019 UI) ───────────────────────────
+ * Every scenario is a live test, re-driven through the slice-019 UI (FR-111 removed the `M`
+ * shortcut — the move now runs on the row "⋯" menu's "Przenieś do projektu…"):
+ *   - `app/(app)/page.tsx` mounts `ProjectSelector` behind the row menu's move item (T041).
  *   - `Sidebar.tsx` exposes per-project Edit / Archive / Delete affordances that open the edit
- *     `ProjectForm` and `DeleteProjectDialog` (T049/T050); each project row links to its task view.
- *   - `app/(app)/projects/[id]/page.tsx` is the project-tasks view with the move-to-another-project
- *     affordance, enabling the move-to-Inbox round-trip (T051).
+ *     `ProjectForm` and `DeleteProjectDialog`; each project row links to its task view.
+ *   - `app/(app)/projects/[id]/page.tsx` is the project-tasks view whose rows carry the same
+ *     move affordance, enabling the move-to-Inbox round-trip.
  * Covered here: AS-01 (create form), AS-02 (nesting), AS-03 (grandchild prevention by omission),
  * AS-04/EC-03 + AS-10 (delete dispositions), AS-05 (archived hidden), AS-07/08/09 (edit/re-parent),
- * AS-11 (unarchive), US-08.AS-05 (the `M` move + move-to-Inbox), and the Inbox narrowing (FR-021).
+ * AS-11 (unarchive), US-08.AS-05 (the menu move + move-to-Inbox), and the Inbox narrowing (FR-021).
  *
  * AS-06 (command-palette SEARCH for an archived project) is slice 013 — out of scope here; the
  * Archived-disclosure bridge (AS-11) covers reaching + unarchiving an archived project (research R8).
@@ -56,6 +57,15 @@ async function signedInPage(
 /** The sidebar's active project tree (excludes the Archived disclosure list). */
 function sidebarTree(page: Page) {
   return page.locator(".tf-sidebar__tree");
+}
+
+/** Opens the sidebar project row's "⋯" menu and activates the given management item (slice 019). */
+async function projectMenuAction(page: Page, projectName: string, item: string): Promise<void> {
+  await page.getByRole("button", { name: `Akcje projektu ${projectName}` }).click();
+  await page
+    .getByRole("menu", { name: `Akcje projektu ${projectName}` })
+    .getByRole("menuitem", { name: item, exact: true })
+    .click();
 }
 
 /* ───────────────────────────────── GREEN: wired UI ───────────────────────────────── */
@@ -220,10 +230,10 @@ test.describe("US-10 Project Management — wired UI (GREEN)", () => {
 /* ───── RED + FIXME: behaviours blocked on the T041/T028 wiring gap (and one beyond it) ───── */
 
 test.describe("US-10/US-08 Project Management — edit / delete / move-to-project (wired, T041/T049–T052)", () => {
-  // The `M` move (real trigger) plus the edit/archive/delete affordances and the project-tasks view
-  // are now wired into the app shell (T049–T052), so every scenario below is a live test.
+  // The move flow runs on visible affordances since slice 019 (FR-111 removed the `M` shortcut):
+  // the row's "⋯" menu carries "Przenieś do projektu…" which opens the selector.
 
-  test("US-08.AS-05: pressing M on the selected task opens the move-to-project selector [INV-040]", async ({
+  test("US-08.AS-05: the row menu's 'Przenieś do projektu…' opens the move-to-project selector [INV-040]", async ({
     browser,
   }) => {
     const seeded = await signedInPage(browser, "as05-move");
@@ -233,11 +243,13 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
     await seeded.page.goto("/");
     await expect(seeded.page.getByRole("option")).toHaveCount(1);
 
-    // Select the row (it defaults to index 0) and press `M`. The selector dialog should open with
+    // Open the row's "⋯" menu and choose the move item. The selector dialog should open with
     // the Inbox option + the owned project as keyboard-reachable choices (US-08.AS-05, R7).
-    const listbox = seeded.page.getByRole("listbox", { name: "Tasks" });
-    await listbox.focus();
-    await seeded.page.keyboard.press("m");
+    await seeded.page.getByRole("button", { name: "Więcej akcji: Movable" }).click();
+    await seeded.page
+      .getByRole("menu", { name: "Akcje taska" })
+      .getByRole("menuitem", { name: "Przenieś do projektu…" })
+      .click();
 
     const selector = seeded.page.getByRole("dialog", { name: /Move/ });
     await expect(selector).toBeVisible({ timeout: 5_000 });
@@ -259,10 +271,14 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
       const project = await api.createProject({ name: "Holder", color: COLOR, icon: ICON });
       await api.moveTask(task.id, project.id, task.version);
 
-      // On the project view, the projected task row carries a "Move … to another project" trigger
+      // On the project view, the projected task row's "⋯" menu carries "Przenieś do projektu…"
       // → opening the selector → choosing "Inbox" (projectId = null, R6/R7) returns it to the Inbox.
       await page.goto(`/projects/${project.id}`);
-      await page.getByRole("button", { name: /Move .* to another project/ }).click();
+      await page.getByRole("button", { name: "Więcej akcji: In a project" }).click();
+      await page
+        .getByRole("menu", { name: "Akcje taska" })
+        .getByRole("menuitem", { name: "Przenieś do projektu…" })
+        .click();
       // Await the move PATCH before navigating, so the round-trip never races the server round-trip.
       const moved = page.waitForResponse(
         (r) => r.request().method() === "PATCH" && /\/api\/tasks\/.*\/project$/.test(r.url()) && r.ok(),
@@ -289,9 +305,9 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
     await page.goto("/");
     await expect(sidebarTree(page).getByText("Old name", { exact: true })).toBeVisible();
 
-    // The sidebar Edit affordance opens the editor seeded with the project; renaming + Save persists
-    // and the sidebar reflects the new name.
-    await page.getByRole("button", { name: "Edit Old name" }).click();
+    // The sidebar row's "⋯" menu Edit item opens the editor seeded with the project; renaming +
+    // Save persists and the sidebar reflects the new name.
+    await projectMenuAction(page, "Old name", "Edit");
     await page.getByRole("dialog", { name: "Edit project" }).waitFor();
     await page.getByRole("textbox", { name: "Project name" }).fill("New name");
     await page.getByRole("button", { name: "Save" }).click();
@@ -312,7 +328,7 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
 
     // Opening the editor on "Mover", choosing "NewParent" as parent, and saving nests it one
     // level under "NewParent" (AS-08, within FR-012).
-    await page.getByRole("button", { name: "Edit Mover" }).click();
+    await projectMenuAction(page, "Mover", "Edit");
     const dialog = page.getByRole("dialog", { name: "Edit project" });
     await dialog.waitFor();
     await dialog.getByRole("combobox").selectOption({ label: "NewParent" });
@@ -337,7 +353,7 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
 
     // Opening the editor on "Mover" (which has children) and attempting to set "Root" as its parent
     // surfaces the inline one-level-nesting message (R15/FR-049) and disables Save.
-    await page.getByRole("button", { name: "Edit Mover" }).click();
+    await projectMenuAction(page, "Mover", "Edit");
     const dialog = page.getByRole("dialog", { name: "Edit project" });
     await dialog.waitFor();
     await dialog.getByRole("combobox").selectOption({ label: "Root" });
@@ -360,9 +376,9 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
     await page.goto("/");
     await expect(sidebarTree(page).getByText("Busy", { exact: true })).toBeVisible();
 
-    // The sidebar Delete affordance opens the DeleteProjectDialog with the THREE task dispositions
+    // The sidebar menu's Delete item opens the DeleteProjectDialog with the THREE task dispositions
     // (move-to-Inbox / archive-with-tasks / cascade), defaulting to the least-destructive choice.
-    await page.getByRole("button", { name: "Delete Busy" }).click();
+    await projectMenuAction(page, "Busy", "Delete");
     const dialog = page.getByRole("dialog", { name: "Delete project" });
     await dialog.waitFor();
     await expect(dialog.getByRole("radio", { name: /Move them to the Inbox/ })).toBeVisible();
@@ -382,9 +398,9 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
     await page.goto("/");
     await expect(sidebarTree(page).getByText("Umbrella", { exact: true })).toBeVisible();
 
-    // The sidebar Delete affordance surfaces the TWO-way child disposition with its blast radius
+    // The sidebar menu's Delete item surfaces the TWO-way child disposition with its blast radius
     // (Principle VII): orphan-to-top (default) vs cascade.
-    await page.getByRole("button", { name: "Delete Umbrella" }).click();
+    await projectMenuAction(page, "Umbrella", "Delete");
     const dialog = page.getByRole("dialog", { name: "Delete project" });
     await dialog.waitFor();
     await expect(dialog.getByRole("radio", { name: /Promote them to top-level/ })).toBeVisible();
@@ -406,7 +422,7 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
     // AS-10 covers archive AS WELL AS delete: archiving a parent-with-children prompts the child
     // disposition (cascade-archive the subtree vs orphan-to-top) and states its blast radius — it does
     // NOT silently default. Archive keeps the project's tasks, so there is no task disposition.
-    await page.getByRole("button", { name: "Archive Canopy" }).click();
+    await projectMenuAction(page, "Canopy", "Archive");
     const dialog = page.getByRole("dialog", { name: "Archive project" });
     await dialog.waitFor();
     await expect(dialog.getByRole("radio", { name: /Promote them to top-level/ })).toBeVisible();

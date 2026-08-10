@@ -32,10 +32,13 @@ test.describe("US1 seeded-session (AS-02/03/04)", () => {
     await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
     await expect(page.locator(".tf-profile__name")).toHaveText("Ada Lovelace");
     await expect(page.locator(".tf-profile__email")).toHaveText(profileEmail);
-    await expect(page.locator("img.tf-profile__avatar")).toHaveAttribute(
-      "src",
-      "https://avatars.test/ada.png",
-    );
+    // The avatar identity element: the Google photo when it loads, else the FR-105
+    // deterministic initials fallback (slice 019) — both expose the display name as the
+    // accessible img name. The seeded avatars.test URL never resolves, so the fallback
+    // is the expected steady state here.
+    await expect(
+      page.getByRole("main").getByRole("img", { name: "Ada Lovelace" }).last(),
+    ).toBeVisible();
 
     await context.close();
   });
@@ -83,9 +86,12 @@ test.describe("US1 seeded-session (AS-02/03/04)", () => {
     const page = await context.newPage();
 
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Your workspace" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
 
-    await page.getByRole("button", { name: "Sign out" }).click();
+    // The sign-out affordance lives on the Settings screen since the slice-019 shell
+    // rebuild (reached via the topbar identity → Settings); still a plain form POST.
+    await page.goto("/settings");
+    await page.getByRole("button", { name: "Wyloguj" }).click();
     await page.waitForURL("**/signin");
 
     // Server-side invalidation (FR-054).
