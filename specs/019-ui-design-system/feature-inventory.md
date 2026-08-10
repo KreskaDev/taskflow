@@ -175,6 +175,22 @@ not the capability — S2.3's sole exception is the shortcut system itself, inve
 | INV-135 | Given state-changing requests, When they lack a same-origin Origin/Referer, Then the BFF rejects them (CSRF gate) — UI flows always pass. | Principle XII | [C] |
 | INV-136 | Given the virtualized Inbox at scale, When rendered, Then rows virtualize (bounded DOM) and scrolling stays responsive — the redesigned rows keep working inside `@tanstack/react-virtual` (stacking-context regression guarded). | Constitution Performance | [E] |
 
+## M. Project Board & groupable List (slice 010)
+
+| ID | Given / When / Then | Realizes | Level |
+|---|---|---|---|
+| INV-140 | Given the project view `/projects/{id}`, When it renders, Then the header shows a visible, keyboard-operable segmented mode switch **„Lista" \| „Tablica"** (Lucide `List`/`LayoutGrid`); activating „Tablica" swaps the projection to the Board and „Lista" back — same data, no navigation. | US-03 AS-02, FR-103 | [E] |
+| INV-141 | Given a project whose mode was switched to Tablica, When the user reloads, Then the Board renders again (per-project `localStorage` persistence); a DIFFERENT project still defaults to Lista; cleared storage/invalid stored value falls back to Lista. | US-03 AS-02 | [E]+[C] |
+| INV-142 | Given a project with tasks in several statuses, When the Board renders, Then EXACTLY four columns appear in order Backlog, Do zrobienia, W toku, Zrobione — each a labelled `role="listbox"` with `aria-label` „<label>, N zadań" and a visible live count; cards show sanitized title, due/priority/label chips and assignee avatars on catalog components; an empty column renders the catalog EmptyState. | US-03 AS-03, FR-025, FR-110 | [E]+[A] |
+| INV-143 | Given a project containing a `cancelled` task, When the Board renders, Then that task appears NOWHERE on the Board (no column, no card), while the List keeps it reachable. | EC-11 | [E]+[C] |
+| INV-144 | Given a Board card, When the user drags it to another column (pointer or dnd-kit KeyboardSensor), Then the card paints in the target column OPTIMISTICALLY and exactly ONE `PATCH /api/tasks/{id}/status` is issued with the target column's status — `position` untouched. | US-03 AS-04, FR-025 | [E] |
+| INV-145 | Given a Board card's „⋯" menu, When it opens, Then „Przenieś w lewo"/„Przenieś w prawo" move the card one column; at a boundary the item is OMITTED (Zrobione offers no right move, Backlog no left) — and the full standard action set stays available. | US-03 AS-05/AS-06, FR-108 | [E]+[C] |
+| INV-146 | Given the List view, When the user sets „Grupuj: Status" via the visible group-by control, Then groups render in column order (Backlog, Do zrobienia, W toku, Zrobione) with „Anulowane" LAST when non-empty; empty groups are omitted; the grouped render keeps the single-listbox `role="group"` pattern with a flat index. | US-03 AS-07, FR-024 | [E]+[C] |
+| INV-147 | Given the List view, When the user sets „Grupuj: Priorytet", Then groups render P0→P3 then „Bez priorytetu" last; „Brak" restores the flat list; „wg cyklu" is NOT offered (slice 011). | US-03 AS-07, FR-024 | [E]+[C] |
+| INV-148 | Given a project whose group-by was set, When the user reloads, Then the grouping choice re-applies (per-project `localStorage`, default Brak). | US-03 AS-07 | [E]+[C] |
+| INV-149 | Given a VIEWER on a shared project, When the Board renders, Then it is read-only: no drag activation and no move items in the card menu (server still denies a forged PATCH with 403). | FR-065/FR-068 | [E] |
+| INV-150 | Given a column move whose PATCH fails server-side, When the error lands, Then the card returns to its source column (rollback) and the failure is announced via the established toast/live-region path with retry. | FR-049/FR-050 | [C] |
+
 ---
 
 ## Transfer notes (D11 — rows asserting UNSHIPPED capabilities move to their owning slices)
