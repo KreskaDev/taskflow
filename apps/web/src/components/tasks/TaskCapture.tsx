@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
+import { Plus } from "lucide-react";
 
 import { Dialog } from "@/components/ui/Dialog";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
-import { parseTaskInput } from "@/lib/dates";
+import { parseTaskInput, resolveDatePhrase } from "@/lib/dates";
 import { createTaskSchema } from "@/lib/validation/task";
+import styles from "./TaskCapture.module.css";
 
-const TITLE_ID = "task-capture-title";
 const ERROR_ID = "task-capture-error";
 
 /**
@@ -17,107 +19,141 @@ const ERROR_ID = "task-capture-error";
 const UNRECOGNIZED_MESSAGE = "nie rozpoznano";
 
 interface TaskCaptureProps {
-  /** Whether the capture surface is visible — owned by the app-shell page (T058). */
-  open: boolean;
-  /** Dismiss handler — the page flips its `captureOpen` state (AS-07). */
-  onClose: () => void;
+  /** Create in this project's context (FR-107); null/absent = the Inbox. */
+  contextProjectId?: string | null;
+  /** Today-view context: a dateless entry resolves to due-today (clarification 2026-08-09). */
+  defaultDueToday?: boolean;
+  autoFocus?: boolean;
+  /** Fired after a successful create (the dialog host closes on it). */
+  onCreated?: () => void;
+  /** Esc inside the field (FR-030) — cancel/close without creating. */
+  onCancel?: () => void;
+  /** Unique error-node id when several captures mount at once. */
+  errorId?: string;
+  /** Optional input id so an EmptyState action can focus this capture. */
+  inputId?: string;
 }
 
 /**
- * The `C` capture surface (T039/T058; US-01.AS-01/06/07, FR-031/FR-043, Constitution III).
- *
- * CONTROLLED (T058): the surface owns no `open` state and registers NO key listener of its
- * own — the global shortcut gate ({@link useGlobalShortcuts}, T054) owns the bare `C` (and
- * its FR-031/AS-09 text-field suppression) and drives `open`/`onClose` from the page. This
- * removes the duplicate `C` listener that previously lived here.
- *
- * The surface is mounted statically with NO network or lazy import on the `C` path: the
- * Dialog grants its FIRST focusable child (the single title `<input>`) initial focus
- * synchronously within one frame (≤16 ms), satisfying SC-003 / US-01.AS-01. Enter
- * parses the raw title for a trailing Polish date phrase (T012; R4), validates the
- * resulting create payload with the Zod schema (Constitution VI) and, when valid, drives
- * the optimistic create (T037) before clearing + closing (AS-06). A trailing date *attempt*
- * that cannot resolve creates nothing, keeps the field's value (EC-02), and shows a polite
- * "nie rozpoznano" message below the input (T017; FR-006/FR-101). Esc — handled entirely by
- * the Dialog focus contract — cancels, creates nothing, and restores focus to the
- * invoking element (AS-07).
+ * Inline quick-add (slice 019 T044 — FR-107, FR-030; rebuilt from the slice-001 `C`
+ * capture dialog after the shortcut-system removal). Present within each task list; Enter
+ * parses the trailing Polish date phrase (slice-003 grammar) and drives the optimistic
+ * create in THIS view's context; Esc cancels; an unresolvable date attempt keeps the value
+ * and shows "nie rozpoznano" via the persistent polite status node (EC-02/FR-006).
  */
-export function TaskCapture({ open, onClose }: TaskCaptureProps) {
+export function TaskCapture({
+  contextProjectId = null,
+  defaultDueToday = false,
+  autoFocus = false,
+  onCreated,
+  onCancel,
+  errorId = ERROR_ID,
+  inputId,
+}: TaskCaptureProps) {
   const [title, setTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
   const { createTask } = useTaskMutations();
 
-  const close = () => {
-    setTitle("");
-    setError(null);
-    onClose();
-  };
-
   const onInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      setTitle("");
+      setError(null);
+      onCancel?.();
+      return;
+    }
     if (event.key !== "Enter") return;
     event.preventDefault();
 
-    // Parse the raw title for an end-anchored Polish date phrase (R4). The injected `now`
-    // resolves relative phrases against the reference zone (R5/R9); this is synchronous and
-    // in-process — no network, so the optimistic paint stays within one frame (SC-003).
+    // Parse the raw title for an end-anchored Polish date phrase (R4) — synchronous and
+    // in-process, so the optimistic paint stays within one frame (SC-003).
     const parsed = parseTaskInput(title, new Date());
 
     if (parsed.error) {
-      // A genuine trailing date attempt that cannot resolve (EC-02 / FR-006). Create nothing,
-      // keep the field's value, and surface "nie rozpoznano" — announced via the polite
-      // status region below WITHOUT stealing focus. No mutation fires, so the auto
-      // MutationCache error-announcer never runs; this is the sole announcement (FR-101).
+      // EC-02/FR-006: create nothing, keep the value, announce politely without focus theft.
       setError(UNRECOGNIZED_MESSAGE);
       return;
     }
 
-    // No date token → `{ title }` (full title); resolves → `{ title, dueDate, dueHasTime }`
-    // (stripped prefix). Both flow through one create path — the due fields are simply
-    // absent for a dateless task. `safeParse` is the empty-title no-op guard (mirrors the
-    // prior `taskTitleSchema.safeParse`): empty/invalid → stay open, create nothing.
+    // Today-view context: a dateless entry defaults to due-today (FR-107 clarification);
+    // an explicit phrase in the input always wins.
+    const contextDue =
+      defaultDueToday && parsed.dueDate === undefined
+        ? resolveDatePhrase("dzis", new Date())
+        : null;
+
     const result = createTaskSchema.safeParse({
       title: parsed.title,
-      dueDate: parsed.dueDate,
-      dueHasTime: parsed.dueHasTime,
+      dueDate: parsed.dueDate ?? contextDue?.dueDate,
+      dueHasTime: parsed.dueHasTime ?? contextDue?.dueHasTime,
     });
-    if (!result.success) return; // Empty after trim: nothing to create — a no-op, stay open.
+    if (!result.success) return; // Empty after trim: nothing to create — a no-op.
 
-    createTask(result.data);
-    close();
+    createTask({ ...result.data, projectId: contextProjectId });
+    setTitle("");
+    setError(null);
+    onCreated?.();
   };
 
   return (
-    <Dialog open={open} onClose={close} titleId={TITLE_ID}>
-      <h2 id={TITLE_ID} className="tf-sr-only">
-        Create task
-      </h2>
+    <div className={styles.capture}>
+      <span className={styles.plus} aria-hidden="true">
+        <Plus size={15} strokeWidth={1.75} />
+      </span>
       <input
+        id={inputId}
         type="text"
-        className="tf-task-capture__input"
+        className={styles.input}
         aria-label="Task title"
-        placeholder="New task…"
-        // Hard cap matching the Zod `.max(500)` so an over-length title can never be
-        // entered — closes the silent-drop case where a >500 title would fail validation
-        // and create nothing with no feedback (FIX 3; FR-049).
+        aria-describedby={errorId}
+        placeholder="Nowy task… (np. „Raport jutro”)"
         maxLength={500}
+        autoFocus={autoFocus}
         value={title}
         onChange={(event) => {
           setTitle(event.target.value);
-          // Re-edit clears the recoverable-failure message (the user is fixing the phrase).
           if (error) setError(null);
         }}
         onKeyDown={onInputKeyDown}
       />
-      {/*
-        Single persistent polite status node (mirrors the slice-002 LiveRegion pattern,
-        Toast.tsx lines 30-36): mounted with the dialog and fed empty text when there is no
-        error, so the empty → "nie rozpoznano" transition is what a polite SR announces. A
-        node mounted only on error may be skipped. Visible red text (≥4.5:1, T020) doubles as
-        the on-screen affordance; non-focusable, so the Dialog Tab contract is undisturbed.
-      */}
-      <p id={ERROR_ID} className="tf-task-capture__error" role="status" aria-live="polite">
+      {/* Persistent polite status node: mounted always, fed empty text when there is no
+          error, so the empty → "nie rozpoznano" transition is what a polite SR announces. */}
+      <p id={errorId} className={styles.error} role="status" aria-live="polite">
         {error ?? ""}
       </p>
+    </div>
+  );
+}
+
+const GLOBAL_TITLE_ID = "global-capture-title";
+
+/**
+ * The global "+ Nowy task" capture host (T036/FR-107): a modal Dialog around the same
+ * capture input, resolving the creation context from the CURRENT route per the 2026-08-09
+ * clarification — Inbox → Inbox, project view → that project, Today → due today, all other
+ * surfaces → Inbox.
+ */
+export function GlobalCaptureDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const pathname = usePathname();
+  const projectMatch = /^\/projects\/([^/]+)/.exec(pathname ?? "");
+  const contextProjectId = projectMatch?.[1] ?? null;
+  const defaultDueToday = pathname === "/today";
+
+  if (!open) return null;
+  return (
+    <Dialog open={open} onClose={onClose} titleId={GLOBAL_TITLE_ID}>
+      <h2 id={GLOBAL_TITLE_ID} className="sr-only">
+        Nowy task
+      </h2>
+      <TaskCapture
+        contextProjectId={contextProjectId}
+        defaultDueToday={defaultDueToday}
+        autoFocus
+        onCreated={onClose}
+        onCancel={onClose}
+        errorId="global-capture-error"
+      />
     </Dialog>
   );
 }

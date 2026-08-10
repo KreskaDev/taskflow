@@ -13,7 +13,7 @@ import { useProjects } from "@/hooks/useProjects";
  * and orders; this component resolves project ids to names.
  */
 export function AssignedView() {
-  const { data, isError, refetch } = useAssignedTasks();
+  const { data, isError, isPending, refetch } = useAssignedTasks();
   const { data: projects } = useProjects();
 
   const projectNames = useMemo(() => {
@@ -47,6 +47,7 @@ export function AssignedView() {
       label="Przypisane do mnie"
       groups={groups}
       projectName={projectName}
+      loading={isPending}
       emptyMessage="Brak zadań przypisanych do Ciebie."
     />
   );

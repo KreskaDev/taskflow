@@ -24,9 +24,9 @@ interface CommentComposerProps {
 }
 
 /**
- * The comment composer (slice 009, T038; AS-01/AS-02, R6/R8/R14). A plain `<textarea>` — the app-shell
- * global gate (`useGlobalShortcuts.isTextFieldFocused`) already suppresses every bare single-key shortcut
- * while it holds focus (FR-031), so typing `c`/`e`/`?` mid-comment is never hijacked. Submits on
+ * The comment composer (slice 009, T038; AS-01/AS-02, R6/R8/R14). A plain `<textarea>`; since slice 019
+ * removed the single-key shortcut system entirely (FR-111), typing any character here is never hijacked
+ * by design — there are no bare-key bindings left to suppress. Submits on
  * Ctrl+Enter or the button. Validation (trim → non-empty, ≤ 4000) runs at the trust boundary with an
  * actionable FR-049 message; the server re-validates authoritatively (422). @mentions are added ONLY via
  * the {@link MentionPicker}'s typed tokens — a literal `@` typed in prose stays inert text (R6).

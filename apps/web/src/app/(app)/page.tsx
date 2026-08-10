@@ -1,207 +1,177 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import { LabelSelector } from "@/components/labels/LabelSelector";
 import { ProjectSelector } from "@/components/projects/ProjectSelector";
-import { ShortcutsHelp } from "@/components/tasks/ShortcutsHelp";
+import { PriorityPicker } from "@/components/tasks/PriorityPicker";
+import { RescheduleInput } from "@/components/tasks/RescheduleInput";
 import { TaskCapture } from "@/components/tasks/TaskCapture";
 import { TaskList } from "@/components/tasks/TaskList";
-import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
+import type { TaskRowActions } from "@/components/tasks/TaskRow";
+import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { useDuplicateTask } from "@/hooks/useDuplicateTask";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
-import { useTasks } from "@/hooks/useTasks";
+import { useTasks, type TaskResponse } from "@/hooks/useTasks";
+
+const CAPTURE_INPUT_ID = "inbox-capture";
 
 /**
- * Workspace home — the app-shell ORCHESTRATOR (T058, EC-01). It owns ALL keyboard-surface
- * state (selection, capture/help overlays, which row is inline-renaming), wires the single
- * global shortcut gate ({@link useGlobalShortcuts}, T054) to that state + the task mutations
- * ({@link useTaskMutations}, T057), and renders the controlled capture surface, help overlay
- * and (selection-/rename-)controlled {@link TaskList}.
+ * Workspace home — the Inbox orchestrator, rebuilt in slice 019 (T034/T035/T041/T045).
+ * The single-key shortcut system is GONE (FR-111): every operation now has a visible
+ * affordance — the inline quick-add (FR-107), row quick actions + the complete "⋯" menu
+ * (FR-108, incl. "Duplikuj" FR-112 and "Przenieś wyżej/niżej" S3.7), and composite-widget
+ * keyboard operability INSIDE the listbox (↑/↓/Space/Enter — D5).
  *
- * Region branching (FR-049): when the query FAILED we show an accessible error alert with a
- * retry (distinct from an empty inbox so a load failure is never mistaken for "no tasks");
- * when the query RESOLVED with zero rows we show a quiet, accessible empty-Inbox hint (press
- * `C`) — not an onboarding wizard or modal (Constitution IV); while loading we fall through
- * to {@link TaskList}, which shares the single `['tasks']` query so the read is deduped.
- *
- * Bare `C` is no longer owned by {@link TaskCapture} — the gate owns it (and its FR-031/AS-09
- * text-field suppression), so capture/help are CONTROLLED via `open`/`onClose`.
+ * Region branching (FR-049): a FAILED load shows an accessible error alert with retry;
+ * a confirmed-empty Inbox shows the EmptyState (hint + action, no shortcut copy — FR-110);
+ * loading falls through to the list (shared, deduped `['tasks']` query).
  */
 export default function WorkspaceHome() {
   const { data, isPending, isError, error, refetch } = useTasks();
   const tasks = useMemo(() => data ?? [], [data]);
   const isEmpty = !isPending && !isError && tasks.length === 0;
 
-  const { renameTask, setTaskDone, reorderTask, deleteTask, moveTaskToProject, setTaskLabels } = useTaskMutations();
-  const router = useRouter();
+  const {
+    renameTask,
+    setTaskDone,
+    reorderTask,
+    deleteTask,
+    moveTaskToProject,
+    setTaskLabels,
+    setTaskPriority,
+    rescheduleTask,
+  } = useTaskMutations();
+  const { duplicateTask } = useDuplicateTask();
 
-  // The page OWNS the entire keyboard surface state. `selectedIndex` indexes `tasks`;
-  // `captureOpen`/`helpOpen` drive the two controlled overlays; `renamingId` is the id of
-  // the row in inline-rename mode (or null).
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [captureOpen, setCaptureOpen] = useState(false);
-  const [helpOpen, setHelpOpen] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
-  // The id of the task whose move-to-project selector is open (or null). The selector reads the
-  // live task by id so a concurrent list change can't strand a stale row reference.
   const [movingId, setMovingId] = useState<string | null>(null);
-  // The id of the task whose label selector is open (or null). Read live by id (concurrent-change safe).
   const [labelingId, setLabelingId] = useState<string | null>(null);
+  const [priorityId, setPriorityId] = useState<string | null>(null);
+  const [reschedulingId, setReschedulingId] = useState<string | null>(null);
 
-  // Keep `selectedIndex` in range as the list shrinks (delete) or grows. A fixed index would
-  // otherwise dangle past the end after a delete and select nothing — clamp to the last row.
+  // Keep `selectedIndex` in range as the list shrinks (delete) or grows.
   useEffect(() => {
     setSelectedIndex((i) => Math.min(i, Math.max(0, tasks.length - 1)));
   }, [tasks.length]);
 
-  // The handler set is memoized because `useGlobalShortcuts` re-subscribes its document
-  // listener whenever the reference changes. The operate handlers close over `tasks` and
-  // `selectedIndex`, so both are in the deps — re-subscribing per change is cheap and keeps
-  // every handler reading the CURRENT selection/list (no stale closures). Every operate
-  // handler guards against no/invalid selection because the gate fires globally (even on an
-  // empty Inbox or while an overlay is open).
-  const shortcutHandlers = useMemo(
-    () => ({
-      onCapture: () => setCaptureOpen(true),
-      onHelp: () => setHelpOpen(true),
-      onMoveUp: () => setSelectedIndex((i) => Math.max(0, i - 1)),
-      onMoveDown: () => setSelectedIndex((i) => Math.min(tasks.length - 1, i + 1)),
+  const byId = (id: string | null): TaskResponse | undefined =>
+    id === null ? undefined : tasks.find((t) => t.id === id);
 
-      // Space — toggle the selected task done↔backlog (desired-state, idempotent under retry).
-      onToggle: () => {
-        const sel = tasks[selectedIndex];
-        if (!sel) return;
-        setTaskDone(sel.id, sel.status !== "done");
-      },
+  // Reorder one rank up/down: recomputes `between()` from FRESH neighbour ranks inside
+  // `reorderTask`; the menu items are the keyboard-reachable reorder path (S3.7, D9).
+  const moveRowUp = (index: number) => {
+    const sel = tasks[index];
+    if (!sel || index < 1) return;
+    reorderTask(sel.id, tasks[index - 2]?.id ?? null, tasks[index - 1]!.id);
+    setSelectedIndex(index - 1);
+  };
+  const moveRowDown = (index: number) => {
+    const sel = tasks[index];
+    if (!sel || index > tasks.length - 2) return;
+    reorderTask(sel.id, tasks[index + 1]!.id, tasks[index + 2]?.id ?? null);
+    setSelectedIndex(index + 1);
+  };
 
-      // E — enter inline-rename on the selected row (the row renders the autofocused input).
-      onRename: () => {
-        const sel = tasks[selectedIndex];
-        if (!sel) return;
-        setRenamingId(sel.id);
-      },
+  /** The complete Inbox row operation set (FR-103: EVERY operation has an affordance). */
+  const rowActions = (task: TaskResponse, index: number): TaskRowActions => ({
+    onToggleDone: () => setTaskDone(task.id, task.status !== "done"),
+    onEdit: () => {
+      setSelectedIndex(index);
+      setRenamingId(task.id);
+    },
+    onOpenPriority: () => setPriorityId(task.id),
+    onOpenReschedule: () => setReschedulingId(task.id),
+    onOpenLabels: () => setLabelingId(task.id),
+    onOpenMove: () => setMovingId(task.id),
+    onDuplicate: () => duplicateTask(task),
+    onMoveUp: index > 0 ? () => moveRowUp(index) : undefined,
+    onMoveDown: index < tasks.length - 1 ? () => moveRowDown(index) : undefined,
+    onDelete: () => deleteTask(task.id),
+  });
 
-      // M — open the move-to-project selector for the selected task (US-08.AS-05, R7). The
-      // selector lists the Inbox + every owned project; the actual move fires on selection.
-      onMove: () => {
-        const sel = tasks[selectedIndex];
-        if (!sel) return;
-        setMovingId(sel.id);
-      },
-
-      // L — open the label selector for the selected task (slice 006, US-08.AS-04). Per-user labels apply to
-      // any task (incl. personal Inbox tasks), so it is offered here unconditionally on a selected row.
-      onLabel: () => {
-        const sel = tasks[selectedIndex];
-        if (!sel) return;
-        setLabelingId(sel.id);
-      },
-
-      // Del — soft-delete the selected task (optimistic remove + rollback-in-place; the
-      // FR-049 failure announcement is the global MutationCache announcer — no bespoke toast).
-      onDelete: () => {
-        const sel = tasks[selectedIndex];
-        if (!sel) return;
-        deleteTask(sel.id);
-      },
-
-      // Alt+↑ — reorder the selected task UP one rank (FROZEN R18 chord). The list is ascending
-      // by `position` (top-is-lowest), so moving up means landing between the row two above
-      // (its new upper neighbour, smaller rank) and the row one above (its new lower neighbour).
-      // `reorderTask` recomputes `between()` from the FRESH neighbour ranks, so we pass ids.
-      onReorderUp: () => {
-        const sel = tasks[selectedIndex];
-        if (!sel || selectedIndex < 1) return;
-        const aboveId = tasks[selectedIndex - 2]?.id ?? null;
-        const belowId = tasks[selectedIndex - 1]!.id;
-        reorderTask(sel.id, aboveId, belowId);
-        setSelectedIndex(selectedIndex - 1);
-      },
-
-      // Alt+↓ — reorder the selected task DOWN one rank. It lands between the row one below
-      // (its new upper neighbour) and the row two below (its new lower neighbour, may be the tail).
-      onReorderDown: () => {
-        const sel = tasks[selectedIndex];
-        if (!sel || selectedIndex > tasks.length - 2) return;
-        const aboveId = tasks[selectedIndex + 1]!.id;
-        const belowId = tasks[selectedIndex + 2]?.id ?? null;
-        reorderTask(sel.id, aboveId, belowId);
-        setSelectedIndex(selectedIndex + 1);
-      },
-
-      // G-chord navigation (slice 005, US-08): G I → Inbox (here), G T → Today, G U → Upcoming.
-      onGoInbox: () => router.push("/"),
-      onGoToday: () => router.push("/today"),
-      onGoUpcoming: () => router.push("/upcoming"),
-      onGoAssigned: () => router.push("/assigned"),
-    }),
-    [tasks, selectedIndex, setTaskDone, deleteTask, reorderTask, router],
-  );
-  useGlobalShortcuts(shortcutHandlers);
-
-  // Inline-rename commit/cancel (driven by the row's input; T058). Commit re-stamps the
-  // validated title via the optimistic rename recipe (server 422 surfaces through the global
-  // announcer); both close edit mode so {@link TaskList} returns focus to the listbox.
   const commitRename = (title: string) => {
     if (renamingId !== null) {
       renameTask(renamingId, title);
     }
     setRenamingId(null);
   };
-  const cancelRename = () => setRenamingId(null);
+
+  const selectedTask = tasks[selectedIndex];
 
   return (
-    <section aria-labelledby="workspace-heading" className="tf-workspace">
-      <h1 id="workspace-heading">Your workspace</h1>
-      <TaskCapture open={captureOpen} onClose={() => setCaptureOpen(false)} />
-      <ShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
+    <section aria-labelledby="workspace-heading">
+      <h1 id="workspace-heading">Inbox</h1>
+
+      <TaskCapture errorId="inbox-capture-error" inputId={CAPTURE_INPUT_ID} />
+
       <ProjectSelector
         open={movingId !== null}
         onClose={() => setMovingId(null)}
-        task={tasks.find((t) => t.id === movingId)}
-        // These are Inbox rows (project_id IS NULL), so the source is the Inbox (fromProjectId=null);
-        // null target = stay/return to Inbox, a project id moves it there (R6/R7).
+        task={byId(movingId)}
         onSelect={(projectId) => {
           if (movingId !== null) moveTaskToProject(movingId, projectId, null);
         }}
       />
-      {(() => {
-        const labelingTask = labelingId !== null ? tasks.find((t) => t.id === labelingId) : undefined;
-        return labelingTask ? (
-          <LabelSelector
-            open
-            current={labelingTask.labels}
-            onClose={() => setLabelingId(null)}
-            onSubmit={(ids) => {
-              setTaskLabels(labelingTask.id, ids);
-              setLabelingId(null);
-            }}
-          />
-        ) : null;
-      })()}
+      {byId(labelingId) ? (
+        <LabelSelector
+          open
+          current={byId(labelingId)!.labels}
+          onClose={() => setLabelingId(null)}
+          onSubmit={(ids) => {
+            setTaskLabels(labelingId!, ids);
+            setLabelingId(null);
+          }}
+        />
+      ) : null}
+      {byId(priorityId) ? (
+        <PriorityPicker
+          open
+          current={byId(priorityId)!.priority}
+          onClose={() => setPriorityId(null)}
+          onSelect={(priority) => setTaskPriority(priorityId!, priority)}
+        />
+      ) : null}
+      {byId(reschedulingId) ? (
+        <RescheduleInput
+          open
+          onClose={() => setReschedulingId(null)}
+          onSubmit={(dueDate, dueHasTime) => {
+            rescheduleTask(reschedulingId!, dueDate, dueHasTime);
+            setReschedulingId(null);
+          }}
+        />
+      ) : null}
 
       {isError ? (
-        // `role="alert"` announces the load failure assertively (it's a direct response to
-        // the user's own navigation), distinct from the quiet empty-inbox hint. The retry
-        // button re-runs the single `['tasks']` query (FR-049).
-        <div role="alert" className="tf-workspace__error">
-          <p>We couldn&apos;t load your tasks. {error.message}</p>
-          <button type="button" className="tf-button" onClick={() => void refetch()}>
-            Retry
-          </button>
+        <div role="alert">
+          <p>Nie udało się wczytać zadań. {error.message}</p>
+          <Button variant="secondary" onClick={() => void refetch()}>
+            Spróbuj ponownie
+          </Button>
         </div>
       ) : isEmpty ? (
-        <p className="tf-workspace__empty">
-          Your Inbox is empty. Press <kbd>C</kbd> to create your first task.
-        </p>
+        <EmptyState
+          hint="Twój Inbox jest pusty."
+          action={
+            <Button onClick={() => document.getElementById(CAPTURE_INPUT_ID)?.focus()}>
+              Dodaj pierwszy task
+            </Button>
+          }
+        />
       ) : (
         <TaskList
           selectedIndex={selectedIndex}
           onSelectedIndexChange={setSelectedIndex}
           renamingId={renamingId}
           onCommitRename={commitRename}
-          onCancelRename={cancelRename}
+          onCancelRename={() => setRenamingId(null)}
+          onToggleSelected={
+            selectedTask ? () => setTaskDone(selectedTask.id, selectedTask.status !== "done") : undefined
+          }
+          rowActions={rowActions}
         />
       )}
     </section>

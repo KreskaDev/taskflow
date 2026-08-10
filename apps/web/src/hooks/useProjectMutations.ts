@@ -1,5 +1,6 @@
 "use client";
 
+import { invalidateViewCounts } from "@/hooks/useViewCounts";
 import { type QueryClient, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { apiClient, mapError, type ProblemDetails } from "@/lib/api/client";
@@ -54,6 +55,8 @@ function rollback(queryClient: QueryClient, context: ProjectMutationContext | un
 async function settle(queryClient: QueryClient): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: ACTIVE_PROJECTS_KEY });
   await queryClient.invalidateQueries({ queryKey: ARCHIVED_PROJECTS_KEY });
+  // Membership/project changes shift the sidebar counts (slice 019, D6).
+  await invalidateViewCounts(queryClient);
 }
 
 /* ───────────────────────────────── CREATE (PUT) ────────────────────────────────── */

@@ -1,0 +1,66 @@
+/* Topbar (T036) — 44px chrome bar on bg-deep (mockup). */
+
+.topbar {
+  grid-area: topbar;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: var(--topbar-height);
+  padding: 0 var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-deep);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+}
+
+.brand {
+  font-weight: var(--weight-heading);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  text-decoration: none;
+}
+
+/* Disabled search placeholder (slice 013 owns function): visually per mockup,
+   excluded from the tab order, announced unavailable. */
+.search {
+  flex: 1;
+  max-width: 340px;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 32px;
+  padding: 0 var(--space-3);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text-secondary);
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: 0;
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: not-allowed;
+}
+
+.search input::placeholder {
+  color: var(--color-text-secondary);
+}
+
+.newTask {
+  flex: none;
+}
+
+.identity {
+  display: inline-flex;
+  border-radius: 50%;
+  flex: none;
+}
