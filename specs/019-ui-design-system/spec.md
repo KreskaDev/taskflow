@@ -34,9 +34,12 @@ Slice-specific (owned IDs):
 - SC-018 (first-time user completes the full daily workflow with visible UI only, shortcut system absent)
 
 Partially realized (owned elsewhere or shared):
-- FR-102 — the persisted-`position` reorder API already ships (PATCH `/api/tasks/{id}/position`); this slice delivers its VISIBLE reorder affordance (drag handle and/or move actions in the row menu) per the FR-102 parenthetical and FR-103. The keyboard reorder binding stays deferred (OOS-20).
-- FR-032/FR-034 (command palette) — NOT owned here (slice 013); this slice must not regress the constraint that no operation is reachable ONLY via the palette (FR-103).
+- FR-102 — the persisted-`position` reorder API already ships (PATCH `/api/tasks/{id}/position`); this slice delivers its VISIBLE reorder affordance (drag handle AND "Move up"/"Move down" in the row "⋯" menu — per clarification 2026-08-09) per the FR-102 parenthetical and FR-103. The keyboard reorder binding stays deferred (OOS-20).
+- FR-032/FR-034 (command palette / search) — NOT owned here (slice 013); this slice must not regress the constraint that no operation is reachable ONLY via the palette (FR-103). The topbar ships the mockup's search field as a DISABLED placeholder (visually consistent, excluded from tab order, announced as unavailable); functional, keyboard-focusable search arrives with slice 013 — UIT-022's focusability/functionality assertions transfer there, 019 asserts only the placeholder's presence and disabled semantics.
 - FR-048 (mode/palette switching UI + OS preference) — NOT owned here (slice 018 per ASM-07); this slice ships the token architecture and all four palettes; the default is `dark-cool` with no user-facing switcher yet.
+
+New capability (allocated by product-vision amendment, 2026-08-09):
+- FR-112 (task duplication — "Duplikuj" in the row "⋯" menu) — added by owner decision (2026-08-09 clarification, confirming the approved mockup and UIT-041); allocated in product-vision.md under the US-18 FR block before `/speckit-plan` ran, per the recorded precondition. Owned by this slice.
 
 Cross-cutting (realized in this slice):
 - UI accessibility — FR-042, FR-043, FR-044, FR-045, FR-046, FR-047, FR-101 (this slice makes them verifiable per palette; FR-031 is dormant per the FR-027..031 deferral note — its regression here is that no single-key bindings exist at all)
@@ -63,6 +66,16 @@ Depends on:
 > scenario keeps its canonical `US-18.AS-xx` anchor where one exists, and scenarios added
 > by this spec are numbered locally per story (`S<n>.<k>`). Slice-local ID namespaces:
 > `INV-###` (feature inventory), `UIT-###` (test plan).
+
+## Clarifications
+
+### Session 2026-08-09
+
+- Q: The mockup and UIT-022 show a search field in the topbar, but search functionality (FR-032/FR-034) belongs to slice 013 — what should slice 019 ship in the topbar? → A: A disabled placeholder: the search field renders per the mockup but is non-functional and excluded from tab order until slice 013.
+- Q: The mockup and UIT-041 list "Duplikuj" (duplicate task) in the row "⋯" menu, but no product-vision FR covers duplication and the shipped app has no such feature — drop it or ship it? → A: Ship it: task duplication is added to slice 019 as a new capability; a product-vision amendment must allocate its FR ID before /speckit-plan.
+- Q: S3.7 leaves the reorder affordance as "drag handle and/or move actions in the row ⋯ menu" — which form ships? → A: Both: a drag handle on hover/focus for pointer reordering AND "Move up"/"Move down" items in the ⋯ menu as the keyboard-reachable equivalent.
+- Q: What context does the persistent global "+ New task" target when clicked from different views? → A: It inherits the current view's context where one is defined (Inbox → Inbox; project view → that project; Today → due today) and falls back to Inbox on all other surfaces (Upcoming, Assigned, Settings, …).
+- Q: What exactly does each sidebar item count represent (new authorization-scoped read, FR-109)? → A: The number of INCOMPLETE tasks the view would list: Inbox = incomplete unprojected; Today = due today + overdue; Upcoming = due in its window; Assigned = incomplete assigned to the caller; project = incomplete tasks in that project.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -135,13 +148,13 @@ Tab/Enter/Esc interaction; a binding audit confirms no single-key shortcut is re
 
 **Acceptance Scenarios**:
 
-1. **(US-18.AS-01) Given** any view where tasks can exist, **When** the user looks at it, **Then** a visible "add task" affordance is present (global "+ New task" in the app bar AND an inline add within the list) and creates a task in that context.
-2. **(US-18.AS-02) Given** a task row, **When** the user points at or focuses it, **Then** quick actions (complete, edit, overflow "⋯") are visible, and the "⋯" menu exposes every operation available on that task (edit, priority, due date, labels, move, assign, comments, delete) — with keyboard-focus equivalents (FR-046).
-3. **(US-18.AS-04) Given** the sidebar, **When** the user reads it, **Then** all primary views (Inbox, Today, Upcoming, Assigned, projects) are clickable entries with icons and item counts, and the sidebar is collapsible.
+1. **(US-18.AS-01) Given** any view where tasks can exist, **When** the user looks at it, **Then** a visible "add task" affordance is present (global "+ New task" in the app bar AND an inline add within the list) and creates a task in that context. Context resolution for the global button: Inbox → Inbox; project view → that project; Today → new task due today; all other surfaces (Upcoming, Assigned, Settings, …) → Inbox.
+2. **(US-18.AS-02) Given** a task row, **When** the user points at or focuses it, **Then** quick actions (complete, edit, overflow "⋯") are visible, and the "⋯" menu exposes every operation available on that task (edit, priority, due date, labels, move, assign, duplicate, comments, delete) — with keyboard-focus equivalents (FR-046).
+3. **(US-18.AS-04) Given** the sidebar, **When** the user reads it, **Then** all primary views (Inbox, Today, Upcoming, Assigned, projects) are clickable entries with icons and item counts (count = incomplete tasks the view would list; Today includes overdue), and the sidebar is collapsible.
 4. **(US-18.AS-05) Given** any empty list, **When** it renders, **Then** it shows a short hint plus the relevant action button (no onboarding wizards — Principle IV).
-5. **(S3.5) Given** the application after this slice, **When** the user presses any former shortcut key (C/E/M/L/T/1–4, G-chords, `?`) while a list has focus, **Then** nothing happens — no action fires, no dead binding errors — and the shortcuts help overlay no longer exists (FR-111); standard editing keys (Ctrl+Enter save, Esc cancel — FR-030) and WCAG operability (Tab order, arrows within composite widgets) still work.
+5. **(S3.5) Given** the application after this slice, **When** the user presses any former shortcut key (C/E/M/L/T/A/1–4, G-chords, `?`, Delete) while a list has focus, **Then** nothing happens — no action fires, no dead binding errors — and the shortcuts help overlay no longer exists (FR-111); standard editing keys (Ctrl+Enter save, Esc cancel — FR-030) and WCAG operability (Tab order, arrows within composite widgets) still work.
 6. **(S3.6) Given** a first-time user with no instruction, **When** they attempt the full daily workflow (create → edit → set priority/date/labels → move to project → complete → comment on a shared task), **Then** every step is completable through visible controls alone (SC-018).
-7. **(S3.7) Given** a task list, **When** the user wants to reorder tasks, **Then** a visible reorder affordance exists (drag handle and/or move actions in the row "⋯" menu) persisting the order through the existing reorder capability (FR-102 affordance; non-pointer equivalent required).
+7. **(S3.7) Given** a task list, **When** the user wants to reorder tasks, **Then** BOTH reorder affordances exist: a drag handle revealed on row hover/focus for pointer reordering, AND "Move up"/"Move down" items in the row "⋯" menu as the keyboard-reachable non-pointer equivalent (FR-046) — each persisting the order through the existing reorder capability (FR-102 affordance).
 
 ---
 
@@ -257,11 +270,15 @@ for tokens, dimensions, and the menu/modal/toast contracts.
 - **FR-104**: The UI MUST be built on a single set of design tokens (color, typography, spacing, radii, elevation) applied consistently across all views, with token names and values taken 1:1 from the owner's KreskaDev token system (2 modes × 2 palettes; see `specs/019-ui-design-system/design-brief.md`) so the set stays extractable into a future shared package. The default theme is `dark-cool` ("black and blue", accent `#5290BD`) at Linear-inspired density (13px base list typography); components use semantic tokens only (no raw hexes), and every token combination MUST satisfy FR-044 contrast in each palette. (Slice 019 ships the token architecture with all four palettes; the mode/palette switcher and preference persistence arrive with the theming story — ASM-07/OOS-10.) *(Story 1)*
 - **FR-105**: Application chrome (navigation, actions, statuses) MUST use a single coherent icon set; emoji MUST NOT serve as system iconography (they remain permitted solely as user-chosen project icons). Users MUST be represented by avatars — Google photo with an initials fallback — wherever authorship, assignment, or mention identity is shown. *(Story 1)*
 - **FR-106**: Task details (all editable fields plus, for shared-project tasks, the comment thread) MUST open in a right-side detail panel (drawer) without leaving the current view. *(Story 4)*
-- **FR-107**: A visible "add task" affordance MUST be present on every view where tasks can exist: a persistent global "+ New task" action in the app bar AND an inline add within each task list (Inbox, project, Today), creating the task in that view's context. *(Story 3)*
+- **FR-107**: A visible "add task" affordance MUST be present on every view where tasks can exist: a persistent global "+ New task" action in the app bar AND an inline add within each task list (Inbox, project, Today), creating the task in that view's context. *(Story 3)* — Clarified 2026-08-09: the global action inherits the current view's context (Inbox → Inbox; project → that project; Today → due today) and falls back to Inbox on surfaces without a creation context (Upcoming, Assigned, Settings).
 - **FR-108**: Each task row MUST expose quick actions on hover/focus (complete, edit, overflow) and a "⋯" menu containing every operation available on that task; all row actions MUST have keyboard-focus-triggered equivalents (FR-046) and correct hit targets/stacking so pointer clicks always land (Principle I). *(Story 3)*
-- **FR-109**: The sidebar MUST present all primary views (Inbox, Today, Upcoming, Assigned, projects) as clickable entries with icons and item counts, and MUST be collapsible. *(Story 3)*
+- **FR-109**: The sidebar MUST present all primary views (Inbox, Today, Upcoming, Assigned, projects) as clickable entries with icons and item counts, and MUST be collapsible. *(Story 3)* — Clarified 2026-08-09: each count is the number of INCOMPLETE tasks the view would list (Inbox = incomplete unprojected; Today = due today + overdue; Upcoming = due within its window; Assigned = incomplete tasks assigned to the caller; project = incomplete tasks in that project), computed by an authorization-scoped read (FR-065/FR-068).
 - **FR-110**: Every empty list state MUST present a short explanatory hint plus the relevant action button; onboarding wizards and first-run modal tours remain prohibited (Principle IV). *(Stories 3, 5)*
 - **FR-111**: The existing single-key shortcut system (global/list/navigation bindings and the shortcuts help overlay) MUST be removed from the application as part of realizing US-18; standard editing keys (FR-030) and WCAG operability (FR-042..047, FR-101) MUST remain intact. *(Stories 2, 3)*
+
+### Slice-added Requirement (allocated 2026-08-09)
+
+- **FR-112**: The row "⋯" menu MUST offer "Duplikuj", creating a new task in the same context (same list/project) copying the user-editable fields — title, description, priority, due date, labels, and assignees where the caller's membership still permits assignment — but NOT completion state and NOT comments. The duplicate appears optimistically (Principle III) and is subject to the same authorization scoping as task creation (FR-065/FR-068). *(Story 3; UIT-041)*
 
 ### Cross-cutting Requirements (realized in this slice)
 
@@ -298,7 +315,7 @@ the redesigned surfaces with behavior unchanged (see Entity touchpoints in Prove
 - **Regression gate** (this slice's exit bar, §J2.5): 100% of `feature-inventory.md` entries have a covering automated test, and the full inventory passes against the redesigned UI in CI. *(Story 2)*
 - **SC-008** (referenced): Every main view passes automated accessibility audit at WCAG 2.1 AA level — extended here to run per palette (×4). *(Stories 1, 5)*
 - **SC-002 / SC-003** (referenced): FCP <1 s, TTI <2.5 s; optimistic paint within 16 ms — the redesign MUST NOT regress these budgets (UIT-110/111 guard them).
-- **SC-014** (referenced): live fan-out within ~1 s remains intact on redesigned surfaces (UIT-045/082/112).
+- **SC-014** (referenced, deferred): live fan-out within ~1 s is not verifiable this slice — the real-time transport arrives with slice 016. UIT-045/082/112 transfer to slice 016 via the inventory's transfer notes (D11); this slice's obligation is only that redesigned surfaces do not preclude their later passage.
 - **Sweep & cleanup gate** (§J3): an automated post-migration audit finds zero raw hex values outside the token source file, zero surfaces styled outside the design system, and zero unreferenced UI-layer modules (dead code, including shortcut-system remnants). *(Story 5)*
 
 **Test plan**: `ui-test-plan.md` (UIT-001..UIT-112) enumerates the design-system tests
