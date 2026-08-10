@@ -43,7 +43,9 @@ export function CommentThread({
   const canCompose = role === "owner" || role === "editor";
 
   return (
-    <section className="tf-comment-thread" aria-label="Komentarze">
+    // No own aria-label: the drawer's comment SECTION (DrawerCommentSection) is the single
+    // "Komentarze" landmark — a second nested one would duplicate the region name (T053).
+    <section className="tf-comment-thread">
       {comments.length === 0 ? (
         <p className="tf-comment-thread__empty">Brak komentarzy.</p>
       ) : (

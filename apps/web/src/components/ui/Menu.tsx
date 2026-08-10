@@ -92,7 +92,9 @@ export function Menu({
     first?.focus();
   }, [open]);
 
-  // Click outside closes (without stealing focus back to the trigger).
+  // Click outside closes (without stealing focus back to the trigger). Esc closes even
+  // when focus sits OUTSIDE the popup (e.g. it never landed or was moved) — a scoped,
+  // while-open dismissal listener, not a global shortcut binding (FR-111 stays honored).
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (event: PointerEvent) => {
@@ -100,8 +102,18 @@ export function Menu({
       if (menuRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
       close(false);
     };
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      close(true);
+    };
     document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onEscape, true);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onEscape, true);
+    };
   }, [open, close]);
 
   const focusables = (): HTMLElement[] =>
