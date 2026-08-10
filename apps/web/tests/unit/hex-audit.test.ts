@@ -4,12 +4,10 @@
  *
  * tokens.css is the ONLY file allowed to contain raw color values. This test greps
  * `#[0-9A-Fa-f]{3,8}` across apps/web/src/** (TS/TSX/CSS) and fails on any match
- * outside it. Recognized exemptions:
- *   1. globals.css lines BELOW the `LEGACY — delete in T064` marker (T005's retained
- *      pre-redesign rules; T064 deletes the block AND this exemption together);
- *   2. an inline `hex-audit-exempt:` justification comment on the same line
- *      (contracts/ui-theme.md — currently unused; the LEGACY block is the only
- *      allowed exemption until T064).
+ * outside it. The single recognized exemption is an inline `hex-audit-exempt:`
+ * justification comment on the same line (contracts/ui-theme.md — currently unused).
+ * T064 deleted the T005 LEGACY block in globals.css together with its blanket
+ * exemption — the audit now runs unexempted (S5.6).
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
@@ -17,8 +15,6 @@ import { describe, expect, it } from "vitest";
 
 const SRC_DIR = resolve(__dirname, "../../src");
 const TOKENS_FILE = resolve(SRC_DIR, "app/tokens.css");
-const GLOBALS_FILE = resolve(SRC_DIR, "app/globals.css");
-const LEGACY_MARKER = "LEGACY — delete in T064";
 
 /** Hex color literal. The trailing boundary keeps 9+ hex-char ids (UUID chunks in
  * comments) out; CSS ids/urls do not appear in source. */
@@ -47,13 +43,8 @@ describe("hex audit — zero raw colors outside tokens.css (UIT-004)", () => {
       if (file === TOKENS_FILE) continue;
 
       const lines = readFileSync(file, "utf8").split(/\r?\n/);
-      let inLegacyBlock = false;
 
       lines.forEach((line, index) => {
-        if (file === GLOBALS_FILE && line.includes(LEGACY_MARKER)) {
-          inLegacyBlock = true; // runs to EOF — T064 deletes the whole tail
-        }
-        if (inLegacyBlock) return;
         if (line.includes("hex-audit-exempt:")) return;
 
         const matches = line.match(HEX_PATTERN);

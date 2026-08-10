@@ -10,7 +10,7 @@ export const MAX_LABEL_NAME_LENGTH = 50;
 
 export const labelNameSchema = z.string().trim().min(1).max(MAX_LABEL_NAME_LENGTH);
 
-export type LabelName = z.infer<typeof labelNameSchema>;
+type LabelName = z.infer<typeof labelNameSchema>;
 
 /**
  * Label-set validation (slice 006, R2): a set of the caller's label ids (uuids), no duplicates, bounded —
@@ -24,4 +24,4 @@ export const labelSetSchema = z
   .max(MAX_LABELS_PER_TASK)
   .refine((ids) => new Set(ids).size === ids.length, { message: "Label ids must not contain duplicates" });
 
-export type LabelSet = z.infer<typeof labelSetSchema>;
+type LabelSet = z.infer<typeof labelSetSchema>;

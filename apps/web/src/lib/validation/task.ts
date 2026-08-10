@@ -8,7 +8,7 @@ import { z } from "zod";
  */
 export const taskTitleSchema = z.string().trim().min(1).max(500);
 
-export type TaskTitle = z.infer<typeof taskTitleSchema>;
+type TaskTitle = z.infer<typeof taskTitleSchema>;
 
 /**
  * Create-payload validation (research R8 pairing invariant, Constitution VI
@@ -30,7 +30,7 @@ export const createTaskSchema = z
     { message: "dueDate and dueHasTime must both be present or both be absent" },
   );
 
-export type CreateTaskInput = z.infer<typeof createTaskSchema>;
+type CreateTaskInput = z.infer<typeof createTaskSchema>;
 
 /**
  * Task priority (slice 005, R2). The closed token set `P0`–`P3`, validated at the client trust
@@ -42,7 +42,7 @@ export const prioritySchema = z.enum(["P0", "P1", "P2", "P3"]).nullable();
 export type Priority = z.infer<typeof prioritySchema>;
 
 /** The maximum description length (markdown source), mirroring the server (R3). */
-export const MAX_DESCRIPTION_LENGTH = 8000;
+const MAX_DESCRIPTION_LENGTH = 8000;
 
 /**
  * The full task-editor payload (slice 005, AS-06/07/08, R4) — a WHOLE-OBJECT replace validated at the
@@ -65,18 +65,18 @@ export const editTaskSchema = z
     path: ["dueDate"],
   });
 
-export type EditTaskInput = z.infer<typeof editTaskSchema>;
+type EditTaskInput = z.infer<typeof editTaskSchema>;
 
 /**
  * Assignee-set validation (slice 008, R2). A set of member user ids (uuids), no duplicates, bounded — the
  * client trust boundary mirroring the server's `SetTaskAssigneesValidator`. Membership-validity is a
  * server-side cross-row check (the picker only offers members, so the client cannot be authoritative).
  */
-export const MAX_ASSIGNEES = 50;
+const MAX_ASSIGNEES = 50;
 
 export const assigneeSetSchema = z
   .array(z.string().uuid())
   .max(MAX_ASSIGNEES)
   .refine((ids) => new Set(ids).size === ids.length, { message: "Assignee ids must not contain duplicates" });
 
-export type AssigneeSet = z.infer<typeof assigneeSetSchema>;
+type AssigneeSet = z.infer<typeof assigneeSetSchema>;

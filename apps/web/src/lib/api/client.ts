@@ -6,7 +6,7 @@ import type { components, paths } from "@/lib/api/generated/schema";
  * (`/api/proxy/...`), never the API directly; the proxy attaches the identity
  * carrier and forwards the path verbatim to the internal API.
  */
-export const API_PROXY_BASE_URL = "/api/proxy";
+const API_PROXY_BASE_URL = "/api/proxy";
 
 export const apiClient = createClient<paths>({ baseUrl: API_PROXY_BASE_URL });
 
@@ -18,7 +18,7 @@ export type ProblemDetails = components["schemas"]["ProblemDetails"];
  * `version_conflict`) widens this type after `pnpm gen:api`, which forces the
  * `ERROR_UX` map below to grow a matching entry — the compiler is the exhaustiveness gate (T027).
  */
-export type ErrorCode = NonNullable<components["schemas"]["ProblemDetails"]["errorCode"]>;
+type ErrorCode = NonNullable<components["schemas"]["ProblemDetails"]["errorCode"]>;
 
 /** How the client should react to a given error code (FR-049). */
 export interface ErrorUx {

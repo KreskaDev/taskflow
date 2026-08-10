@@ -36,6 +36,6 @@ export const transferSchema = z.object({
 });
 
 export type MembershipRole = z.infer<typeof membershipRoleSchema>;
-export type InviteInput = z.infer<typeof inviteSchema>;
-export type ChangeRoleInput = z.infer<typeof changeRoleSchema>;
-export type TransferInput = z.infer<typeof transferSchema>;
+type InviteInput = z.infer<typeof inviteSchema>;
+type ChangeRoleInput = z.infer<typeof changeRoleSchema>;
+type TransferInput = z.infer<typeof transferSchema>;

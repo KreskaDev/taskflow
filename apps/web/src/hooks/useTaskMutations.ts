@@ -948,7 +948,7 @@ export interface EditTaskVariables {
  * editable fields and recomputes view membership/order. Plain rollback on error. `onSettled` additionally
  * invalidates the source + target project caches when the edit moved the task across projects.
  */
-export function editTaskMutationOptions(queryClient: QueryClient): ViewMutationOptions<EditTaskVariables> {
+function editTaskMutationOptions(queryClient: QueryClient): ViewMutationOptions<EditTaskVariables> {
   return {
     mutationFn: async (variables: EditTaskVariables): Promise<TaskResponse> => {
       const { id, title, description, priority, dueDate, dueHasTime, projectId, version } = variables;

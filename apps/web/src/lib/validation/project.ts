@@ -12,7 +12,7 @@ import { PROJECT_COLORS, PROJECT_ICONS } from "@/lib/projectPresets";
  */
 
 /** A project name: trimmed, non-empty, ≤ 200 chars (API `MaxNameLength = 200` — NOT the task 500). */
-export const projectNameSchema = z.string().trim().min(1).max(200);
+const projectNameSchema = z.string().trim().min(1).max(200);
 
 /**
  * The FROZEN preset color/icon enums (ASM-04, R10). Built from the `projectPresets` tuples so the
@@ -20,8 +20,8 @@ export const projectNameSchema = z.string().trim().min(1).max(200);
  * rather than a `.refine` that would erase the inferred type. The tuples are `readonly … as const`,
  * so they are spread into a mutable copy to satisfy `z.enum`'s `[string, ...string[]]` signature.
  */
-export const projectColorSchema = z.enum([...PROJECT_COLORS] as [string, ...string[]]);
-export const projectIconSchema = z.enum([...PROJECT_ICONS] as [string, ...string[]]);
+const projectColorSchema = z.enum([...PROJECT_COLORS] as [string, ...string[]]);
+const projectIconSchema = z.enum([...PROJECT_ICONS] as [string, ...string[]]);
 
 /**
  * The task disposition (FR-014/EC-03, R5) chosen when deleting a project that has tasks:
@@ -62,7 +62,7 @@ export const editProjectSchema = z.object({
   version: z.number(),
 });
 
-export type CreateProjectInput = z.infer<typeof createProjectSchema>;
-export type EditProjectInput = z.infer<typeof editProjectSchema>;
+type CreateProjectInput = z.infer<typeof createProjectSchema>;
+type EditProjectInput = z.infer<typeof editProjectSchema>;
 export type TaskDisposition = z.infer<typeof taskDispositionSchema>;
 export type ChildDisposition = z.infer<typeof childDispositionSchema>;

@@ -26,6 +26,8 @@ jobs:
       - run: pnpm --filter @taskflow/web lint
       - run: pnpm --filter @taskflow/web typecheck
       - run: pnpm --filter @taskflow/web test
+      # Dead-code gate (slice 019, T065/D14 — §J3.7): zero unreferenced UI-layer modules.
+      - run: pnpm --filter @taskflow/web audit:dead
 
   # Playwright E2E in CI (slice 019, D14): without this job the inventory/S2.4 gate and
   # every [E]/[A]/[V] exit criterion would be advisory-only. The harness self-boots its

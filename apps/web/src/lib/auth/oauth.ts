@@ -19,7 +19,7 @@ const GOOGLE_DEFAULTS = {
 } as const;
 
 /** The OAuth callback path the BFF listens on; the IdP redirects the browser here. */
-export const CALLBACK_PATH = "/api/auth/callback";
+const CALLBACK_PATH = "/api/auth/callback";
 
 /** Cookie carrying the in-flight OAuth transaction between `/signin` and `/callback`. */
 export const OAUTH_TX_COOKIE = "taskflow_oauth";
