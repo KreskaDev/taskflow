@@ -99,10 +99,10 @@ all owned AS + EC-11 covered by tagged tests
 
 **Purpose**: Gates green, no dead code, full-suite verification, manual validation.
 
-- [ ] T023 Run `pnpm --dir apps/web test` and drive the inventory-coverage gate green: every slice-010 `INV-###` row from T002 has an `[INV-###]`-tagged covering test and every tag has a row (typo guard) — reconcile rows/tags as needed (D11)
-- [ ] T024 [P] Run `pnpm --dir apps/web exec knip` (zero dead modules) and confirm the hex audit passes with no new exemptions (tokens-only styling in all new .module.css)
-- [ ] T025 Run the full suites per quickstart.md: `pnpm --dir apps/web test`, `dotnet build apps/api/src/TaskFlow.Api -c Debug` + `pnpm --dir apps/web e2e`, `dotnet test` in apps/api — all green; re-check the `tasks-core` shard capacity after the new container-per-fact tests (D12: budget ~12–16 new facts; verify the complement filters still partition correctly)
-- [ ] T026 Walk quickstart.md Scenarios 1–4 against the interactive stack (`node apps/web/dev-run.mjs`): Board rendering + moves, last-used mode, groupable List + cancelled, authorization matrix (viewer read-only + forged PATCH 403, non-member 404, editor full rights, D4 owner-sees-member-task repair incl. sidebar count)
+- [X] T023 Run `pnpm --dir apps/web test` and drive the inventory-coverage gate green: every slice-010 `INV-###` row from T002 has an `[INV-###]`-tagged covering test and every tag has a row (typo guard) — reconcile rows/tags as needed (D11)
+- [X] T024 [P] Run `pnpm --dir apps/web exec knip` (zero dead modules) and confirm the hex audit passes with no new exemptions (tokens-only styling in all new .module.css)
+- [X] T025 Run the full suites per quickstart.md: `pnpm --dir apps/web test`, `dotnet build apps/api/src/TaskFlow.Api -c Debug` + `pnpm --dir apps/web e2e`, `dotnet test` in apps/api — all green; re-check the `tasks-core` shard capacity after the new container-per-fact tests (D12: budget ~12–16 new facts; verify the complement filters still partition correctly)
+- [X] T026 Walk quickstart.md Scenarios 1–4 against the interactive stack (`node apps/web/dev-run.mjs`): Board rendering + moves, last-used mode, groupable List + cancelled, authorization matrix (viewer read-only + forged PATCH 403, non-member 404, editor full rights, D4 owner-sees-member-task repair incl. sidebar count)
 
 ---
 
