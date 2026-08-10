@@ -1,0 +1,43 @@
+/* BoardColumn (slice 010, T017) — one labelled status column of the Kanban board. */
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.heading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 0 var(--space-1);
+}
+
+.headingLabel {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heading);
+  color: var(--color-text-primary);
+}
+
+.headingCount {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-surface);
+  min-height: 120px;
+  overflow-y: auto;
+}
+
+/* Drop-target affordance while a card hovers the column (dnd-kit isOver). */
+.list[data-over="true"] {
+  border-color: var(--color-accent);
+}

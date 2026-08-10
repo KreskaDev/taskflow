@@ -1,0 +1,23 @@
+/* BoardView (slice 010, T018) — the four-column Kanban grid + drag overlay. */
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  gap: var(--space-3);
+  align-items: start;
+}
+
+/* The moving visual while a card is dragged — portalled above the columns (--z-menu). */
+.dragOverlay {
+  z-index: var(--z-menu);
+}
+
+.dragPreview {
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-surface);
+  box-shadow: 0 8px 24px var(--color-scrim);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+}
