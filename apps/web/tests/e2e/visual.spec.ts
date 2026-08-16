@@ -39,6 +39,17 @@ async function forcePalette(page: Page, palette: string): Promise<void> {
   }, palette);
 }
 
+/**
+ * [V] guard: the pixels about to become CI truth must use the app's REAL typography.
+ * Red whenever the palette swap (or anything else) knocks out the next/font variable
+ * classes and the body falls back to a serif system font.
+ */
+async function assertRealTypography(page: Page): Promise<void> {
+  await expect
+    .poll(() => page.evaluate(() => getComputedStyle(document.body).fontFamily))
+    .toContain("Geist");
+}
+
 /** The harness runs `next dev` — hide its DevTools badge from every baseline. */
 const SCREENSHOT_STYLE = fileURLToPath(new URL("./visual.hide-dev-overlay.css", import.meta.url));
 
@@ -84,6 +95,7 @@ for (const screen of SCREENS) {
             await expect(page.locator('[class*="EmptyState"]').first()).toBeVisible();
           }
           await forcePalette(page, palette);
+          await assertRealTypography(page);
 
           await expect(page).toHaveScreenshot(`${screen.slug}-${palette}-${width}.png`, {
             fullPage: true,
@@ -164,6 +176,7 @@ test.describe("[V] project board & grouped list (slice 010)", () => {
             await expect(page.getByRole("group", { name: "Anulowane" })).toBeVisible();
           }
           await forcePalette(page, palette);
+          await assertRealTypography(page);
 
           await expect(page).toHaveScreenshot(`${projection}-${palette}-${width}.png`, {
             fullPage: true,
@@ -191,6 +204,7 @@ test.describe("[V] signin (anonymous)", () => {
         await page.goto("/signin");
         await page.waitForLoadState("networkidle");
         await forcePalette(page, palette);
+        await assertRealTypography(page);
 
         await expect(page).toHaveScreenshot(`signin-${palette}-${width}.png`, {
           fullPage: true,
