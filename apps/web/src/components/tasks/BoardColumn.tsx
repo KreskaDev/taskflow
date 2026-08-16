@@ -1,14 +1,13 @@
 "use client";
 
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { BoardCard } from "@/components/tasks/BoardCard";
-import { taskOptionId, type TaskRowActions } from "@/components/tasks/TaskRow";
+import type { TaskRowActions } from "@/components/tasks/TaskRow";
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { TaskResponse } from "@/hooks/useTasks";
 import type { BoardStatus } from "@/lib/board";
-import { listboxKeyDown } from "@/lib/listboxKeys";
 import styles from "./BoardColumn.module.css";
 
 /** Polish plural for the column count: 1 zadanie · 2–4 zadania · 5+ zadań. */
@@ -37,12 +36,13 @@ interface BoardColumnProps {
 }
 
 /**
- * One Kanban column (slice 010, T017 — research D10): a `role="listbox"` labelled
- * „<label>, N zadań” (live count included) whose options are the cards. Arrow navigation
- * reuses the shared {@link listboxKeyDown} INSIDE the column; the column is a single tab
- * stop, so Tab moves between columns (and the rest of the page). The column body is the
- * dnd-kit drop target (`useDroppable` by status); an empty column renders the catalog
- * {@link EmptyState} (FR-110) and stays a valid drop target.
+ * One Kanban column (slice 010, T017): a `role="list"` labelled „<label>, N zadań” (live
+ * count included) whose cards are `role="listitem"`s. A card's controls (checkbox, „⋯”
+ * menu) are ordinary tab stops — an option-role column would forbid focusable children
+ * (axe `nested-interactive`), so the guaranteed keyboard move path is the card menu's
+ * „Przenieś w lewo/w prawo” reached by Tab (FR-103/FR-046). The column BODY (list + the
+ * FR-110 {@link EmptyState}, which must sit OUTSIDE the list element — axe
+ * `aria-required-children`) is the dnd-kit drop target (`useDroppable` by status).
  */
 export function BoardColumn({
   status,
@@ -53,11 +53,7 @@ export function BoardColumn({
   draggable = false,
   emptyAction,
 }: BoardColumnProps) {
-  const [selectedIndex, setSelectedIndex] = useState(0);
   const { setNodeRef, isOver } = useDroppable({ id: status });
-
-  const clamped = Math.min(selectedIndex, Math.max(0, tasks.length - 1));
-  const selected: TaskResponse | undefined = tasks[clamped];
   const countLabel = taskCountLabel(tasks.length);
 
   return (
@@ -67,62 +63,41 @@ export function BoardColumn({
         <span className={styles.headingCount}>{countLabel}</span>
       </div>
 
-      <div
-        ref={setNodeRef}
-        role="listbox"
-        tabIndex={0}
-        aria-label={`${label}, ${countLabel}`}
-        aria-activedescendant={selected ? taskOptionId(selected.id) : undefined}
-        data-over={isOver || undefined}
-        className={styles.list}
-        onKeyDown={listboxKeyDown({
-          count: tasks.length,
-          selectedIndex: clamped,
-          onSelectedIndexChange: setSelectedIndex,
-          onToggleSelected: selected ? () => cardActions?.(selected)?.onToggleDone?.() : undefined,
-          onActivateSelected: selected ? () => cardActions?.(selected)?.onOpenDetails?.() : undefined,
-        })}
-      >
-        {tasks.length === 0 ? (
-          <EmptyState hint="Brak zadań w tej kolumnie." action={emptyAction} />
-        ) : (
-          tasks.map((task, index) => (
+      <div ref={setNodeRef} data-over={isOver || undefined} className={styles.list}>
+        <div role="list" aria-label={`${label}, ${countLabel}`} className={styles.cards}>
+          {tasks.map((task) => (
             <DraggableBoardCard
               key={task.id}
               task={task}
               draggable={draggable}
-              selected={index === clamped}
-              onSelect={() => setSelectedIndex(index)}
               actions={cardActions?.(task)}
               assigneeName={assigneeName}
             />
-          ))
-        )}
+          ))}
+        </div>
+        {tasks.length === 0 ? (
+          <EmptyState hint="Brak zadań w tej kolumnie." action={emptyAction} />
+        ) : null}
       </div>
     </section>
   );
 }
 
 /**
- * The draggable card wrapper: registers the card body as a dnd-kit draggable. Pointer-first
- * (4px activation keeps plain clicks selecting); the wrapper deliberately does NOT take the
- * dnd-kit `attributes` (role="button" + tabIndex 0 would break the column's single-tab-stop
- * listbox model — the TaskList reorder precedent), so the guaranteed keyboard move path is
- * the card menu's „Przenieś w lewo/w prawo” (D7/D10, FR-103/FR-046). `draggable=false`
- * (viewer) disables drag activation entirely while the card stays a normal option.
+ * The draggable card wrapper: the column list's `role="listitem"`, registered as a dnd-kit
+ * draggable. Pointer-first (4px activation keeps plain clicks from starting a drag); the
+ * wrapper deliberately does NOT take the dnd-kit `attributes` (role="button" would break
+ * the list semantics — the TaskList reorder precedent), so the keyboard move path is the
+ * card menu (D7/D10). `draggable=false` (viewer) disables drag activation entirely.
  */
 function DraggableBoardCard({
   task,
   draggable,
-  selected,
-  onSelect,
   actions,
   assigneeName,
 }: {
   task: TaskResponse;
   draggable: boolean;
-  selected: boolean;
-  onSelect: () => void;
   actions?: TaskRowActions;
   assigneeName?: (userId: string) => string | null;
 }) {
@@ -135,10 +110,12 @@ function DraggableBoardCard({
     <div
       ref={setNodeRef}
       {...(draggable ? listeners : {})}
-      tabIndex={-1}
+      role="listitem"
+      // listitem gets NO name from its contents (accname spec) — label it for AT/tests.
+      aria-label={task.title}
       style={isDragging ? { opacity: 0.4 } : undefined}
     >
-      <BoardCard task={task} selected={selected} onSelect={onSelect} actions={actions} assigneeName={assigneeName} />
+      <BoardCard task={task} actions={actions} assigneeName={assigneeName} />
     </div>
   );
 }

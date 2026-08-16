@@ -78,10 +78,12 @@ test.describe("Board rendering & column moves (US-03.AS-01/03..06)", () => {
 
     // AS-02 entry point: the visible mode switch; AS-03: four columns in order, with counts.
     await page.getByRole("button", { name: "Tablica", exact: true }).click();
-    await expect(page.getByRole("listbox", { name: "Backlog, 1 zadanie" })).toBeVisible();
-    await expect(page.getByRole("listbox", { name: "Do zrobienia, 1 zadanie" })).toBeVisible();
-    await expect(page.getByRole("listbox", { name: "W toku, 0 zadań" })).toBeVisible();
-    await expect(page.getByRole("listbox", { name: "Zrobione, 1 zadanie" })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Backlog, 1 zadanie" })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Do zrobienia, 1 zadanie" })).toBeVisible();
+    // An EMPTY column's list element is zero-height (its EmptyState sibling carries the
+    // visuals) — attached to the a11y tree, not "visible" in Playwright's bounding-box sense.
+    await expect(page.getByRole("list", { name: "W toku, 0 zadań" })).toBeAttached();
+    await expect(page.getByRole("list", { name: "Zrobione, 1 zadanie" })).toBeVisible();
 
     // AS-04: drag „Do wzięcia” from Do zrobienia to W toku — optimistic paint + exactly ONE
     // PATCH /status carrying in_progress (D6: position untouched — no /position request).
@@ -94,8 +96,8 @@ test.describe("Board rendering & column moves (US-03.AS-01/03..06)", () => {
       if (r.method() === "PATCH" && r.url().includes("/position")) positionPatches.push(r.url());
     });
 
-    const card = page.getByRole("option", { name: /Do wzięcia/ });
-    const targetColumn = page.getByRole("listbox", { name: /W toku/ });
+    const card = page.getByRole("listitem", { name: /Do wzięcia/ });
+    const targetColumn = page.getByRole("list", { name: /W toku/ });
     const moved = page.waitForResponse(
       (r) => r.request().method() === "PATCH" && r.url().includes("/status") && r.ok(),
     );
@@ -107,7 +109,7 @@ test.describe("Board rendering & column moves (US-03.AS-01/03..06)", () => {
     await page.mouse.up();
 
     // Optimistic: the card is in W toku before the server answer settles the UI.
-    await expect(page.getByRole("listbox", { name: /W toku/ }).getByRole("option", { name: /Do wzięcia/ })).toBeVisible();
+    await expect(page.getByRole("list", { name: /W toku/ }).getByRole("listitem", { name: /Do wzięcia/ })).toBeVisible();
     await moved;
     expect(statusPatches).toHaveLength(1);
     expect(positionPatches).toHaveLength(0);
@@ -120,7 +122,7 @@ test.describe("Board rendering & column moves (US-03.AS-01/03..06)", () => {
     await page.getByRole("menuitem", { name: /Przenieś w lewo/ }).click();
     await menuMoved;
     await expect(
-      page.getByRole("listbox", { name: /Do zrobienia/ }).getByRole("option", { name: /Do wzięcia/ }),
+      page.getByRole("list", { name: /Do zrobienia/ }).getByRole("listitem", { name: /Do wzięcia/ }),
     ).toBeVisible();
 
     // Zrobione offers no right move; Backlog no left (items OMITTED, not disabled).
@@ -141,7 +143,7 @@ test.describe("Board rendering & column moves (US-03.AS-01/03..06)", () => {
     await page.getByRole("menuitem", { name: /Przenieś w prawo/ }).click();
     await toTodo;
     await expect(
-      page.getByRole("listbox", { name: /Do zrobienia/ }).getByRole("option", { name: /W backlogu/ }),
+      page.getByRole("list", { name: /Do zrobienia/ }).getByRole("listitem", { name: /W backlogu/ }),
     ).toBeVisible();
     await page.getByRole("button", { name: "Lista", exact: true }).click();
     await expect(page.getByRole("checkbox", { name: "Oznacz „Skończone” jako niezrobione" })).toBeChecked();
@@ -162,21 +164,21 @@ test.describe("Last-used mode per project (US-03.AS-02)", () => {
 
     await enterProjectFromSidebar(page, "Zapamiętany", boardProject.id);
     await page.getByRole("button", { name: "Tablica", exact: true }).click();
-    await expect(page.getByRole("listbox", { name: /Do zrobienia/ })).toBeVisible();
+    await expect(page.getByRole("list", { name: /Do zrobienia/ })).toBeVisible();
 
     // Reload → the Board renders again (per-project localStorage).
     await page.reload();
-    await expect(page.getByRole("listbox", { name: /Do zrobienia/ })).toBeVisible();
+    await expect(page.getByRole("list", { name: /Do zrobienia/ })).toBeVisible();
     await expect(page.getByRole("button", { name: "Tablica", exact: true })).toHaveAttribute("aria-pressed", "true");
 
     // A DIFFERENT project still defaults to Lista.
     await enterProjectFromSidebar(page, "Świeży", otherProject.id);
     await expect(page.getByRole("button", { name: "Lista", exact: true })).toHaveAttribute("aria-pressed", "true");
-    await expect(page.getByRole("listbox", { name: /Do zrobienia/ })).toHaveCount(0);
+    await expect(page.getByRole("list", { name: /Do zrobienia/ })).toHaveCount(0);
 
     // Returning → still Board.
     await enterProjectFromSidebar(page, "Zapamiętany", boardProject.id);
-    await expect(page.getByRole("listbox", { name: /Do zrobienia/ })).toBeVisible();
+    await expect(page.getByRole("list", { name: /Do zrobienia/ })).toBeVisible();
 
     await context.close();
   });
@@ -206,9 +208,9 @@ test.describe("Groupable List & cancelled (US-03.AS-07, EC-11)", () => {
 
     // The Board shows the cancelled task NOWHERE (EC-11) — and no „Anulowane” column exists.
     await page.getByRole("button", { name: "Tablica", exact: true }).click();
-    await expect(page.getByRole("listbox", { name: /Backlog/ })).toBeVisible();
-    await expect(page.getByRole("option", { name: /Porzucone/ })).toHaveCount(0);
-    await expect(page.getByRole("listbox", { name: /Anulowane/ })).toHaveCount(0);
+    await expect(page.getByRole("list", { name: /Backlog/ })).toBeAttached();
+    await expect(page.getByRole("listitem", { name: /Porzucone/ })).toHaveCount(0);
+    await expect(page.getByRole("list", { name: /Anulowane/ })).toHaveCount(0);
 
     // Priority grouping: P0 → „Bez priorytetu” (P3 belongs to the cancelled task's group).
     await page.getByRole("button", { name: "Lista", exact: true }).click();
@@ -260,7 +262,7 @@ test.describe("Viewer sees a read-only board (FR-065/068)", () => {
 
     // The board renders (read access) — but with NO action affordances at all.
     await expect(
-      viewerPage.getByRole("listbox", { name: /Do zrobienia/ }).getByRole("option", { name: /Cudze zadanie/ }),
+      viewerPage.getByRole("list", { name: /Do zrobienia/ }).getByRole("listitem", { name: /Cudze zadanie/ }),
     ).toBeVisible();
     await expect(viewerPage.getByRole("button", { name: /Więcej akcji/ })).toHaveCount(0);
     await expect(viewerPage.getByRole("checkbox")).toHaveCount(0);

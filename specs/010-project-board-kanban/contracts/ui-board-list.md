@@ -17,9 +17,13 @@ icons only (FR-105).
 - Exactly four columns in order: **Backlog, Do zrobienia (todo), W toku (in_progress),
   Zrobione (done)** — from the single `BOARD_COLUMNS` map (`lib/board.ts`); `cancelled` never
   renders a column or card.
-- Column: heading with label + live count („N zadań"), `role="listbox"`
-  `aria-label="<label>, N zadań"`; empty column renders the catalog `EmptyState` (hint +
-  action per FR-110 — the action is the inline add / global add path).
+- Column: heading with label + live count („N zadań"), `role="list"`
+  `aria-label="<label>, N zadań"`; each card is a `role="listitem"` labelled with the task
+  title (listitem gets no name from content), whose controls (checkbox, „⋯") are ordinary
+  tab stops. NOT `listbox`/`option`: an option role forbids focusable children (axe
+  `nested-interactive` — WCAG 4.1.2). Empty column renders the catalog `EmptyState` (hint +
+  action per FR-110 — the action is the inline add / global add path) as a SIBLING of the
+  list element, never inside it (axe `aria-required-children`).
 - Card: title (sanitized text — FR-099 posture unchanged: no raw HTML render path), optional
   due chip, priority chip, label chips, assignee avatars — catalog components only. Card
   exposes on hover/focus the quick-action zone and the full „⋯" menu (FR-108) built by the
