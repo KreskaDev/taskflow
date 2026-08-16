@@ -21,3 +21,12 @@ hooks:
     prompt: Execute speckit.agent-context.update?
     description: Refresh agent context after planning
     condition: null
+  after_implement:
+  - extension: taskflow
+    command: speckit.verify
+    enabled: true
+    optional: false
+    priority: 10
+    prompt: Run the full regression suite?
+    description: Run the full local regression suite after implementation (static, web unit, api, e2e)
+    condition: null
