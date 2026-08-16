@@ -2,14 +2,64 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'release/**']
   pull_request:
+  # On-demand full regression run for any branch during development:
+  #   gh workflow run ci.yml --ref <branch>   (or the Actions tab "Run workflow" button)
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ghcr.io/kreskadev/taskflow
 
 jobs:
+  # Regression-test-first gate (docs/bugfix-workflow.md): every fix(NNN) commit must be
+  # preceded in the same PR/push range by a test(NNN) commit that touches test files —
+  # the red repro exists before the fix. Scope-less `fix:` commits require any earlier
+  # test commit touching test files; non-slice scopes (e.g. fix(deps)) are exempt.
+  # Escape hatch for genuinely untestable fixes: a "Repro-Test: none — <why>" line in
+  # the commit body passes the gate but surfaces as a warning annotation for review.
+  bugfix-gate:
+    name: bugfix regression-test-first
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify fix commits pair with an earlier repro-test commit
+        env:
+          RANGE: ${{ github.event_name == 'pull_request' && format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) || github.event_name == 'workflow_dispatch' && 'origin/main..HEAD' || format('{0}..{1}', github.event.before, github.sha) }}
+        run: |
+          set -euo pipefail
+          if [[ "$RANGE" == 0000000000000000000000000000000000000000..* ]]; then
+            echo "New branch push — no commit range to check."; exit 0
+          fi
+          declare -A repro_ok
+          repro_any=0
+          fail=0
+          while read -r sha; do
+            subject=$(git log -1 --format=%s "$sha")
+            if [[ "$subject" =~ ^test(\(([0-9]{3})\))?[:!] ]]; then
+              tslice="${BASH_REMATCH[2]:-}"
+              if git diff-tree --no-commit-id --name-only -r "$sha" | grep -qE '^apps/(api|web)/tests/'; then
+                repro_any=1
+                [[ -n "$tslice" ]] && repro_ok["$tslice"]=1
+              fi
+            elif [[ "$subject" =~ ^fix(\(([0-9]{3})\))?[:!] ]]; then
+              slice="${BASH_REMATCH[2]:-}"
+              body=$(git log -1 --format=%b "$sha")
+              if [[ -n "$slice" && "${repro_ok[$slice]:-}" == "1" ]] || [[ -z "$slice" && "$repro_any" == "1" ]]; then
+                echo "OK: ${sha:0:9} $subject — earlier repro-test commit present"
+              elif grep -q '^Repro-Test: none' <<<"$body"; then
+                echo "::warning::${sha:0:9} $subject — no repro test, justified in commit body: $(grep -m1 '^Repro-Test:' <<<"$body")"
+              else
+                echo "::error::${sha:0:9} $subject violates regression-test-first (docs/bugfix-workflow.md): no earlier test(${slice:-...}) commit touching apps/api/tests/ or apps/web/tests/ in this range, and no 'Repro-Test: none — <why>' justification in the commit body."
+                fail=1
+              fi
+            fi
+          done < <(git rev-list --reverse --no-merges "$RANGE")
+          exit $fail
+
   web-quality:
     name: web lint + typecheck + unit
     runs-on: ubuntu-latest
@@ -165,7 +215,7 @@ jobs:
   build-push:
     name: build + push images
     runs-on: ubuntu-latest
-    needs: [web-quality, web-e2e, api-quality, api-integration, openapi-sync]
+    needs: [bugfix-gate, web-quality, web-e2e, api-quality, api-integration, openapi-sync]
     if: github.ref == 'refs/heads/main'
     permissions:
       contents: read
