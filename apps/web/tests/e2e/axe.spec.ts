@@ -21,7 +21,11 @@ const STATIC_SCREENS = ["/", "/today", "/upcoming", "/assigned", "/settings"] as
 async function signedInPage(
   browser: import("@playwright/test").Browser,
   key: string,
-): Promise<{ page: Page; context: import("@playwright/test").BrowserContext }> {
+): Promise<{
+  page: Page;
+  context: import("@playwright/test").BrowserContext;
+  profile: { id: string };
+}> {
   const profile = await ensureUser({
     sub: `google-sub-${key}`,
     email: `${key}@taskflow.test`,
@@ -33,7 +37,54 @@ async function signedInPage(
     { name: "taskflow_session", value: sessionId, url: "http://localhost:3000" },
   ]);
   const page = await context.newPage();
-  return { page, context };
+  return { page, context, profile };
+}
+
+/**
+ * Seeds REAL rows for a screen and returns the text anchor proving they rendered
+ * before the audit runs. Empty pages made the walks blind: a `role="option"` row
+ * with focusable controls (checkbox / title button / „⋯”) violates axe
+ * `nested-interactive`, but only when a row actually renders — the exact latent
+ * defect the Board shed in PR #8. Anchors are TEXT, not roles, so the same seeds
+ * stay valid across the option→row remediation.
+ */
+async function seedScreen(screen: string, userId: string): Promise<string | null> {
+  const api = apiAs(userId);
+  if (screen === "/") {
+    const task = await api.createTask({ title: "Zadanie w Inbox", position: "a0" });
+    const res = await api.request("PATCH", `/api/tasks/${task.id}/priority`, {
+      priority: "P2",
+      version: task.version,
+    });
+    if (!res.ok) throw new Error(`priority seed failed (${String(res.status)})`);
+    return "Zadanie w Inbox";
+  }
+  if (screen === "/today") {
+    // 12:00Z is the same Warsaw calendar day for every UTC clock; a boundary-window
+    // run at worst renders the row as overdue — still a row on /today.
+    const noon = `${new Date().toISOString().slice(0, 10)}T12:00:00Z`;
+    await api.createTask({ title: "Zadanie na dziś", position: "a0", dueDate: noon });
+    return "Zadanie na dziś";
+  }
+  if (screen === "/upcoming") {
+    const future = new Date(Date.now() + 3 * 24 * 3600 * 1000).toISOString();
+    await api.createTask({ title: "Zadanie nadchodzące", position: "a0", dueDate: future });
+    return "Zadanie nadchodzące";
+  }
+  if (screen === "/assigned") {
+    // Assignment requires a SHARED project (FR-069) — the owner self-assigns.
+    const project = await api.createProject({ name: "Wspólny AA", color: "blue", icon: "folder" });
+    await api.shareProject(project.id, project.version);
+    const task = await api.createTask({ title: "Zadanie przypisane", position: "a0" });
+    await api.moveTask(task.id, project.id, task.version);
+    const res = await api.request("PATCH", `/api/tasks/${task.id}/assignees`, {
+      assigneeIds: [userId],
+      version: task.version + 1,
+    });
+    if (!res.ok) throw new Error(`assignees seed failed (${String(res.status)})`);
+    return "Zadanie przypisane";
+  }
+  return null; // /settings has no rows to seed.
 }
 
 async function setPalette(page: Page, palette: string): Promise<void> {
@@ -61,12 +112,16 @@ for (const screen of STATIC_SCREENS) {
   test.describe(`axe AA — ${screen}`, () => {
     for (const palette of PALETTES) {
       test(`${screen} in ${palette}: zero WCAG 2.1 AA violations`, async ({ browser }) => {
-        const { page, context } = await signedInPage(
+        const { page, context, profile } = await signedInPage(
           browser,
           `axe-${screen.replace(/\W/g, "") || "inbox"}-${palette}`,
         );
+        const anchor = await seedScreen(screen, profile.id);
         await page.goto(screen);
         await page.waitForLoadState("networkidle");
+        if (anchor) {
+          await expect(page.getByText(anchor).first()).toBeVisible();
+        }
         await setPalette(page, palette);
         await auditCurrentPage(page, `${screen} × ${palette}`);
         await context.close();
@@ -111,6 +166,57 @@ test.describe("axe AA — project board (slice 010)", () => {
       await page.waitForLoadState("networkidle");
       await setPalette(page, palette);
       await auditCurrentPage(page, `board × ${palette}`);
+      await context.close();
+    });
+  }
+});
+
+/**
+ * The status-GROUPED project List joins the walk with seeded rows in every group
+ * (incl. „Anulowane”) — the GroupedTaskList surface the empty static walks never
+ * exercised.
+ */
+test.describe("axe AA — project grouped list (slice 010)", () => {
+  for (const palette of PALETTES) {
+    test(`grouped list in ${palette}: zero WCAG 2.1 AA violations`, async ({ browser }) => {
+      const profile = await ensureUser({
+        sub: `google-sub-axe-glist-${palette}`,
+        email: `axe-glist-${palette}@taskflow.test`,
+        name: "Axe Walker",
+      });
+      const api = apiAs(profile.id);
+      const project = await api.createProject({ name: "Lista AA", color: "blue", icon: "folder" });
+      const seedTask = async (title: string, position: string, status?: string) => {
+        const task = await api.createTask({ title, position });
+        await api.moveTask(task.id, project.id, task.version);
+        if (status) {
+          const res = await api.request("PATCH", `/api/tasks/${task.id}/status`, {
+            status,
+            version: task.version + 1,
+          });
+          if (!res.ok) throw new Error(`status seed failed (${String(res.status)})`);
+        }
+      };
+      await seedTask("Wiersz w backlogu", "a0");
+      await seedTask("Wiersz w toku", "a1", "in_progress");
+      await seedTask("Wiersz anulowany", "a2", "cancelled");
+
+      const sessionId = await insertSession(profile.id);
+      const context = await browser.newContext();
+      await context.addCookies([
+        { name: "taskflow_session", value: sessionId, url: "http://localhost:3000" },
+      ]);
+      // Force the grouped LIST projection before load (per-project localStorage — D8).
+      await context.addInitScript((id) => {
+        window.localStorage.setItem(`taskflow.project-view.${id}`, "list");
+        window.localStorage.setItem(`taskflow.project-groupby.${id}`, "status");
+      }, project.id);
+      const page = await context.newPage();
+      await page.goto(`/projects/${project.id}`);
+      await page.waitForLoadState("networkidle");
+      await expect(page.getByText("Wiersz anulowany").first()).toBeVisible();
+      await setPalette(page, palette);
+      await auditCurrentPage(page, `grouped list × ${palette}`);
       await context.close();
     });
   }
