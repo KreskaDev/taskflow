@@ -76,14 +76,18 @@ For every task in the closing cycle with `status ∉ {done, cancelled}` ("incomp
 
 Per cycle (team-wide aggregates over non-deleted tasks with `cycle_id = c.id`):
 `total`, `done` (status=done), `breakdown{backlog,todo,in_progress,done,cancelled}`,
-`percentDone = done/total` (0 when total=0). "Days remaining" is client-computed from
+`percentDone = done / max(1, total − cancelled)` (0 when the denominator is empty — cancelled
+tasks are not outstanding work, so they do not deflate progress; the breakdown still shows
+them). "Days remaining" is client-computed from
 `end_date` vs today in Europe/Warsaw (FR-092); an overdue active cycle renders
 `0 dni (po terminie)` (D13).
 
 ## API response shapes (D9, D16)
 
-- `CycleResponse`: `{ id, name, startDate, endDate, status, version, metrics: { total, done,
-  breakdown } }` — from `GET /api/cycles` (ordered per D5).
+- `CycleResponse`: `{ id, name, startDate, endDate, status, version, createdAt, metrics:
+  { total, done, breakdown } }` — from `GET /api/cycles` (ordered per D5; `createdAt` is
+  exposed so the client-side D5 tiebreaker has its data — the server list is already in D5
+  order and client sorting is defensive only).
 - `TaskResponse` (+ flattened Today/Upcoming/Assigned rows): `+ cycleId: uuid|null`,
   `+ carriedOver: boolean`.
 - `GET /api/cycles/{id}/tasks`: caller-visible `TaskResponse[]` (D10).

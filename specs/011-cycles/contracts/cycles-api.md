@@ -30,7 +30,8 @@ Body: `{ rollover?: "next" | "backlog" | "keep", overrides?: [{ taskId, choice }
 - Legal only from `active` → else 422 `cycle_not_active`.
 - Applies the rollover matrix of `data-model.md` to every incomplete task in ONE transaction
   with the status flip. `rollover` defaults to `keep`; with zero incomplete tasks it is a
-  pure close.
+  pure close. (The UI ALWAYS sends an explicit choice when incomplete tasks exist — the
+  default exists for the pure-close path, not as a silent decision.)
 - `rollover: "next"` with no planned cycle → 422 `no_next_cycle` (US-05.AS-06 prompt).
 - `overrides` entries referencing tasks the caller cannot see → 404 posture for that call
   (whole command rejected; nothing partial).
