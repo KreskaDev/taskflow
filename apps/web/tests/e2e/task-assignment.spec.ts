@@ -43,7 +43,7 @@ test.describe("US-13 Task Assignment (AS-01..AS-04)", () => {
 
     // Owner opens Today, opens the row's "⋯" menu → "Przypisz…", checks the editor, saves.
     await page.goto("/today");
-    const row = page.getByRole("option").filter({ hasText: "Coordinate launch" });
+    const row = page.getByRole("row").filter({ hasText: "Coordinate launch" });
     await expect(row).toBeVisible();
     await page.getByRole("button", { name: "Więcej akcji: Coordinate launch" }).click();
     await page.getByRole("menu", { name: "Akcje taska" }).getByRole("menuitem", { name: "Przypisz…" }).click();
@@ -70,7 +70,7 @@ test.describe("US-13 Task Assignment (AS-01..AS-04)", () => {
     const editorPage = await editorContext.newPage();
     await editorPage.goto("/assigned");
     await expect(editorPage.getByRole("heading", { name: "Przypisane do mnie" })).toBeVisible();
-    await expect(editorPage.getByRole("option").filter({ hasText: "Coordinate launch" })).toBeVisible();
+    await expect(editorPage.getByRole("row").filter({ hasText: "Coordinate launch" })).toBeVisible();
     await editorContext.close();
   });
 
@@ -80,7 +80,7 @@ test.describe("US-13 Task Assignment (AS-01..AS-04)", () => {
 
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
-    await expect(page.getByRole("option").filter({ hasText: "Personal errand" })).toBeVisible();
+    await expect(page.getByRole("row").filter({ hasText: "Personal errand" })).toBeVisible();
 
     // No assignment affordance on a personal task (AS-04): the "⋯" menu is populated but
     // carries no "Przypisz…" entry, and no picker dialog exists.

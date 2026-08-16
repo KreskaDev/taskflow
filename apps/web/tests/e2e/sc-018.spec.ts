@@ -48,7 +48,7 @@ test("SC-018: full daily workflow via visible UI only [INV-020] [INV-021]", asyn
   await inline.fill("Kupić kawę");
   await inline.press("Enter");
   await created2;
-  await expect(page.getByRole("option")).toHaveCount(2);
+  await expect(page.getByRole("row")).toHaveCount(2);
 
   // ── 3. Edit (inline rename via the visible row action) ──────────────────────────
   await page.getByRole("button", { name: "Edytuj „Kupić kawę”" }).click();
@@ -69,7 +69,7 @@ test("SC-018: full daily workflow via visible UI only [INV-020] [INV-021]", asyn
   await page.getByRole("dialog", { name: "Priorytet" }).getByRole("button", { name: "P1", exact: true }).click();
   await prioritized;
   await expect(
-    page.getByRole("option").filter({ hasText: "Kupić kawę ziarnistą" }).getByText("P1"),
+    page.getByRole("row").filter({ hasText: "Kupić kawę ziarnistą" }).getByText("P1"),
   ).toBeVisible();
 
   // ── 5. Due date via the menu ("Termin…" → Polish phrase) ────────────────────────
@@ -98,7 +98,7 @@ test("SC-018: full daily workflow via visible UI only [INV-020] [INV-021]", asyn
   );
   await labelDialog.getByRole("button", { name: /Zapisz/ }).click();
   await labelsSet;
-  await expect(page.getByRole("option").filter({ hasText: "Kupić kawę ziarnistą" })).toContainText(
+  await expect(page.getByRole("row").filter({ hasText: "Kupić kawę ziarnistą" })).toContainText(
     "zakupy",
   );
 
@@ -119,7 +119,7 @@ test("SC-018: full daily workflow via visible UI only [INV-020] [INV-021]", asyn
   );
   await page.getByRole("dialog", { name: /Przenieś/ }).getByRole("button", { name: "Wspólny plan" }).click();
   await moved;
-  await expect(page.getByRole("option").filter({ hasText: "Kupić kawę ziarnistą" })).toHaveCount(0);
+  await expect(page.getByRole("row").filter({ hasText: "Kupić kawę ziarnistą" })).toHaveCount(0);
 
   // Share the project + invite the member (visible sidebar/dialog controls only — the
   // project row's "⋯" menu carries Share/Members).

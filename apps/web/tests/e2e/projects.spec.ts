@@ -213,14 +213,14 @@ test.describe("US-10 Project Management — wired UI (GREEN)", () => {
 
     await page.goto("/");
     // Both tasks start in the Inbox (the narrowed GET /api/tasks).
-    await expect(page.getByRole("option")).toHaveCount(2);
+    await expect(page.getByRole("row")).toHaveCount(2);
 
     await api.moveTask(move.id, project.id, move.version);
     await page.reload();
 
     // After the move, only the unprojected task remains in the Inbox list (FR-021).
-    await expect(page.getByRole("option")).toHaveCount(1);
-    await expect(page.getByRole("option").first()).toHaveText(/Stays in Inbox/);
+    await expect(page.getByRole("row")).toHaveCount(1);
+    await expect(page.getByRole("row").first()).toHaveText(/Stays in Inbox/);
     await expect(page.getByText(/Goes to project/)).toHaveCount(0);
 
     await context.close();
@@ -241,7 +241,7 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
     await seeded.api.createProject({ name: "Target", color: COLOR, icon: ICON });
 
     await seeded.page.goto("/");
-    await expect(seeded.page.getByRole("option")).toHaveCount(1);
+    await expect(seeded.page.getByRole("row")).toHaveCount(1);
 
     // Open the row's "⋯" menu and choose the move item. The selector dialog should open with
     // the Inbox option + the owned project as keyboard-reachable choices (US-08.AS-05, R7).
@@ -287,7 +287,7 @@ test.describe("US-10/US-08 Project Management — edit / delete / move-to-projec
       await moved;
 
       await page.goto("/");
-      await expect(page.getByRole("option").filter({ hasText: "In a project" })).toBeVisible();
+      await expect(page.getByRole("row").filter({ hasText: "In a project" })).toBeVisible();
 
       await context.close();
     },

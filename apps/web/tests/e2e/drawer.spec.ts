@@ -106,7 +106,7 @@ test.describe("Task drawer (FR-106, S4.2/S4.3)", () => {
     await described;
 
     // The list behind repainted optimistically with the new title.
-    await expect(page.getByRole("option").filter({ hasText: "Po edycji w panelu" })).toHaveCount(1);
+    await expect(page.getByRole("row").filter({ hasText: "Po edycji w panelu" })).toHaveCount(1);
 
     await context.close();
   });
@@ -152,10 +152,10 @@ test.describe("Task drawer (FR-106, S4.2/S4.3)", () => {
     // Browser BACK closes it (URL state), FORWARD restores it; the list stays put.
     await page.goBack();
     await expect(page.getByRole("complementary")).toHaveCount(0);
-    await expect(page.getByRole("option")).toHaveCount(1);
+    await expect(page.getByRole("row")).toHaveCount(1);
     await page.goForward();
     await expect(page.getByRole("complementary")).toBeVisible();
-    await expect(page.getByRole("option")).toHaveCount(1);
+    await expect(page.getByRole("row")).toHaveCount(1);
 
     await context.close();
   });

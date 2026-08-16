@@ -75,7 +75,7 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
     // state carries a hint + a real action (FR-110) — no shortcut copy.
     await expect(emptyHint(page)).toBeVisible();
     await expect(page.getByRole("button", { name: "Dodaj pierwszy task" })).toBeVisible();
-    await expect(page.getByRole("option")).toHaveCount(0);
+    await expect(page.getByRole("row")).toHaveCount(0);
 
     await context.close();
   });
@@ -85,8 +85,8 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
     await page.goto("/");
     await createTask(page, "Anatomia jutro"); // trailing "jutro" → a due date on the row
 
-    const row = page.getByRole("option").first();
-    await expect(page.getByRole("listbox", { name: "Zadania" })).toBeVisible();
+    const row = page.getByRole("row").first();
+    await expect(page.getByRole("grid", { name: "Zadania" })).toBeVisible();
 
     // Priority via the row menu (text badge, FR-044).
     await page.getByRole("button", { name: "Więcej akcji: Anatomia" }).click();
@@ -154,20 +154,20 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
     // First task. The inline capture clears for the next entry; the optimistic row paints.
     await createTask(page, "First task");
     await expect(page.getByRole("textbox", { name: "Nowy task" })).toHaveValue("");
-    await expect(page.getByRole("option")).toHaveCount(1);
-    await expect(page.getByRole("option").first()).toHaveText(/First task/);
+    await expect(page.getByRole("row")).toHaveCount(1);
+    await expect(page.getByRole("row").first()).toHaveText(/First task/);
 
     // Second task → newest-first means it lands ABOVE the first.
     await createTask(page, "Second task");
-    await expect(page.getByRole("option")).toHaveCount(2);
-    await expect(page.getByRole("option").nth(0)).toHaveText(/Second task/);
-    await expect(page.getByRole("option").nth(1)).toHaveText(/First task/);
+    await expect(page.getByRole("row")).toHaveCount(2);
+    await expect(page.getByRole("row").nth(0)).toHaveText(/Second task/);
+    await expect(page.getByRole("row").nth(1)).toHaveText(/First task/);
 
     // Server round-trip: reload and assert both tasks persist AND newest-first order holds.
     await page.reload();
-    await expect(page.getByRole("option")).toHaveCount(2);
-    await expect(page.getByRole("option").nth(0)).toHaveText(/Second task/);
-    await expect(page.getByRole("option").nth(1)).toHaveText(/First task/);
+    await expect(page.getByRole("row")).toHaveCount(2);
+    await expect(page.getByRole("row").nth(0)).toHaveText(/Second task/);
+    await expect(page.getByRole("row").nth(1)).toHaveText(/First task/);
 
     await context.close();
   });
@@ -179,7 +179,7 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
 
     // One committed task so the count-unchanged assertion is meaningful.
     await createTask(page, "Keeper");
-    await expect(page.getByRole("option")).toHaveCount(1);
+    await expect(page.getByRole("row")).toHaveCount(1);
 
     // The topbar "Nowy task" button is the deterministic invoker (the Dialog focus contract's
     // return target). Esc inside the capture input cancels without creating (FR-030).
@@ -192,7 +192,7 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
 
     // No task created (count unchanged) and focus restored to the invoking button.
     await expect(page.getByRole("dialog", { name: "Nowy task" })).toBeHidden();
-    await expect(page.getByRole("option")).toHaveCount(1);
+    await expect(page.getByRole("row")).toHaveCount(1);
     await expect(invoker).toBeFocused();
 
     await context.close();
@@ -236,7 +236,7 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
  */
 test.describe("US1 Natural-Language Dates (AS-02..05 capture-with-date, EC-02, version guard)", () => {
   /** The top (newest-first) row. */
-  const topRow = (page: Page) => page.getByRole("option").first();
+  const topRow = (page: Page) => page.getByRole("row").first();
   /**
    * The top row's title BUTTON (the drawer trigger) matched by its EXACT accessible name —
    * the strip-correctness probe: a leaked date phrase like "Kupic mleko po 17" fails the
@@ -273,7 +273,7 @@ test.describe("US1 Natural-Language Dates (AS-02..05 capture-with-date, EC-02, v
 
       // Exactly one row, and its TITLE is the stripped prefix (exact accessible-name match, so
       // a leaked date phrase like "Kupic mleko po 17" would fail). This is the strip proof.
-      await expect(page.getByRole("option")).toHaveCount(1);
+      await expect(page.getByRole("row")).toHaveCount(1);
       await expect(topTitle(page, title)).toBeVisible();
 
       // The resolved due date paints a visible label on the row (the end-to-end point — we do NOT
@@ -307,7 +307,7 @@ test.describe("US1 Natural-Language Dates (AS-02..05 capture-with-date, EC-02, v
 
     // No task was created (the inbox stays empty), and the inline capture retains the field's
     // value so the user can fix the phrase (EC-02 / FR-006).
-    await expect(page.getByRole("option")).toHaveCount(0);
+    await expect(page.getByRole("row")).toHaveCount(0);
     await expect(emptyHint(page)).toBeVisible();
     await expect(input).toHaveValue("Spotkanie 30.02");
 
@@ -323,7 +323,7 @@ test.describe("US1 Natural-Language Dates (AS-02..05 capture-with-date, EC-02, v
     // string is the title, no due date, no error. `createTask` proves a real server write landed.
     await createTask(page, "Wersja 2.0");
 
-    await expect(page.getByRole("option")).toHaveCount(1);
+    await expect(page.getByRole("row")).toHaveCount(1);
     await expect(topTitle(page, "Wersja 2.0")).toBeVisible();
     // No due-date label rendered (no "termin:" qualifier on the row), and the capture raised no
     // recoverable-failure message — its persistent status node stays EMPTY (it is always
@@ -368,7 +368,7 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
     // way compatible with virtualization — @tanstack/react-virtual only mounts the visible window
     // (~21 rows here), so asserting the full `titles.length` option count would (wrongly) fail for
     // large seeds even though every task was created. Each caller asserts its own order afterward.
-    await expect(page.getByRole("option").first()).toHaveText(
+    await expect(page.getByRole("row").first()).toHaveText(
       new RegExp(titles[titles.length - 1]!),
     );
   }
@@ -381,8 +381,8 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
     // Newest-first ⇒ render order top→bottom is Gamma, Beta, Alpha.
     await seedTasks(page, ["Alpha", "Beta", "Gamma"]);
 
-    const listbox = page.getByRole("listbox", { name: "Zadania" });
-    const options = page.getByRole("option");
+    const listbox = page.getByRole("grid", { name: "Zadania" });
+    const options = page.getByRole("row");
 
     // selectedIndex defaults to 0, so the TOP row is already the active option on load.
     const top = options.nth(0);
@@ -436,12 +436,12 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
     await expect(emptyHint(page)).toBeVisible();
 
     await createTask(page, "Toggle me");
-    const row = page.getByRole("option").first();
+    const row = page.getByRole("row").first();
     await expect(row).toHaveAttribute("data-status", "backlog");
 
     // Space is a composite-widget key: it toggles the SELECTED row and must be sent to the
     // FOCUSED listbox (container-level handler, not document-level).
-    const listbox = page.getByRole("listbox", { name: "Zadania" });
+    const listbox = page.getByRole("grid", { name: "Zadania" });
     await listbox.focus();
 
     // Space → done (assert the data-status hook the styling reads).
@@ -463,7 +463,7 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
     await persistWrite;
 
     await page.reload();
-    await expect(page.getByRole("option").first()).toHaveAttribute("data-status", "done");
+    await expect(page.getByRole("row").first()).toHaveAttribute("data-status", "done");
 
     await context.close();
   });
@@ -474,7 +474,7 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
     await expect(emptyHint(page)).toBeVisible();
 
     await createTask(page, "Original title");
-    const row = page.getByRole("option").first();
+    const row = page.getByRole("row").first();
 
     // The row's "Edytuj" quick action → inline rename input, autofocused and seeded with the
     // current title (the old `E` shortcut's affordance replacement, FR-108).
@@ -491,12 +491,12 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
     await renameSettled;
 
     await page.reload();
-    await expect(page.getByRole("option").first()).toHaveText(/Renamed title/);
+    await expect(page.getByRole("row").first()).toHaveText(/Renamed title/);
 
     // Esc path: re-open via the (renamed) Edytuj button, Esc, and the committed title stays
     // intact (no write).
     await page
-      .getByRole("option")
+      .getByRole("row")
       .first()
       .getByRole("button", { name: "Edytuj „Renamed title”" })
       .click();
@@ -505,7 +505,7 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
     await reopened.fill("Discarded edit");
     await page.keyboard.press("Escape");
     await expect(page.getByRole("textbox", { name: "Zmień nazwę zadania" })).toHaveCount(0);
-    await expect(page.getByRole("option").first()).toHaveText(/Renamed title/);
+    await expect(page.getByRole("row").first()).toHaveText(/Renamed title/);
 
     await context.close();
   });
@@ -517,7 +517,7 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
 
     // Two rows so the listbox survives the delete; delete the top one.
     await seedTasks(page, ["Keeper", "Doomed"]); // render order top→bottom: Doomed, Keeper
-    const top = page.getByRole("option").first();
+    const top = page.getByRole("row").first();
     await expect(top).toHaveText(/Doomed/);
 
     // "Usuń" in the row's "⋯" menu is the delete affordance — IMMEDIATE, no confirm (the same
@@ -525,14 +525,14 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
     await top.getByRole("button", { name: "Więcej akcji: Doomed" }).click();
     const deleteSettled = page.waitForResponse(deleteWrite);
     await page.getByRole("menuitem", { name: "Usuń" }).click();
-    await expect(page.getByRole("option")).toHaveCount(1);
+    await expect(page.getByRole("row")).toHaveCount(1);
     await expect(page.getByText(/Doomed/)).toHaveCount(0);
     await deleteSettled;
 
     await page.reload();
-    await expect(page.getByRole("option")).toHaveCount(1);
+    await expect(page.getByRole("row")).toHaveCount(1);
     await expect(page.getByText(/Doomed/)).toHaveCount(0);
-    await expect(page.getByRole("option").first()).toHaveText(/Keeper/);
+    await expect(page.getByRole("row").first()).toHaveText(/Keeper/);
 
     await context.close();
   });
@@ -544,14 +544,14 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
 
     // Three rows; delete the MIDDLE so "reappears in original position" tests position, not presence.
     await seedTasks(page, ["Bottom", "Middle", "Top"]); // render order top→bottom: Top, Middle, Bottom
-    const options = page.getByRole("option");
+    const options = page.getByRole("row");
     await expect(options.nth(0)).toHaveText(/Top/);
     await expect(options.nth(1)).toHaveText(/Middle/);
     await expect(options.nth(2)).toHaveText(/Bottom/);
 
     // Selection still tracks arrow-nav on the focused listbox (kept from the pre-019 spec —
     // the delete itself is row-scoped via the menu, independent of selection).
-    const listbox = page.getByRole("listbox", { name: "Zadania" });
+    const listbox = page.getByRole("grid", { name: "Zadania" });
     await listbox.focus();
     await page.keyboard.press("ArrowDown"); // select index 1 (Middle)
     await expect(options.nth(1)).toHaveAttribute("aria-selected", "true");
@@ -604,7 +604,7 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
     await expect(emptyHint(page)).toBeVisible();
 
     await seedTasks(page, ["Third", "Second", "First"]); // render order top→bottom: First, Second, Third
-    const options = page.getByRole("option");
+    const options = page.getByRole("row");
     await expect(options.nth(0)).toHaveText(/First/);
 
     const urlBefore = page.url();
@@ -623,8 +623,8 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
     expect(page.url()).toBe(urlBefore);
 
     await page.reload();
-    await expect(page.getByRole("option").nth(0)).toHaveText(/Second/);
-    await expect(page.getByRole("option").nth(1)).toHaveText(/First/);
+    await expect(page.getByRole("row").nth(0)).toHaveText(/Second/);
+    await expect(page.getByRole("row").nth(1)).toHaveText(/First/);
 
     await context.close();
   });
@@ -642,7 +642,7 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
     const titles = Array.from({ length: 60 }, (_, i) => `Bulk task ${String(i + 1).padStart(2, "0")}`);
     await seedTasks(page, titles);
 
-    const listbox = page.getByRole("listbox", { name: "Zadania" });
+    const listbox = page.getByRole("grid", { name: "Zadania" });
     await listbox.focus();
 
     // The top row (index 0) is selected. Capture its option id from aria-activedescendant.

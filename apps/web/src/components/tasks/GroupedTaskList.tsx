@@ -26,11 +26,12 @@ interface GroupedTaskListProps {
 
 /**
  * The groupable project List (slice 010, T015 — FR-024, D9, US-03.AS-07): the DailyView
- * grouped-listbox pattern generalized to the project view's status/priority groupings.
- * ONE `role="listbox"` holds DOM focus; each group is a `role="group"` with its visible
- * heading mirrored into `aria-label`; selection is a FLAT `aria-activedescendant` index
- * across groups (↑/↓ walk group boundaries transparently). Virtualization is consciously
- * bypassed exactly as DailyView does — grouped project lists render at daily-view scale.
+ * grouped-grid pattern generalized to the project view's status/priority groupings
+ * (roles remediated from listbox/option post-010 — see TaskList). ONE `role="grid"`
+ * holds DOM focus; each group is a `role="rowgroup"` with its visible heading mirrored
+ * into `aria-label`; selection is a FLAT `aria-activedescendant` index across groups
+ * (↑/↓ walk group boundaries transparently). Virtualization is consciously bypassed
+ * exactly as DailyView does — grouped project lists render at daily-view scale.
  */
 export function GroupedTaskList({
   groups,
@@ -48,7 +49,7 @@ export function GroupedTaskList({
 
   return (
     <div
-      role="listbox"
+      role="grid"
       tabIndex={0}
       aria-label="Zadania"
       aria-activedescendant={hasSelection ? taskOptionId(flat[selectedIndex]!.id) : undefined}
@@ -62,7 +63,7 @@ export function GroupedTaskList({
       })}
     >
       {groups.map((group) => (
-        <div key={group.key} role="group" aria-label={group.label} className={styles.group}>
+        <div key={group.key} role="rowgroup" aria-label={group.label} className={styles.group}>
           <div className={styles.groupHeading} aria-hidden="true">
             {group.label}
           </div>

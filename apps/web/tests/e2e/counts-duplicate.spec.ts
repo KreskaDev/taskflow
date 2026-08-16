@@ -109,9 +109,9 @@ test.describe("Duplikuj (FR-112)", () => {
     await page.getByRole("menuitem", { name: "Duplikuj" }).click();
 
     // Optimistic paint: the copy appears immediately, ADJACENT to (directly below) the source.
-    await expect(page.getByRole("option")).toHaveCount(3);
+    await expect(page.getByRole("row")).toHaveCount(3);
     const titles = await page
-      .getByRole("option")
+      .getByRole("row")
       .evaluateAll((rows) => rows.map((r) => r.textContent ?? ""));
     expect(titles[0]).toContain("Oryginał");
     expect(titles[1]).toContain("Oryginał"); // the duplicate sits right after its source
@@ -119,7 +119,7 @@ test.describe("Duplikuj (FR-112)", () => {
 
     await duplicated;
     await page.reload();
-    await expect(page.getByRole("option")).toHaveCount(3);
+    await expect(page.getByRole("row")).toHaveCount(3);
 
     await context.close();
   });
@@ -139,11 +139,11 @@ test.describe("Reorder affordances (S3.7)", () => {
     await page.getByRole("menuitem", { name: "Przenieś niżej" }).click();
 
     // Optimistic swap, then persisted.
-    await expect(page.getByRole("option").first()).toContainText("Spód");
+    await expect(page.getByRole("row").first()).toContainText("Spód");
     await repositioned;
     await page.reload();
-    await expect(page.getByRole("option").first()).toContainText("Spód");
-    await expect(page.getByRole("option").nth(1)).toContainText("Góra");
+    await expect(page.getByRole("row").first()).toContainText("Spód");
+    await expect(page.getByRole("row").nth(1)).toContainText("Góra");
 
     await context.close();
   });
@@ -155,10 +155,10 @@ test.describe("Reorder affordances (S3.7)", () => {
     await createTask(page, "Przeciągany");
 
     const handle = page
-      .getByRole("option")
+      .getByRole("row")
       .filter({ hasText: "Przeciągany" })
       .locator("[data-drag-handle]");
-    const target = page.getByRole("option").filter({ hasText: "Pod spodem" });
+    const target = page.getByRole("row").filter({ hasText: "Pod spodem" });
 
     const repositioned = page.waitForResponse(
       (r) => r.request().method() === "PATCH" && r.url().includes("/position") && r.ok(),
@@ -173,8 +173,8 @@ test.describe("Reorder affordances (S3.7)", () => {
     await repositioned;
 
     await page.reload();
-    await expect(page.getByRole("option").first()).toContainText("Pod spodem");
-    await expect(page.getByRole("option").nth(1)).toContainText("Przeciągany");
+    await expect(page.getByRole("row").first()).toContainText("Pod spodem");
+    await expect(page.getByRole("row").nth(1)).toContainText("Przeciągany");
 
     await context.close();
   });

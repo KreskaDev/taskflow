@@ -45,8 +45,8 @@ test.describe("Shortcut-system removal (FR-111, S3.5)", () => {
     await page.goto("/");
     await createViaInlineCapture(page, "Nietykalny task");
 
-    const listbox = page.getByRole("listbox", { name: "Zadania" });
-    await expect(page.getByRole("option")).toHaveCount(1);
+    const listbox = page.getByRole("grid", { name: "Zadania" });
+    await expect(page.getByRole("row")).toHaveCount(1);
     await listbox.focus();
 
     const pageErrors: string[] = [];
@@ -74,7 +74,7 @@ test.describe("Shortcut-system removal (FR-111, S3.5)", () => {
     expect(new URL(page.url()).pathname).toBe("/");
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(page.getByRole("dialog", { name: "Keyboard shortcuts" })).toHaveCount(0);
-    await expect(page.getByRole("option")).toHaveCount(1, {
+    await expect(page.getByRole("row")).toHaveCount(1, {
       timeout: 2000,
     });
     expect(pageErrors).toEqual([]);
@@ -99,9 +99,9 @@ test.describe("Shortcut-system removal (FR-111, S3.5)", () => {
     await expect(capture).toHaveValue("");
 
     // Composite-widget keys still operate INSIDE the listbox (D5): arrows + Space.
-    const listbox = page.getByRole("listbox", { name: "Zadania" });
+    const listbox = page.getByRole("grid", { name: "Zadania" });
     await listbox.focus();
-    const option = page.getByRole("option").first();
+    const option = page.getByRole("row").first();
     await expect(option).toHaveAttribute("aria-selected", "true");
     const toggled = page.waitForResponse(
       (r) => r.request().method() === "PATCH" && r.url().includes("/status") && r.ok(),

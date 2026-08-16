@@ -43,9 +43,13 @@ icons only (FR-105).
 - The existing List gains a visible group-by control: **„Grupuj: Brak | Status | Priorytet"**
   (by-cycle appears only in slice 011). Persisted per project
   (`localStorage["taskflow.project-groupby.<projectId>"]`, default none).
-- Grouped render reuses the DailyView grouped-listbox pattern: one `role="listbox"`,
-  `role="group" aria-label` per group, flat index across groups, virtualization preserved or
-  consciously bypassed exactly as DailyView does today.
+- Grouped render reuses the DailyView grouped pattern: one composite container,
+  a labelled group element per group, flat index across groups, virtualization preserved or
+  consciously bypassed exactly as DailyView does today. *(Post-010 remediation: the task-list
+  containers are `role="grid"`, groups `role="rowgroup"`, rows `role="row"` with a single
+  `display:contents` `gridcell` — `option` forbids the rows' focusable controls, the same axe
+  `nested-interactive` rationale as the Board's list/listitem decision below, while `grid`
+  keeps the spec'd ↑/↓/Space/Enter composite-widget behavior.)*
 - Status grouping: column order + „Anulowane" group last (cancelled visible HERE — EC-11
   counterpart); priority grouping: P0→P3, then „Bez priorytetu". Empty groups omitted.
 

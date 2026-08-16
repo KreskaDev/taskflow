@@ -52,11 +52,14 @@ interface TaskListViewProps extends TaskListProps {
 }
 
 /**
- * The virtualized Inbox listbox (rebuilt in slice 019 — T035/T040). Keyboard operability
- * lives INSIDE the widget after the shortcut-system removal (D5): the container handles
- * ↑/↓/Home/End selection, Space toggle, Enter open via {@link listboxKeyDown} — no
- * document-level listeners. Selection stays `aria-activedescendant`-based (the only
- * pattern that survives virtualization × keyboard-nav × screen-reader).
+ * The virtualized Inbox task grid (rebuilt in slice 019 — T035/T040; roles remediated
+ * from listbox/option to grid/row/gridcell post-010: `option` forbids the focusable row
+ * controls — axe `nested-interactive` — while `gridcell` legally holds them and `grid`
+ * keeps the composite-widget contract). Keyboard operability lives INSIDE the widget
+ * after the shortcut-system removal (D5): the container handles ↑/↓/Home/End selection,
+ * Space toggle, Enter open via {@link listboxKeyDown} — no document-level listeners.
+ * Selection stays `aria-activedescendant`-based (the only pattern that survives
+ * virtualization × keyboard-nav × screen-reader).
  */
 export function TaskList({ tasks, ...props }: TaskListProps & { tasks?: TaskResponse[] }) {
   const { data } = useTasks();
@@ -136,7 +139,7 @@ function TaskListView({
   const body = (
     <div
       ref={scrollRef}
-      role="listbox"
+      role="grid"
       tabIndex={0}
       aria-label="Zadania"
       aria-activedescendant={hasSelection ? taskOptionId(tasks[selectedIndex]!.id) : undefined}

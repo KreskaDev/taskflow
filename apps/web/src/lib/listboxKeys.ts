@@ -1,10 +1,12 @@
 /**
- * Shared composite-widget keyboard operability for the task listboxes (slice 019, T035; D5,
- * UIT-090..093). AFTER the shortcut-system removal (FR-111) these keys are NOT shortcuts —
- * they are WAI-ARIA listbox behavior, living INSIDE the widget (no document-level listener):
- * ↑/↓ move the active option, Space toggles it, Enter opens it. Both listbox renderers
- * (TaskList and DailyView) attach this to their `role="listbox"` container, which holds DOM
- * focus while `aria-activedescendant` points at the selected option.
+ * Shared composite-widget keyboard operability for the task grids (slice 019, T035; D5,
+ * UIT-090..093; the containers were remediated listbox→grid post-010 — the handler is
+ * role-agnostic). AFTER the shortcut-system removal (FR-111) these keys are NOT
+ * shortcuts — they are WAI-ARIA composite-widget behavior, living INSIDE the widget (no
+ * document-level listener): ↑/↓ move the active row, Space toggles it, Enter opens it.
+ * The grid renderers (TaskList, GroupedTaskList, DailyView) attach this to their
+ * `role="grid"` container, which holds DOM focus while `aria-activedescendant` points at
+ * the selected row.
  */
 
 export interface ListboxKeyOptions {

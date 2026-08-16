@@ -13,7 +13,7 @@ import { formatInReferenceZone } from "@/lib/timezone";
 import { taskTitleSchema } from "@/lib/validation/task";
 import styles from "./TaskRow.module.css";
 
-/** Stable, deterministic option id derived from the task id (research R18). */
+/** Stable, deterministic row id derived from the task id (research R18). */
 export function taskOptionId(taskId: string): string {
   return `task-option-${taskId}`;
 }
@@ -121,43 +121,77 @@ export function buildMenuItems(task: TaskResponse, actions: TaskRowActions): Men
   );
   const items: (MenuItemSpec | null)[] = [
     actions.onToggleDone
-      ? { id: "toggle", label: done ? "Oznacz jako niezrobione" : "Oznacz jako zrobione", onSelect: actions.onToggleDone }
+      ? {
+          id: "toggle",
+          label: done ? "Oznacz jako niezrobione" : "Oznacz jako zrobione",
+          onSelect: actions.onToggleDone,
+        }
       : null,
     actions.onEdit ? { id: "edit", label: "Edytuj", onSelect: actions.onEdit } : null,
-    actions.onOpenPriority ? { id: "priority", label: "Priorytet…", onSelect: actions.onOpenPriority } : null,
-    actions.onOpenReschedule ? { id: "due", label: "Termin…", onSelect: actions.onOpenReschedule } : null,
-    actions.onOpenLabels ? { id: "labels", label: "Etykiety…", onSelect: actions.onOpenLabels } : null,
-    actions.onOpenMove ? { id: "move", label: "Przenieś do projektu…", onSelect: actions.onOpenMove } : null,
-    actions.onOpenAssign ? { id: "assign", label: "Przypisz…", onSelect: actions.onOpenAssign } : null,
-    actions.onDuplicate ? { id: "duplicate", label: "Duplikuj", onSelect: actions.onDuplicate } : null,
-    actions.onOpenDetails ? { id: "details", label: "Szczegóły i komentarze", onSelect: actions.onOpenDetails } : null,
-    actions.onMoveUp ? { id: "move-up", label: "Przenieś wyżej", onSelect: actions.onMoveUp } : null,
-    actions.onMoveDown ? { id: "move-down", label: "Przenieś niżej", onSelect: actions.onMoveDown } : null,
+    actions.onOpenPriority
+      ? { id: "priority", label: "Priorytet…", onSelect: actions.onOpenPriority }
+      : null,
+    actions.onOpenReschedule
+      ? { id: "due", label: "Termin…", onSelect: actions.onOpenReschedule }
+      : null,
+    actions.onOpenLabels
+      ? { id: "labels", label: "Etykiety…", onSelect: actions.onOpenLabels }
+      : null,
+    actions.onOpenMove
+      ? { id: "move", label: "Przenieś do projektu…", onSelect: actions.onOpenMove }
+      : null,
+    actions.onOpenAssign
+      ? { id: "assign", label: "Przypisz…", onSelect: actions.onOpenAssign }
+      : null,
+    actions.onDuplicate
+      ? { id: "duplicate", label: "Duplikuj", onSelect: actions.onDuplicate }
+      : null,
+    actions.onOpenDetails
+      ? { id: "details", label: "Szczegóły i komentarze", onSelect: actions.onOpenDetails }
+      : null,
+    actions.onMoveUp
+      ? { id: "move-up", label: "Przenieś wyżej", onSelect: actions.onMoveUp }
+      : null,
+    actions.onMoveDown
+      ? { id: "move-down", label: "Przenieś niżej", onSelect: actions.onMoveDown }
+      : null,
     // Board column moves (slice 010, AS-05/AS-06): presence = the caller found a neighbour
     // column via adjacentStatus; a boundary column simply has no item (omitted, not disabled).
     actions.onMoveLeft
       ? {
           id: "move-left",
-          label: moveLabel(<ChevronLeft size={14} strokeWidth={1.75} aria-hidden="true" />, "Przenieś w lewo"),
+          label: moveLabel(
+            <ChevronLeft size={14} strokeWidth={1.75} aria-hidden="true" />,
+            "Przenieś w lewo",
+          ),
           onSelect: actions.onMoveLeft,
         }
       : null,
     actions.onMoveRight
       ? {
           id: "move-right",
-          label: moveLabel(<ChevronRight size={14} strokeWidth={1.75} aria-hidden="true" />, "Przenieś w prawo"),
+          label: moveLabel(
+            <ChevronRight size={14} strokeWidth={1.75} aria-hidden="true" />,
+            "Przenieś w prawo",
+          ),
           onSelect: actions.onMoveRight,
         }
       : null,
-    actions.onDelete ? { id: "delete", label: "Usuń", onSelect: actions.onDelete, destructive: true } : null,
+    actions.onDelete
+      ? { id: "delete", label: "Usuń", onSelect: actions.onDelete, destructive: true }
+      : null,
   ];
   return items.filter((i): i is MenuItemSpec => i !== null);
 }
 
 /**
- * A single listbox option (rebuilt in slice 019 — T040/T041; FR-108, US-18.AS-02, 13px
- * density). `role="option"` with a STABLE id (the listbox's `aria-activedescendant`
- * addresses it across virtualizer mount/unmount); accessible name = title + labelled
+ * A single grid row (rebuilt in slice 019 — T040/T041; FR-108, US-18.AS-02, 13px
+ * density; roles remediated to `grid`/`row`/`gridcell` post-010). `role="row"` with a
+ * STABLE id (the grid's `aria-activedescendant` addresses it across virtualizer
+ * mount/unmount) and `aria-selected`; the single `role="gridcell"` wrapper is
+ * `display: contents` (zero layout impact) and, unlike the former `role="option"`,
+ * LEGALLY contains the focusable controls (axe `nested-interactive` — the Board's
+ * PR #8 rationale applied to the List). Accessible name = title + labelled
  * qualifiers (sr-only "termin:"/"priorytet:" prefixes).
  *
  * Quick actions (complete / edit / "⋯") live in an action zone that is VISIBLE on row
@@ -186,7 +220,7 @@ export function TaskRow({
   return (
     <div
       id={taskOptionId(task.id)}
-      role="option"
+      role="row"
       aria-selected={selected}
       data-status={task.status}
       className={[styles.row, done ? styles.done : null, selected ? styles.selected : null]
@@ -195,78 +229,97 @@ export function TaskRow({
       style={style}
       onClick={onSelect}
     >
-      {actions?.onToggleDone ? (
-        <Checkbox
-          aria-label={done ? `Oznacz „${task.title}” jako niezrobione` : `Oznacz „${task.title}” jako zrobione`}
-          checked={done}
-          onChange={() => actions.onToggleDone?.()}
-          onClick={(event) => event.stopPropagation()}
-          className={styles.checkbox}
-        />
-      ) : (
-        <span className={styles.stateGlyph} aria-hidden="true" data-done={done} />
-      )}
-
-      {isRenaming ? (
-        <RenameInput initialTitle={task.title} onCommit={onCommitRename} onCancel={onCancelRename} />
-      ) : (
-        <RowTitle task={task} onSelect={onSelect} onOpenDetails={actions?.onOpenDetails} />
-      )}
-
-      {!isRenaming && projected && projectName ? (
-        <span className={styles.projectChip}>
-          <span className="sr-only">projekt: </span>
-          {projectName}
-        </span>
-      ) : null}
-
-      {!isRenaming && priority ? (
-        <span className={styles.priority} data-priority={task.priority}>
-          <span className="sr-only">priorytet: </span>
-          {priority}
-        </span>
-      ) : null}
-
-      {!isRenaming && isOverdue ? <span className={styles.overdue}>zaległe</span> : null}
-
-      {!isRenaming && task.assignees.length > 0 ? (
-        <span className={styles.assignees}>
-          <span className="sr-only">przypisani: </span>
-          {task.assignees.length}
-        </span>
-      ) : null}
-
-      {!isRenaming ? <LabelChips labelIds={task.labels} /> : null}
-
-      {!isRenaming && task.dueDate ? (
-        <span className={styles.due}>
-          <span className="sr-only">termin: </span>
-          {formatDueDate(task.dueDate, task.dueHasTime)}
-        </span>
-      ) : null}
-
-      {!isRenaming && actions ? (
-        <span
-          className={styles.actionZone}
-          // The action zone is presentation-level chrome inside the option; its buttons are
-          // individually labelled. Clicks inside must not re-fire row selection handlers twice.
-          onClick={(event) => event.stopPropagation()}
-        >
-          {dragHandle}
-          {actions.onEdit ? (
-            <IconButton aria-label={`Edytuj „${task.title}”`} className={styles.action} onClick={actions.onEdit}>
-              <Pencil size={14} strokeWidth={1.75} aria-hidden="true" />
-            </IconButton>
-          ) : null}
-          <Menu
-            items={buildMenuItems(task, actions)}
-            triggerLabel={`Więcej akcji: ${task.title}`}
-            menuLabel="Akcje taska"
-            triggerContent={<span aria-hidden="true" className={styles.ellipsis}>⋯</span>}
-            triggerClassName={styles.action}
+      {/* display:contents — the required grid child chain (row > gridcell) with zero layout impact. */}
+      <div role="gridcell" className={styles.cell}>
+        {actions?.onToggleDone ? (
+          <Checkbox
+            aria-label={
+              done
+                ? `Oznacz „${task.title}” jako niezrobione`
+                : `Oznacz „${task.title}” jako zrobione`
+            }
+            checked={done}
+            onChange={() => actions.onToggleDone?.()}
+            onClick={(event) => event.stopPropagation()}
+            className={styles.checkbox}
           />
-        </span>
-      ) : null}
+        ) : (
+          <span className={styles.stateGlyph} aria-hidden="true" data-done={done} />
+        )}
+
+        {isRenaming ? (
+          <RenameInput
+            initialTitle={task.title}
+            onCommit={onCommitRename}
+            onCancel={onCancelRename}
+          />
+        ) : (
+          <RowTitle task={task} onSelect={onSelect} onOpenDetails={actions?.onOpenDetails} />
+        )}
+
+        {!isRenaming && projected && projectName ? (
+          <span className={styles.projectChip}>
+            <span className="sr-only">projekt: </span>
+            {projectName}
+          </span>
+        ) : null}
+
+        {!isRenaming && priority ? (
+          <span className={styles.priority} data-priority={task.priority}>
+            <span className="sr-only">priorytet: </span>
+            {priority}
+          </span>
+        ) : null}
+
+        {!isRenaming && isOverdue ? <span className={styles.overdue}>zaległe</span> : null}
+
+        {!isRenaming && task.assignees.length > 0 ? (
+          <span className={styles.assignees}>
+            <span className="sr-only">przypisani: </span>
+            {task.assignees.length}
+          </span>
+        ) : null}
+
+        {!isRenaming ? <LabelChips labelIds={task.labels} /> : null}
+
+        {!isRenaming && task.dueDate ? (
+          <span className={styles.due}>
+            <span className="sr-only">termin: </span>
+            {formatDueDate(task.dueDate, task.dueHasTime)}
+          </span>
+        ) : null}
+
+        {!isRenaming && actions ? (
+          <span
+            className={styles.actionZone}
+            // The action zone is presentation-level chrome inside the option; its buttons are
+            // individually labelled. Clicks inside must not re-fire row selection handlers twice.
+            onClick={(event) => event.stopPropagation()}
+          >
+            {dragHandle}
+            {actions.onEdit ? (
+              <IconButton
+                aria-label={`Edytuj „${task.title}”`}
+                className={styles.action}
+                onClick={actions.onEdit}
+              >
+                <Pencil size={14} strokeWidth={1.75} aria-hidden="true" />
+              </IconButton>
+            ) : null}
+            <Menu
+              items={buildMenuItems(task, actions)}
+              triggerLabel={`Więcej akcji: ${task.title}`}
+              menuLabel="Akcje taska"
+              triggerContent={
+                <span aria-hidden="true" className={styles.ellipsis}>
+                  ⋯
+                </span>
+              }
+              triggerClassName={styles.action}
+            />
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }
