@@ -34,8 +34,23 @@ test.use({ contextOptions: { reducedMotion: "reduce" } });
 test.skip(process.platform !== "linux", "[V] baselines are linux-only (CI-matching image)");
 
 async function forcePalette(page: Page, palette: string): Promise<void> {
+  // Hydration-safe palette swap. Two traps live here (both shipped in the first
+  // generation rounds):
+  // 1. `className = cls` WIPED the next/font `__variable_*` classes, so `--font-sans`
+  //    went undefined and every baseline rendered in the serif fallback instead of
+  //    Geist (font-family with an unset var() is invalid at computed-value time).
+  //    Swap ONLY the palette token; keep every other class.
+  // 2. Swapping before React finished hydrating triggered an attribute-mismatch
+  //    ("1 Issue" dev-overlay badge on every [V] page). The harness always runs
+  //    `next dev`, whose overlay portal mounts client-side — its presence proves the
+  //    client bundle has taken over, so the swap below can never race hydration.
+  await page.waitForSelector("nextjs-portal", { state: "attached" });
   await page.evaluate((cls) => {
-    document.documentElement.className = cls;
+    const el = document.documentElement;
+    el.className = el.className
+      .split(/\s+/)
+      .map((c) => (/^(dark|light)-(cool|warm)$/.test(c) ? cls : c))
+      .join(" ");
   }, palette);
 }
 
