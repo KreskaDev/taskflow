@@ -85,6 +85,16 @@ Keyboard-trigger deferral (product-vision UI-first reinterpretation clause, cons
   shortcuts exist (post-FR-111) and is NOT realized here. If the accelerator slice ever lands
   FR-028/FR-029, those bindings layer ON TOP of the affordances shipped here.
 
+## Clarifications
+
+### Session 2026-08-16
+
+- Q: Where do the list of all cycles and the lifecycle operations (create/edit/activate/close/delete) live? → A: The Cycle view is the single management surface — sidebar's active-cycle entry (FR-017) navigates to it; it renders the current cycle's metrics plus a cycle list/switcher exposing all lifecycle operations. No separate management route or settings surface.
+- Q: Is cycle close manual or automatic at the end date, and what is the "cycle review"? → A: Close is always MANUAL — the server never auto-transitions a cycle. Once the end date passes, the UI marks the active cycle as overdue and prompts to close it; the review IS the close flow: it lists incomplete tasks and the FR-018 rollover options, and closing commits the chosen rollover.
+- Q: Which cycles does the task cycle selector (US-05.AS-01) list as "available"? → A: ALL cycles — active, planned, and closed (plus the "backlog" option to clear the assignment). Assigning into a closed cycle is allowed (e.g. tidying history); a closed cycle's metrics reflect its current assignments. The "carried over" flag is set only by the keep-in-closed-cycle rollover, never by a later manual assignment.
+- Q: May cycle date ranges overlap? → A: Yes — overlap is allowed. The only date validation is start < end (both required). The single-active invariant rides on STATUS (manual activation), not on dates; cycle ordering is by start date with a deterministic tiebreaker on equal starts.
+- Q: Where does the configurable default cycle duration (FR-015) live, and what is its scope? → A: Per-user preference on the existing /settings page. Each cycle's actual duration is free — start/end dates are set per cycle at create/edit time (one cycle may span 1 week, another 3) — and the setting only drives the default end-date pre-fill (start + configured duration, default 2 weeks) in the create form.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 5 - Cycle Management & Review (Priority: P3)
@@ -106,7 +116,7 @@ User works with 2-week cycles (sprints). They assign tasks to the current cycle,
 reinterpretation clause — original keyboard phrasing retained in product-vision.md for the
 future accelerator slice, OOS-20):
 
-1. **(US-05.AS-01) Given** the user is on any view with a task selected, **When** they invoke the task's cycle-assignment action from its "⋯" menu (the original `#` trigger is deferred per OOS-20), **Then** a cycle selector appears listing available cycles and a "backlog" option.
+1. **(US-05.AS-01) Given** the user is on any view with a task selected, **When** they invoke the task's cycle-assignment action from its "⋯" menu (the original `#` trigger is deferred per OOS-20), **Then** a cycle selector appears listing available cycles and a "backlog" option. *(Session 2026-08-16: "available cycles" = ALL cycles — active, planned, and closed — ordered by start date; the "backlog" option clears the assignment. Assigning into a closed cycle is permitted and its metrics reflect current assignments; the "carried over" flag is only ever set by the keep-in-closed-cycle rollover, never by a later manual assignment.)*
 2. **(US-05.AS-02) Given** the cycle selector is open, **When** user selects a cycle, **Then** the task is assigned to that cycle.
 3. **(US-05.AS-03) Given** the user navigates to the current cycle view via the sidebar's active-cycle entry (FR-017; the original `G C` chord is deferred per OOS-20), **When** the view renders, **Then** it shows: percentage of tasks done, days remaining in the cycle, and a breakdown of tasks by status.
 4. **(US-05.AS-04) Given** a cycle has ended with unfinished tasks, **When** user opens the cycle review, **Then** they see a list of incomplete tasks with options to: move all to next cycle, move all to backlog, or handle individually.
@@ -115,6 +125,18 @@ future accelerator slice, OOS-20):
 7. **(US-05.AS-07) Given** an active cycle exists, **When** user attempts to delete it, **Then** the system prevents deletion and shows a message explaining the cycle must be closed first.
 
 > Cycle ordering & lifecycle (resolves the rollover "next cycle" ambiguity for US-05.AS-05/AS-06): cycles are ordered by start date, and the **"next cycle"** for rollover is the next **planned** cycle by start date. A cycle has status planned, active, or closed; the **planned → active** transition is a **manual activation**, and a **single-active invariant** holds (at most one active cycle at any time across the team-wide instance). The single-active invariant is enforced by a **global partial-unique index** on the active-cycle status (database-level guarantee), in addition to the handler-level activation check. If no planned cycle exists when rollover targets the next cycle, US-05.AS-06 prompts the user to create one first.
+
+> Date semantics (Session 2026-08-16): cycle date ranges MAY overlap — the only date validation
+> is start < end (both dates required). The single-active invariant rides on STATUS (manual
+> activation), never on dates; cycle ordering is by start date, with a deterministic tiebreaker
+> when two cycles share a start date.
+
+> Close semantics (Session 2026-08-16): closing is always **manual** — the server never
+> auto-transitions a cycle at its end date. Once the end date passes, the UI marks the still-active
+> cycle as overdue ("has ended" in US-05.AS-04's Given) and prompts to close it; the **cycle review
+> IS the close flow**: it lists the incomplete tasks with the FR-018 rollover options, and
+> confirming the close commits the chosen rollover in the same operation. A cycle with no
+> incomplete tasks closes without the rollover step.
 
 ### Edge Cases
 
@@ -127,6 +149,12 @@ future accelerator slice, OOS-20):
 ### Functional Requirements (slice-specific)
 
 - **FR-015**: System MUST support cycles (sprints) with a default duration of 2 weeks, configurable in application settings.
+
+  > Clarification (Session 2026-08-16): the configurable default lives as a per-user preference
+  > on the existing /settings page. Each cycle's actual duration is free — start/end dates are
+  > set per cycle at create/edit time (one cycle may span 1 week, another 3); the preference only
+  > drives the create form's default end-date pre-fill (start + configured duration, default 2
+  > weeks).
 - **FR-016**: Each task MUST belong to at most one cycle (or no cycle, meaning backlog).
 - **FR-017**: The active cycle MUST be visible in the sidebar.
 - **FR-018**: When a cycle is closed with incomplete tasks, the system MUST provide rollover options: move all to next cycle, move all to backlog (remove cycle assignment), keep all in the closed cycle with a "carried over" flag, or handle individually (per-task choice among the same three options).
@@ -137,6 +165,12 @@ future accelerator slice, OOS-20):
 
 > Scope note: FR-024 is owned here, where its by-cycle grouping dimension is completed; the
 > group-by status and group-by priority dimensions shipped in slice 010.
+
+> Clarification (Session 2026-08-16): the Cycle view is the single cycle-management surface —
+> it renders the current cycle's metrics (FR-026) and a cycle list/switcher covering
+> planned/active/closed cycles, from which the FR-020 lifecycle operations (create, edit,
+> activate, close, delete) are invoked; the sidebar's FR-017 active-cycle entry is the
+> navigation point to this view. No separate cycles-management route or settings surface exists.
 
 > Scope note (shortcut sets): FR-028 (navigation shortcuts, incl. `G C`) and FR-029 (list
 > shortcuts, incl. `#`) are **[DEFERRED]** per constitution v5.0.0 (US-18/OOS-20) and are NOT
