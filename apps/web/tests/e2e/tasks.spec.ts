@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { ensureUser, insertSession } from "./helpers/seed";
 
 /**
@@ -15,14 +15,21 @@ import { ensureUser, insertSession } from "./helpers/seed";
  * are what keep one test's tasks out of another's list (test isolation).
  */
 
-/** Seeds a fresh user + session and returns an authenticated page landed on the workspace. */
+/**
+ * Seeds a fresh user + session and returns an authenticated page landed on the workspace.
+ * ONE user per test × ATTEMPT: `testInfo.retry` is part of the identity key (the [V]-suite
+ * pattern) — a retry reusing the previous attempt's user would find a non-empty inbox and
+ * every `emptyHint`/count/first-row assertion becomes order-dependent (the INV-033 flake).
+ */
 async function signedInPage(
   browser: import("@playwright/test").Browser,
   key: string,
+  testInfo: TestInfo,
 ): Promise<{ page: Page; context: import("@playwright/test").BrowserContext }> {
+  const attemptKey = `${key}-r${testInfo.retry}`;
   const profile = await ensureUser({
-    sub: `google-sub-${key}`,
-    email: `${key}@taskflow.test`,
+    sub: `google-sub-${attemptKey}`,
+    email: `${attemptKey}@taskflow.test`,
     name: "Task Capturer",
     picture: "https://avatars.test/tc.png",
   });
@@ -58,10 +65,8 @@ async function createTask(page: Page, title: string): Promise<void> {
 }
 
 test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
-  test("EC-01: a fresh user sees the accessible empty-Inbox hint and zero options [INV-030]", async ({
-    browser,
-  }) => {
-    const { page, context } = await signedInPage(browser, "tasks-empty");
+  test("EC-01: a fresh user sees the accessible empty-Inbox hint and zero options [INV-030]", async ({ browser }, testInfo) => {
+    const { page, context } = await signedInPage(browser, "tasks-empty", testInfo);
     await page.goto("/");
 
     // The empty-Inbox hint asserts the query RESOLVED with zero rows (page.tsx swaps the
@@ -75,10 +80,8 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
     await context.close();
   });
 
-  test("row anatomy: a labelled listbox of option rows with status, title, priority text, label name, due date; done is distinguished beyond color [INV-031]", async ({
-    browser,
-  }) => {
-    const { page, context } = await signedInPage(browser, "tasks-anatomy");
+  test("row anatomy: a labelled listbox of option rows with status, title, priority text, label name, due date; done is distinguished beyond color [INV-031]", async ({ browser }, testInfo) => {
+    const { page, context } = await signedInPage(browser, "tasks-anatomy", testInfo);
     await page.goto("/");
     await createTask(page, "Anatomia jutro"); // trailing "jutro" → a due date on the row
 
@@ -121,10 +124,8 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
     await context.close();
   });
 
-  test("AS-01: the inline capture is ready on the Inbox and 'Nowy task' opens the global capture with the title input focused [INV-020]", async ({
-    browser,
-  }) => {
-    const { page, context } = await signedInPage(browser, "tasks-focus");
+  test("AS-01: the inline capture is ready on the Inbox and 'Nowy task' opens the global capture with the title input focused [INV-020]", async ({ browser }, testInfo) => {
+    const { page, context } = await signedInPage(browser, "tasks-focus", testInfo);
     await page.goto("/");
     await expect(emptyHint(page)).toBeVisible();
 
@@ -145,10 +146,8 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
     await context.close();
   });
 
-  test("AS-06: Enter creates, the row paints at the top newest-first, and persists across reload [INV-021]", async ({
-    browser,
-  }) => {
-    const { page, context } = await signedInPage(browser, "tasks-create");
+  test("AS-06: Enter creates, the row paints at the top newest-first, and persists across reload [INV-021]", async ({ browser }, testInfo) => {
+    const { page, context } = await signedInPage(browser, "tasks-create", testInfo);
     await page.goto("/");
     await expect(emptyHint(page)).toBeVisible();
 
@@ -173,10 +172,8 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
     await context.close();
   });
 
-  test("AS-07: Esc cancels the global capture — no task is created and focus returns to the invoker [INV-022]", async ({
-    browser,
-  }) => {
-    const { page, context } = await signedInPage(browser, "tasks-cancel");
+  test("AS-07: Esc cancels the global capture — no task is created and focus returns to the invoker [INV-022]", async ({ browser }, testInfo) => {
+    const { page, context } = await signedInPage(browser, "tasks-cancel", testInfo);
     await page.goto("/");
     await expect(emptyHint(page)).toBeVisible();
 
@@ -201,10 +198,8 @@ test.describe("US1 Daily Task Capture (AS-01/06/07/09, EC-01)", () => {
     await context.close();
   });
 
-  test("AS-09 precursor: typing C inside the capture input inserts the character (no capture hijack) [INV-023]", async ({
-    browser,
-  }) => {
-    const { page, context } = await signedInPage(browser, "tasks-suppress");
+  test("AS-09 precursor: typing C inside the capture input inserts the character (no capture hijack) [INV-023]", async ({ browser }, testInfo) => {
+    const { page, context } = await signedInPage(browser, "tasks-suppress", testInfo);
     await page.goto("/");
     await expect(emptyHint(page)).toBeVisible();
 
@@ -265,12 +260,11 @@ test.describe("US1 Natural-Language Dates (AS-02..05 capture-with-date, EC-02, v
   ];
 
   for (const { scenario, input, title } of captureCases) {
-    test(`${scenario}: "${input}" → title "${title}" stripped + due-date label visible [INV-024]`, async ({
-      browser,
-    }) => {
+    test(`${scenario}: "${input}" → title "${title}" stripped + due-date label visible [INV-024]`, async ({ browser }, testInfo) => {
       const { page, context } = await signedInPage(
         browser,
         `dates-${title.toLowerCase().replace(/\s+/g, "-")}`,
+        testInfo,
       );
       await page.goto("/");
       await expect(emptyHint(page)).toBeVisible();
@@ -290,10 +284,8 @@ test.describe("US1 Natural-Language Dates (AS-02..05 capture-with-date, EC-02, v
     });
   }
 
-  test('EC-02: "Spotkanie 30.02" creates NO task and announces "nie rozpoznano"; field retains value [INV-025]', async ({
-    browser,
-  }) => {
-    const { page, context } = await signedInPage(browser, "dates-ec02-impossible");
+  test('EC-02: "Spotkanie 30.02" creates NO task and announces "nie rozpoznano"; field retains value [INV-025]', async ({ browser }, testInfo) => {
+    const { page, context } = await signedInPage(browser, "dates-ec02-impossible", testInfo);
     await page.goto("/");
     await expect(emptyHint(page)).toBeVisible();
 
@@ -322,10 +314,8 @@ test.describe("US1 Natural-Language Dates (AS-02..05 capture-with-date, EC-02, v
     await context.close();
   });
 
-  test('guard: "Wersja 2.0" is created as-is with NO due-date label and NO error [INV-026]', async ({
-    browser,
-  }) => {
-    const { page, context } = await signedInPage(browser, "dates-guard-version");
+  test('guard: "Wersja 2.0" is created as-is with NO due-date label and NO error [INV-026]', async ({ browser }, testInfo) => {
+    const { page, context } = await signedInPage(browser, "dates-guard-version", testInfo);
     await page.goto("/");
     await expect(emptyHint(page)).toBeVisible();
 
@@ -383,10 +373,8 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
     );
   }
 
-  test("AS-03: ↑/↓ move the selection (aria-selected + listbox aria-activedescendant track it) [INV-032]", async ({
-    browser,
-  }) => {
-    const { page, context } = await signedInPage(browser, "us8-nav");
+  test("AS-03: ↑/↓ move the selection (aria-selected + listbox aria-activedescendant track it) [INV-032]", async ({ browser }, testInfo) => {
+    const { page, context } = await signedInPage(browser, "us8-nav", testInfo);
     await page.goto("/");
     await expect(emptyHint(page)).toBeVisible();
 
@@ -421,10 +409,8 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
     await context.close();
   });
 
-  test("AS-09: single-key shortcuts are suppressed while a text input is focused [INV-124]", async ({
-    browser,
-  }) => {
-    const { page, context } = await signedInPage(browser, "us8-suppress");
+  test("AS-09: single-key shortcuts are suppressed while a text input is focused [INV-124]", async ({ browser }, testInfo) => {
+    const { page, context } = await signedInPage(browser, "us8-suppress", testInfo);
     await page.goto("/");
     await expect(emptyHint(page)).toBeVisible();
 
@@ -444,10 +430,8 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
     await context.close();
   });
 
-  test("Space toggles the selected task done↔backlog and the done state persists across reload [INV-033]", async ({
-    browser,
-  }) => {
-    const { page, context } = await signedInPage(browser, "us8-toggle");
+  test("Space toggles the selected task done↔backlog and the done state persists across reload [INV-033]", async ({ browser }, testInfo) => {
+    const { page, context } = await signedInPage(browser, "us8-toggle", testInfo);
     await page.goto("/");
     await expect(emptyHint(page)).toBeVisible();
 
@@ -484,10 +468,8 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
     await context.close();
   });
 
-  test("the row's Edytuj action renames inline (Enter commits + persists); Esc keeps the original [INV-034]", async ({
-    browser,
-  }) => {
-    const { page, context } = await signedInPage(browser, "us8-rename");
+  test("the row's Edytuj action renames inline (Enter commits + persists); Esc keeps the original [INV-034]", async ({ browser }, testInfo) => {
+    const { page, context } = await signedInPage(browser, "us8-rename", testInfo);
     await page.goto("/");
     await expect(emptyHint(page)).toBeVisible();
 
@@ -528,10 +510,8 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
     await context.close();
   });
 
-  test("the row menu's Usuń soft-deletes the task and it stays gone across reload [INV-036]", async ({
-    browser,
-  }) => {
-    const { page, context } = await signedInPage(browser, "us8-delete");
+  test("the row menu's Usuń soft-deletes the task and it stays gone across reload [INV-036]", async ({ browser }, testInfo) => {
+    const { page, context } = await signedInPage(browser, "us8-delete", testInfo);
     await page.goto("/");
     await expect(emptyHint(page)).toBeVisible();
 
@@ -557,10 +537,8 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
     await context.close();
   });
 
-  test("Usuń rollback-in-place: a server 500 reappears the row in position + announces the failure (FR-049) [INV-037]", async ({
-    browser,
-  }) => {
-    const { page, context } = await signedInPage(browser, "us8-delete-rollback");
+  test("Usuń rollback-in-place: a server 500 reappears the row in position + announces the failure (FR-049) [INV-037]", async ({ browser }, testInfo) => {
+    const { page, context } = await signedInPage(browser, "us8-delete-rollback", testInfo);
     await page.goto("/");
     await expect(emptyHint(page)).toBeVisible();
 
@@ -620,10 +598,8 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
     await context.close();
   });
 
-  test("the row menu's Przenieś niżej reorders the task down; the new order persists and the URL is unchanged [INV-038]", async ({
-    browser,
-  }) => {
-    const { page, context } = await signedInPage(browser, "us8-reorder");
+  test("the row menu's Przenieś niżej reorders the task down; the new order persists and the URL is unchanged [INV-038]", async ({ browser }, testInfo) => {
+    const { page, context } = await signedInPage(browser, "us8-reorder", testInfo);
     await page.goto("/");
     await expect(emptyHint(page)).toBeVisible();
 
@@ -653,10 +629,8 @@ test.describe("US8 Keyboard Nav & Row Operations (AS-03/09, Space toggle, rename
     await context.close();
   });
 
-  test("virtualization-focus: the selected row stays mounted + addressable after a wheel scroll, and ↑/↓ still move [INV-041] [INV-136]", async ({
-    browser,
-  }) => {
-    const { page, context } = await signedInPage(browser, "us8-virtualize");
+  test("virtualization-focus: the selected row stays mounted + addressable after a wheel scroll, and ↑/↓ still move [INV-041] [INV-136]", async ({ browser }, testInfo) => {
+    const { page, context } = await signedInPage(browser, "us8-virtualize", testInfo);
     await page.goto("/");
     await expect(emptyHint(page)).toBeVisible();
 
