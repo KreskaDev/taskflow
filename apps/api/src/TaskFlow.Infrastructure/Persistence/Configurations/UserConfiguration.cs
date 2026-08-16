@@ -47,6 +47,13 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
+        // Slice 011 (FR-015/D8): the per-user default cycle duration preference. Server-side so
+        // it survives devices; DEFAULT 14 backfills existing rows in the AddCycles migration.
+        builder.Property(u => u.CycleDefaultDurationDays)
+            .HasColumnName("cycle_default_duration_days")
+            .HasDefaultValue(14)
+            .IsRequired();
+
         builder.HasIndex(u => u.GoogleSubjectId)
             .HasDatabaseName("ix_users_google_subject_id")
             .IsUnique();
@@ -72,6 +79,7 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             DisplayName = "Deleted User",
             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
             UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            CycleDefaultDurationDays = 14,
         });
     }
 }
