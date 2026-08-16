@@ -57,6 +57,13 @@ public sealed class User : AggregateRoot<UserId>
     /// <summary>Last-profile-refresh timestamp (UTC).</summary>
     public DateTime UpdatedAt { get; private set; }
 
+    /// <summary>
+    /// The per-user default cycle duration in days (slice 011, FR-015/D8; default 14 = 2 weeks).
+    /// Drives ONLY the create-cycle form's end-date pre-fill; each cycle's actual duration is free.
+    /// Range 1..90 (validated at the API boundary; guarded here belt-and-braces).
+    /// </summary>
+    public int CycleDefaultDurationDays { get; private set; } = 14;
+
     /// <summary>Creates a new user from a first-time Google sign-in.</summary>
     /// <param name="googleSubjectId">Google's <c>sub</c> claim.</param>
     /// <param name="email">Verified email from the Google profile.</param>
@@ -92,6 +99,23 @@ public sealed class User : AggregateRoot<UserId>
         Email = email;
         DisplayName = displayName;
         AvatarUrl = avatarUrl;
+        UpdatedAt = utcNow;
+    }
+
+    /// <summary>
+    /// Sets the default cycle duration preference (slice 011, FR-015/D8). The 1..90 range is
+    /// validated at the API boundary (FluentValidation → 422); this guard is belt-and-braces.
+    /// </summary>
+    /// <param name="days">The new default duration in days (1..90).</param>
+    /// <param name="utcNow">The current UTC time (injected for testability).</param>
+    public void SetCycleDefaultDuration(int days, DateTime utcNow)
+    {
+        if (days is < 1 or > 90)
+        {
+            throw new ArgumentOutOfRangeException(nameof(days), days, "The default cycle duration must be 1..90 days.");
+        }
+
+        CycleDefaultDurationDays = days;
         UpdatedAt = utcNow;
     }
 }

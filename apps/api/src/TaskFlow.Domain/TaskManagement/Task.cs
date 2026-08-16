@@ -107,8 +107,20 @@ public sealed class Task : AggregateRoot<TaskId>
     /// </summary>
     public ProjectId? ProjectId { get; private set; }
 
-    /// <summary>Reserved (slice 011) — owning cycle. Mapped but unused this slice.</summary>
+    /// <summary>
+    /// The owning cycle (slice 011), or null = the cycle backlog (FR-016). DELIBERATELY a raw
+    /// <c>Guid?</c>, never a value-converted <c>CycleId?</c> (D2 — the slice-005 Npgsql trap:
+    /// <c>Contains</c>/IN over a value-converted nullable FK fails to translate at runtime).
+    /// Written by <see cref="SetCycle"/> and the rollover transitions.
+    /// </summary>
     public Guid? CycleId { get; private set; }
+
+    /// <summary>
+    /// The "carried over" flag (slice 011, D7): set EXCLUSIVELY by the <c>keep</c> rollover on
+    /// incomplete tasks left in a closing cycle (<see cref="MarkCarriedOver"/>); cleared by EVERY
+    /// subsequent cycle write (manual or rollover). Never set by manual assignment.
+    /// </summary>
+    public bool CarriedOver { get; private set; }
 
     /// <summary>Reserved (slice 012) — recurrence rule (jsonb). Mapped but unused this slice.</summary>
     public string? RecurrenceRule { get; private set; }
@@ -311,6 +323,61 @@ public sealed class Task : AggregateRoot<TaskId>
             _assignees.Clear();
         }
         ProjectId = projectId;
+        Touch(utcNow);
+    }
+
+    /// <summary>
+    /// Assigns the task to <paramref name="cycleId"/>, or clears the assignment with null (slice
+    /// 011, US-05.AS-02, contracts/task-cycle.md). ALWAYS clears <see cref="CarriedOver"/> — the
+    /// flag is exclusively rollover-written (D7), so any manual (re)assignment resets it. Bumps
+    /// <see cref="Version"/>. The handler (<c>SetTaskCycle</c>) authorizes on the TASK's visibility
+    /// and validates the cycle's existence before calling this; the aggregate records the move.
+    /// </summary>
+    /// <param name="cycleId">The target cycle, or null for the cycle backlog (FR-016).</param>
+    /// <param name="utcNow">The current UTC time (injected for testability).</param>
+    public void SetCycle(Guid? cycleId, DateTime utcNow)
+    {
+        CycleId = cycleId;
+        CarriedOver = false;
+        Touch(utcNow);
+    }
+
+    /// <summary>
+    /// Rollover transition (slice 011 close flow, D4): moves an incomplete task from the closing
+    /// cycle to the next planned cycle and clears <see cref="CarriedOver"/>. One version bump.
+    /// Called ONLY by the <c>CloseCycle</c> handler inside the close transaction.
+    /// </summary>
+    /// <param name="nextCycleId">The next planned cycle (resolved per D5).</param>
+    /// <param name="utcNow">The current UTC time (injected for testability).</param>
+    public void RollToCycle(Guid nextCycleId, DateTime utcNow)
+    {
+        CycleId = nextCycleId;
+        CarriedOver = false;
+        Touch(utcNow);
+    }
+
+    /// <summary>
+    /// Rollover transition (slice 011 close flow, D4): clears the cycle assignment — back to the
+    /// cycle backlog — and clears <see cref="CarriedOver"/>. One version bump. Called ONLY by the
+    /// <c>CloseCycle</c> handler inside the close transaction.
+    /// </summary>
+    /// <param name="utcNow">The current UTC time (injected for testability).</param>
+    public void RollToBacklog(DateTime utcNow)
+    {
+        CycleId = null;
+        CarriedOver = false;
+        Touch(utcNow);
+    }
+
+    /// <summary>
+    /// Rollover transition (slice 011 close flow, D4/D7): the <c>keep</c> choice — the task stays
+    /// in the (now closed) cycle and is flagged carried-over. One version bump. Called ONLY by the
+    /// <c>CloseCycle</c> handler inside the close transaction, and only for INCOMPLETE tasks.
+    /// </summary>
+    /// <param name="utcNow">The current UTC time (injected for testability).</param>
+    public void MarkCarriedOver(DateTime utcNow)
+    {
+        CarriedOver = true;
         Touch(utcNow);
     }
 

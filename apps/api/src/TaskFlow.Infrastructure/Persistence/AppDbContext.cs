@@ -25,6 +25,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<TaskFlow.Domain.TaskManagement.Comment> Comments => Set<TaskFlow.Domain.TaskManagement.Comment>();
 
+    public DbSet<TaskFlow.Domain.TaskManagement.Cycle> Cycles => Set<TaskFlow.Domain.TaskManagement.Cycle>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);

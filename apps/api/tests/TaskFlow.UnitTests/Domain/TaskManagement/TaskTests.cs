@@ -573,4 +573,87 @@ public sealed class TaskTests
 
         task.Assignees.Should().BeEmpty("EditTask to the Inbox clears the assignee set (FR-069)");
     }
+
+    [Fact]
+    public void SetCycle_assigns_clears_carried_over_and_bumps_the_version()
+    {
+        // Slice 011 (US-05.AS-02, D7): a manual assignment always resets the rollover-only flag.
+        var task = NewTask();
+        task.MarkCarriedOver(MutateInstant);
+        var cycleId = Guid.NewGuid();
+
+        task.SetCycle(cycleId, LaterInstant);
+
+        task.CycleId.Should().Be(cycleId);
+        task.CarriedOver.Should().BeFalse("carried_over is exclusively rollover-written (D7)");
+        task.Version.Should().Be(2, "MarkCarriedOver and SetCycle each bump once");
+        task.UpdatedAt.Should().Be(LaterInstant);
+    }
+
+    [Fact]
+    public void SetCycle_null_clears_the_assignment_and_the_flag()
+    {
+        var task = NewTask();
+        task.SetCycle(Guid.NewGuid(), MutateInstant);
+        task.MarkCarriedOver(MutateInstant);
+
+        task.SetCycle(null, LaterInstant);
+
+        task.CycleId.Should().BeNull("null = the cycle backlog (FR-016)");
+        task.CarriedOver.Should().BeFalse();
+    }
+
+    [Fact]
+    public void RollToCycle_moves_to_the_next_cycle_and_clears_the_flag_with_one_bump()
+    {
+        var task = NewTask();
+        task.SetCycle(Guid.NewGuid(), MutateInstant);
+        task.MarkCarriedOver(MutateInstant);
+        var versionBefore = task.Version;
+        var next = Guid.NewGuid();
+
+        task.RollToCycle(next, LaterInstant);
+
+        task.CycleId.Should().Be(next);
+        task.CarriedOver.Should().BeFalse();
+        task.Version.Should().Be(versionBefore + 1, "a rollover transition is exactly one bump (no version churn)");
+    }
+
+    [Fact]
+    public void RollToBacklog_clears_the_assignment_and_the_flag_with_one_bump()
+    {
+        var task = NewTask();
+        task.SetCycle(Guid.NewGuid(), MutateInstant);
+        var versionBefore = task.Version;
+
+        task.RollToBacklog(LaterInstant);
+
+        task.CycleId.Should().BeNull();
+        task.CarriedOver.Should().BeFalse();
+        task.Version.Should().Be(versionBefore + 1);
+    }
+
+    [Fact]
+    public void MarkCarriedOver_flags_the_task_and_keeps_the_assignment()
+    {
+        var task = NewTask();
+        var cycleId = Guid.NewGuid();
+        task.SetCycle(cycleId, MutateInstant);
+        var versionBefore = task.Version;
+
+        task.MarkCarriedOver(LaterInstant);
+
+        task.CycleId.Should().Be(cycleId, "the keep rollover leaves the task in the closing cycle");
+        task.CarriedOver.Should().BeTrue();
+        task.Version.Should().Be(versionBefore + 1);
+    }
+
+    [Fact]
+    public void A_fresh_task_is_not_carried_over_and_has_no_cycle()
+    {
+        var task = NewTask();
+
+        task.CycleId.Should().BeNull("a task starts in the cycle backlog (FR-016)");
+        task.CarriedOver.Should().BeFalse();
+    }
 }

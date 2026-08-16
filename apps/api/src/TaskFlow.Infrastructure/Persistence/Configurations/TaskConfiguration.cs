@@ -102,6 +102,13 @@ public sealed class TaskConfiguration : IEntityTypeConfiguration<TaskEntity>
         builder.Property(t => t.CycleId)
             .HasColumnName("cycle_id");
 
+        // Slice 011 (D7): the rollover-written "carried over" flag; NOT NULL DEFAULT false
+        // backfills existing rows in the AddCycles migration.
+        builder.Property(t => t.CarriedOver)
+            .HasColumnName("carried_over")
+            .HasDefaultValue(false)
+            .IsRequired();
+
         builder.Property(t => t.RecurrenceRule)
             .HasColumnName("recurrence_rule")
             .HasColumnType("jsonb");
@@ -123,6 +130,15 @@ public sealed class TaskConfiguration : IEntityTypeConfiguration<TaskEntity>
             .WithMany()
             .HasForeignKey(t => t.ProjectId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // cycle_id → cycles(id), ON DELETE RESTRICT (slice 011, D1): the column has existed since
+        // slice-002 AddTasks (reserved); this slice adds only the FK constraint. RESTRICT (not
+        // SET NULL) backs the FR-020 guard at the DB level — only EMPTY planned/closed cycles are
+        // deletable; the handler check gives the friendly error, the FK makes it unbreakable.
+        // NOT modeled as an EF relationship: CycleId deliberately stays a RAW Guid? (D2 — the
+        // value-converted-nullable-FK translation trap), which EF cannot pair with the
+        // value-converted CycleId PK. The constraint + its index are hand-authored in the
+        // AddCycles migration instead (FK_tasks_cycles_cycle_id / IX_tasks_cycle_id).
 
         // Partial composite index serving the single hot query exactly:
         // WHERE created_by = @caller AND deleted_at IS NULL ORDER BY position, id.
