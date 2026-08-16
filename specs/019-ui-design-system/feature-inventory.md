@@ -12,7 +12,8 @@ uncovered row. Rows are behavior-first: where the pre-redesign trigger was a sin
 the row states the BEHAVIOR and the post-redesign visible-control trigger (FR-111 removes the key,
 not the capability — S2.3's sole exception is the shortcut system itself, inventoried in §K).
 
-**Covering-test levels**: [C] Vitest component/unit · [E] Playwright E2E · [A] axe/keyboard a11y.
+**Covering-test levels**: [C] Vitest component/unit · [E] Playwright E2E · [A] axe/keyboard a11y ·
+[V] visual baseline (linux-gated screenshot suite).
 
 ---
 
@@ -186,10 +187,35 @@ not the capability — S2.3's sole exception is the shortcut system itself, inve
 | INV-144 | Given a Board card, When the user drags it to another column (pointer or dnd-kit KeyboardSensor), Then the card paints in the target column OPTIMISTICALLY and exactly ONE `PATCH /api/tasks/{id}/status` is issued with the target column's status — `position` untouched. | US-03 AS-04, FR-025 | [E] |
 | INV-145 | Given a Board card's „⋯" menu, When it opens, Then „Przenieś w lewo"/„Przenieś w prawo" move the card one column; at a boundary the item is OMITTED (Zrobione offers no right move, Backlog no left) — and the full standard action set stays available. | US-03 AS-05/AS-06, FR-108 | [E]+[C] |
 | INV-146 | Given the List view, When the user sets „Grupuj: Status" via the visible group-by control, Then groups render in column order (Backlog, Do zrobienia, W toku, Zrobione) with „Anulowane" LAST when non-empty; empty groups are omitted; the grouped render keeps the single-grid `role="rowgroup"` pattern with a flat index (post-010 remediation). | US-03 AS-07, FR-024 | [E]+[C] |
-| INV-147 | Given the List view, When the user sets „Grupuj: Priorytet", Then groups render P0→P3 then „Bez priorytetu" last; „Brak" restores the flat list; „wg cyklu" is NOT offered (slice 011). | US-03 AS-07, FR-024 | [E]+[C] |
+| INV-147 | Given the List view, When the user sets „Grupuj: Priorytet", Then groups render P0→P3 then „Bez priorytetu" last; „Brak" restores the flat list. (The by-cycle dimension ships with slice 011 — INV-174.) | US-03 AS-07, FR-024 | [E]+[C] |
 | INV-148 | Given a project whose group-by was set, When the user reloads, Then the grouping choice re-applies (per-project `localStorage`, default Brak). | US-03 AS-07 | [E]+[C] |
 | INV-149 | Given a VIEWER on a shared project, When the Board renders, Then it is read-only: no drag activation and no move items in the card menu (server still denies a forged PATCH with 403). | FR-065/FR-068 | [E] |
 | INV-150 | Given a column move whose PATCH fails server-side, When the error lands, Then the card returns to its source column (rollback) and the failure is announced via the established toast/live-region path with retry. | FR-049/FR-050 | [C] |
+
+## N. Cycles (slice 011)
+
+New behaviors of slice 011 (contract `specs/011-cycles/contracts/ui-cycle.md`); rows added
+BEFORE their covering tests per the 019 gate convention. Screens: sidebar, `/cycle`, the task
+„⋯" menu (every surface), project List grouping, `/settings`.
+
+| ID | Given / When / Then | Realizes | Level |
+|---|---|---|---|
+| INV-160 | Given any signed-in screen with NO active cycle, When the sidebar renders, Then a „Cykl" entry (between the daily views and PROJEKTY) is present with the bare label „Cykl" and navigates to `/cycle`. | FR-017, FR-103 | [E] |
+| INV-161 | Given an ACTIVE cycle, When the sidebar renders, Then the entry shows the active cycle's sanitized NAME; when the active cycle's end date is past in Europe/Warsaw, a text badge „po terminie" appears (text, never color-only). | FR-017, FR-044, FR-099 | [E]+[C] |
+| INV-162 | Given `/cycle`, When it renders, Then the switcher lists ALL cycles ordered by `(startDate, createdAt, id)` with status suffix („aktywny"/„planowany"/„zamknięty"); default selection = active → else next planned → else the FR-110 empty state with hint + „Nowy cykl" action. | US-05 AS-03, FR-110 | [E]+[C]+[V] |
+| INV-163 | Given a selected cycle with tasks, When the metrics strip renders, Then it shows „X% ukończone" (done over non-cancelled total), „N dni pozostało" computed in Europe/Warsaw (overdue active cycle: „0 dni (po terminie)"), and the per-status breakdown as labelled TEXT counts; the numbers are TEAM-WIDE (they include other users' tasks). | US-05 AS-03, FR-026, FR-044 | [E]+[C]+[V] |
+| INV-164 | Given the selected cycle's task list, When it renders, Then only CALLER-VISIBLE rows appear (grid-pattern row catalog); a task kept in a closed cycle by the „keep" rollover shows the „przeniesione" text chip; tasks of an ARCHIVED project remain visible here (EC-12). | EC-12, FR-044, FR-065 | [E]+[C] |
+| INV-165 | Given the create dialog („Nowy cykl"), When it opens, Then name pre-fills „Cykl N" (editable), start = today (Warsaw), end = start + the /settings duration preference; inline validation requires a name and `start < end`. | FR-015, FR-020, US-05 AS-06 | [E]+[C] |
+| INV-166 | Given any cycle (any status), When the user edits name/dates via „Edytuj" and saves, Then changes persist (OCC-versioned; `start < end` re-validated). | FR-020 | [E] |
+| INV-167 | Given a PLANNED cycle while another cycle is ACTIVE, When the user activates the planned one, Then the operation is refused with the single-active message; with no active cycle the activation succeeds and the sidebar entry updates. | US-05 lifecycle note, FR-049 | [E] |
+| INV-168 | Given an ACTIVE cycle with incomplete tasks, When „Zamknij cykl" opens the review, Then it lists the caller-visible INCOMPLETE tasks with a bulk choice (Przenieś wszystkie do następnego cyklu / do backlogu / Zostaw w zamkniętym cyklu „przeniesione") plus optional per-task overrides, a footer noting the bulk choice also covers other users' tasks; confirming commits close+rollover atomically and the result toast + polite announcement carry the returned counts. | US-05 AS-04/AS-05, FR-018, FR-101 | [E]+[C] |
+| INV-169 | Given a close with rollover „next" and NO planned cycle, When confirmed, Then the „Najpierw utwórz nowy cykl" prompt appears with a „Nowy cykl" action and nothing is closed. | US-05 AS-06, FR-049 | [E] |
+| INV-170 | Given an ACTIVE cycle, When the user invokes „Usuń" (VISIBLE also on active), Then deletion is refused with „Cyklu nie można usunąć — najpierw go zamknij" (client guard; server 422 backstop); a non-empty planned/closed cycle refuses with the FR-049 „zawiera zadania" copy; an EMPTY planned/closed cycle deletes. | US-05 AS-07, EC-04, FR-019, FR-020 | [E] |
+| INV-171 | Given an ACTIVE cycle whose end date is past (Warsaw), When `/cycle` renders it, Then a banner „Cykl dobiegł końca — zamknij go" appears with the „Zamknij cykl" action (close stays manual — the server never auto-transitions). | US-05 AS-04 (Given), FR-049 | [E] |
+| INV-172 | Given any task row/card „⋯" menu (Inbox, daily views, project List, Board), When it opens, Then a „Cykl…" item appears between „Etykiety…" and „Przenieś do projektu…" (shared `buildMenuItems` contract). | US-05 AS-01, FR-103, FR-108 | [E]+[C] |
+| INV-173 | Given „Cykl…" is invoked, When the CyclePicker dialog opens, Then it lists ALL cycles (D5 order, status suffix) plus „Bez cyklu", with the task's current assignment checked; selecting an option optimistically assigns (one PATCH) and closes; Esc cancels and focus returns to the invoker. | US-05 AS-01/AS-02, FR-016, FR-101 | [E]+[C]+[A] |
+| INV-174 | Given the project List group-by control, When the user sets „Grupuj: Cykl", Then groups render in `(startDate, createdAt, id)` order labelled by cycle name with **„Bez cyklu" LAST** (EC-10 naming — never „Backlog"); empty groups are omitted; the `"cycle"` choice persists per-project (localStorage) and re-applies on reload. | FR-024, EC-10, US-03 AS-07 | [E]+[C] |
+| INV-175 | Given `/settings`, When the user changes „Domyślna długość cyklu (dni)" (1..90) and saves, Then the preference persists server-side (roundtrip across reload), the save is announced politely, and the create-cycle dialog's end-date pre-fill follows the new value. | FR-015, FR-101 | [E]+[C] |
 
 ---
 
