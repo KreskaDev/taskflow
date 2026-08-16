@@ -43,9 +43,12 @@ controls (grid/row/gridcell on list surfaces; list/listitem on cards — never l
   choice also applies to tasks of other users. Confirm commits close+rollover atomically;
   `no_next_cycle` renders the „Najpierw utwórz nowy cykl" prompt with a „Nowy cykl" action
   (US-05.AS-06). Result toast + polite announcement carries the returned counts.
-- **Delete guards (US-05.AS-07 / EC-04 / FR-019/020)**: active → the „Usuń" item is OMITTED
-  (never disabled — 010 boundary convention) and the server 422 is still mapped; non-empty
-  planned/closed → FR-049 message „Cykl zawiera zadania…".
+- **Delete guards (US-05.AS-07 / EC-04 / FR-019/020)**: „Usuń" stays VISIBLE for an active
+  cycle — AS-07 verbatim requires an attempt to be PREVENTED WITH A MESSAGE, so invoking it
+  shows the refusal „Cyklu nie można usunąć — najpierw go zamknij" (client-side guard; the
+  server 422 `cycle_active_delete_forbidden` is the backstop). Non-empty planned/closed →
+  FR-049 message „Cykl zawiera zadania…". (This deliberately diverges from the 010
+  omitted-at-boundary convention because AS-07 specifies a message, not a no-op.)
 - **Overdue prompt**: an active cycle past its end date renders a banner „Cykl dobiegł końca —
   zamknij go" with the „Zamknij cykl" action (close stays manual).
 
@@ -83,6 +86,7 @@ states, settings preference roundtrip;
 [V] `/cycle` screens (empty + seeded × 4 palettes × 3 widths) join visual.spec with the
 deterministic-seed rules (unique user per test × attempt). Date determinism: the seeded cycle's
 dates are RELATIVE to the run day (start = today−7, end = today+7 in Warsaw) so
-„7 dni pozostało" is a constant; the absolute date-range text (which would drift daily) is
-hidden at screenshot time via the existing `visual.hide-dev-overlay.css` stylePath (the
-dev-badge precedent) — pixels stay day-independent. Regeneration via the docker script.
+„7 dni pozostało" is a constant; the absolute date-range element carries a stable
+`data-visual-hide` attribute and the existing `visual.hide-dev-overlay.css` stylePath gains
+`[data-visual-hide] { visibility: hidden }` (the dev-badge precedent) — pixels stay
+day-independent. Regeneration via the docker script.
