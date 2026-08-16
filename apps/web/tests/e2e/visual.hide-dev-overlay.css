@@ -4,3 +4,10 @@
 nextjs-portal {
   display: none !important;
 }
+
+/* The avatar background is a deterministic hash of the USER ID — a fresh random UUID in
+   every CI run's fresh Postgres, i.e. a 1-in-3 color lottery per seeded user across runs
+   (PR #8 run: 19/24 slice-010 baselines fell to exactly this). Pin it for screenshots. */
+[class*="Avatar_avatar"] {
+  background: var(--avatar-a) !important;
+}

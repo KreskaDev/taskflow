@@ -73,6 +73,16 @@ for (const screen of SCREENS) {
           const page = await context.newPage();
           await page.goto(screen.path);
           await settled(page);
+          // Anchor on RESOLVED content, not absence-of-skeleton: the topbar avatar
+          // (profile query) plus the screen's own settled marker — the first PR #8 run
+          // proved networkidle can fire while the inbox EmptyState / settings profile
+          // are still loading.
+          await expect(page.getByRole("img", { name: "Vis Ualnie" }).first()).toBeVisible();
+          if (screen.path === "/settings") {
+            await expect(page.getByRole("button", { name: "Wyloguj" })).toBeVisible();
+          } else {
+            await expect(page.locator('[class*="EmptyState"]').first()).toBeVisible();
+          }
           await forcePalette(page, palette);
 
           await expect(page).toHaveScreenshot(`${screen.slug}-${palette}-${width}.png`, {
@@ -146,6 +156,7 @@ test.describe("[V] project board & grouped list (slice 010)", () => {
           const page = await context.newPage();
           await page.goto(`/projects/${project.id}`);
           await settled(page);
+          await expect(page.getByRole("img", { name: "Vis Ualnie" }).first()).toBeVisible();
           // Settle on the projection's REAL content, not the loading skeleton.
           if (projection === "board") {
             await expect(page.getByRole("listitem", { name: "Zadanie w backlogu" })).toBeVisible();
