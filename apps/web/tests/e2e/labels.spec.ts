@@ -28,7 +28,7 @@ test.describe("US-08.AS-04 Labels (the label selector)", () => {
     await apiAs(userId).createTask({ title: "Buy milk", position: "a0" });
 
     await page.goto("/");
-    const row = page.getByRole("option").filter({ hasText: "Buy milk" });
+    const row = page.getByRole("row").filter({ hasText: "Buy milk" });
     await expect(row).toBeVisible();
 
     // AS-04: the row's "⋯" menu carries "Etykiety…" which opens the selector dialog (FR-101).

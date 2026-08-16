@@ -63,9 +63,9 @@ test.describe("US-02 Daily Planning Session (AS-01..AS-08)", () => {
     await page.getByRole("link", { name: "Dziś" }).click();
 
     await expect(page.getByRole("heading", { name: "Dziś" })).toBeVisible();
-    const listbox = page.getByRole("listbox", { name: "Dziś" });
+    const listbox = page.getByRole("grid", { name: "Dziś" });
     await expect(listbox).toBeVisible();
-    await expect(page.getByRole("option").filter({ hasText: "Review the day" })).toBeVisible();
+    await expect(page.getByRole("row").filter({ hasText: "Review the day" })).toBeVisible();
 
     await context.close();
   });
@@ -75,7 +75,7 @@ test.describe("US-02 Daily Planning Session (AS-01..AS-08)", () => {
     await apiAs(userId).createTask({ title: "Prioritize me", position: "a0", dueDate: dueToday() });
 
     await page.goto("/today");
-    await expect(page.getByRole("option").filter({ hasText: "Prioritize me" })).toBeVisible();
+    await expect(page.getByRole("row").filter({ hasText: "Prioritize me" })).toBeVisible();
 
     await pickRowMenuItem(page, "Prioritize me", "Priorytet…");
     const dialog = page.getByRole("dialog", { name: "Priorytet" });
@@ -84,7 +84,7 @@ test.describe("US-02 Daily Planning Session (AS-01..AS-08)", () => {
     await dialog.getByRole("button", { name: "P0 — najwyższy" }).click();
     await settled;
 
-    await expect(page.getByRole("option").filter({ hasText: "Prioritize me" }).getByText("P0")).toBeVisible();
+    await expect(page.getByRole("row").filter({ hasText: "Prioritize me" }).getByText("P0")).toBeVisible();
     await context.close();
   });
 
@@ -93,14 +93,14 @@ test.describe("US-02 Daily Planning Session (AS-01..AS-08)", () => {
     await apiAs(userId).createTask({ title: "Finish me", position: "a0", dueDate: dueToday() });
 
     await page.goto("/today");
-    await expect(page.getByRole("option").filter({ hasText: "Finish me" })).toBeVisible();
+    await expect(page.getByRole("row").filter({ hasText: "Finish me" })).toBeVisible();
 
     // FR-111: keyboard operability lives INSIDE the listbox now — focus it, then Space.
     const settled = page.waitForResponse((r) => r.request().method() === "PATCH" && /\/status/.test(r.url()) && r.ok());
-    await page.getByRole("listbox", { name: "Dziś" }).press(" ");
+    await page.getByRole("grid", { name: "Dziś" }).press(" ");
     await settled;
 
-    await expect(page.getByRole("option").filter({ hasText: "Finish me" })).toHaveCount(0);
+    await expect(page.getByRole("row").filter({ hasText: "Finish me" })).toHaveCount(0);
     await context.close();
   });
 
@@ -109,7 +109,7 @@ test.describe("US-02 Daily Planning Session (AS-01..AS-08)", () => {
     await apiAs(userId).createTask({ title: "Move me to tomorrow", position: "a0", dueDate: dueToday() });
 
     await page.goto("/today");
-    await expect(page.getByRole("option").filter({ hasText: "Move me to tomorrow" })).toBeVisible();
+    await expect(page.getByRole("row").filter({ hasText: "Move me to tomorrow" })).toBeVisible();
 
     await pickRowMenuItem(page, "Move me to tomorrow", "Termin…");
     await expect(page.getByRole("dialog", { name: "Zmień termin" })).toBeVisible();
@@ -120,7 +120,7 @@ test.describe("US-02 Daily Planning Session (AS-01..AS-08)", () => {
     await page.keyboard.press("Enter");
     await settled;
 
-    await expect(page.getByRole("option").filter({ hasText: "Move me to tomorrow" })).toHaveCount(0);
+    await expect(page.getByRole("row").filter({ hasText: "Move me to tomorrow" })).toHaveCount(0);
     await context.close();
   });
 
@@ -154,7 +154,7 @@ test.describe("US-02 Daily Planning Session (AS-01..AS-08)", () => {
     await apiAs(userId).createTask({ title: "Edit me", position: "a0", dueDate: dueToday() });
 
     await page.goto("/today");
-    await expect(page.getByRole("option").filter({ hasText: "Edit me" })).toBeVisible();
+    await expect(page.getByRole("row").filter({ hasText: "Edit me" })).toBeVisible();
 
     await page.getByRole("button", { name: "Edytuj „Edit me”" }).click();
     const dialog = page.getByRole("dialog", { name: "Edytuj zadanie" });
@@ -168,7 +168,7 @@ test.describe("US-02 Daily Planning Session (AS-01..AS-08)", () => {
     await settled;
 
     await expect(dialog).toHaveCount(0);
-    await expect(page.getByRole("option").filter({ hasText: "Edited title" })).toBeVisible();
+    await expect(page.getByRole("row").filter({ hasText: "Edited title" })).toBeVisible();
     await context.close();
   });
 
@@ -177,7 +177,7 @@ test.describe("US-02 Daily Planning Session (AS-01..AS-08)", () => {
     await apiAs(userId).createTask({ title: "Keep my title", position: "a0", dueDate: dueToday() });
 
     await page.goto("/today");
-    await expect(page.getByRole("option").filter({ hasText: "Keep my title" })).toBeVisible();
+    await expect(page.getByRole("row").filter({ hasText: "Keep my title" })).toBeVisible();
 
     await page.getByRole("button", { name: "Edytuj „Keep my title”" }).click();
     const dialog = page.getByRole("dialog", { name: "Edytuj zadanie" });
@@ -185,8 +185,8 @@ test.describe("US-02 Daily Planning Session (AS-01..AS-08)", () => {
     await page.keyboard.press("Escape");
 
     await expect(dialog).toHaveCount(0);
-    await expect(page.getByRole("option").filter({ hasText: "Keep my title" })).toBeVisible();
-    await expect(page.getByRole("option").filter({ hasText: "Discarded edit" })).toHaveCount(0);
+    await expect(page.getByRole("row").filter({ hasText: "Keep my title" })).toBeVisible();
+    await expect(page.getByRole("row").filter({ hasText: "Discarded edit" })).toHaveCount(0);
     await context.close();
   });
 });
@@ -201,8 +201,8 @@ test.describe("US-08 View Navigation (AS-01/AS-02)", () => {
     await page.getByRole("link", { name: "Nadchodzące" }).click();
 
     await expect(page.getByRole("heading", { name: "Nadchodzące" })).toBeVisible();
-    await expect(page.getByRole("listbox", { name: "Nadchodzące" })).toBeVisible();
-    await expect(page.getByRole("option").filter({ hasText: "Upcoming task" })).toBeVisible();
+    await expect(page.getByRole("grid", { name: "Nadchodzące" })).toBeVisible();
+    await expect(page.getByRole("row").filter({ hasText: "Upcoming task" })).toBeVisible();
     await context.close();
   });
 

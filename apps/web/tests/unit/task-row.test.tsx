@@ -63,7 +63,7 @@ afterEach(cleanup);
 describe("TaskRow due-date label [INV-027]", () => {
   it("a dateless row's accessible name is exactly the title (no qualifier, no glyph)", () => {
     renderRow(makeTask({ dueDate: null, dueHasTime: null }));
-    expect(screen.getByRole("option", { name: "Kupic mleko" })).toBeTruthy();
+    expect(screen.getByRole("row", { name: "Kupic mleko" })).toBeTruthy();
   });
 
   it("a due-bearing row's accessible name carries a 'termin:' qualifier before the date", () => {
@@ -75,7 +75,7 @@ describe("TaskRow due-date label [INV-027]", () => {
     // Teeth: under the pre-fix code the name was "Kupic mleko 22.06.2026" (no qualifier),
     // so this regex would not match. The decorative glyph is aria-hidden and excluded.
     expect(
-      screen.getByRole("option", { name: /Kupic mleko termin: 22\.06\.2026/ }),
+      screen.getByRole("row", { name: /Kupic mleko termin: 22\.06\.2026/ }),
     ).toBeTruthy();
   });
 

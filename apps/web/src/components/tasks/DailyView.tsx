@@ -47,7 +47,7 @@ interface DailyViewProps {
 /**
  * The shared daily view (Today/Upcoming/Assigned — rebuilt in slice 019, T034/T035/T041).
  * The global shortcut gate is GONE (FR-111): keyboard operability lives INSIDE the
- * `role="listbox"` (↑/↓ selection, Space toggle, Enter opens the editor — D5), and every
+ * `role="grid"` (↑/↓ selection, Space toggle, Enter opens the editor — D5; grid/row/gridcell post-010, see TaskList), and every
  * operation has a visible affordance: row quick actions + the complete "⋯" menu
  * (priority/termin/etykiety/przypisz/duplikuj/usuń — FR-108).
  */
@@ -103,7 +103,7 @@ export function DailyView({ label, groups, projectName, emptyMessage, emptyActio
         <EmptyState hint={emptyMessage} action={emptyAction} />
       ) : (
         <div
-          role="listbox"
+          role="grid"
           tabIndex={0}
           aria-label={label}
           aria-activedescendant={hasSelection ? taskOptionId(selected.id) : undefined}
@@ -119,7 +119,7 @@ export function DailyView({ label, groups, projectName, emptyMessage, emptyActio
           })}
         >
           {groups.map((group) => (
-            <div key={group.key} role="group" aria-label={group.label} className={styles.group}>
+            <div key={group.key} role="rowgroup" aria-label={group.label} className={styles.group}>
               <div className={styles.groupHeading} aria-hidden="true">
                 {group.label}
               </div>

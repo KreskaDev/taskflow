@@ -188,7 +188,7 @@ test.describe("[V] project board & grouped list (slice 010)", () => {
           if (projection === "board") {
             await expect(page.getByRole("listitem", { name: "Zadanie w backlogu" })).toBeVisible();
           } else {
-            await expect(page.getByRole("group", { name: "Anulowane" })).toBeVisible();
+            await expect(page.getByRole("rowgroup", { name: "Anulowane" })).toBeVisible();
           }
           await forcePalette(page, palette);
           await assertRealTypography(page);

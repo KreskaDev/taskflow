@@ -19,6 +19,12 @@
   background: var(--color-bg-hover);
 }
 
+/* The single gridcell (row > gridcell — required grid children): display:contents keeps
+   the row's flex layout owning every child, so the wrapper has ZERO pixel impact. */
+.cell {
+  display: contents;
+}
+
 .selected {
   background: var(--color-selection);
   box-shadow: inset 2px 0 0 var(--color-accent);

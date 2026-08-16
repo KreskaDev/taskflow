@@ -201,10 +201,10 @@ test.describe("Groupable List & cancelled (US-03.AS-07, EC-11)", () => {
     // Status grouping: groups render in column order with „Anulowane” LAST and the cancelled
     // task visible IN THE LIST (EC-11 counterpart).
     await page.getByRole("button", { name: "Status", exact: true }).click();
-    const groups = page.getByRole("group");
+    const groups = page.getByRole("rowgroup");
     await expect(groups).toHaveCount(3); // Do zrobienia, W toku, Anulowane (empty omitted)
     await expect(groups.last()).toHaveAccessibleName("Anulowane");
-    await expect(page.getByRole("group", { name: "Anulowane" }).getByRole("option", { name: /Porzucone/ })).toBeVisible();
+    await expect(page.getByRole("rowgroup", { name: "Anulowane" }).getByRole("row", { name: /Porzucone/ })).toBeVisible();
 
     // The Board shows the cancelled task NOWHERE (EC-11) — and no „Anulowane” column exists.
     await page.getByRole("button", { name: "Tablica", exact: true }).click();
@@ -215,18 +215,18 @@ test.describe("Groupable List & cancelled (US-03.AS-07, EC-11)", () => {
     // Priority grouping: P0 → „Bez priorytetu” (P3 belongs to the cancelled task's group).
     await page.getByRole("button", { name: "Lista", exact: true }).click();
     await page.getByRole("button", { name: "Priorytet", exact: true }).click();
-    const priorityGroups = page.getByRole("group");
+    const priorityGroups = page.getByRole("rowgroup");
     await expect(priorityGroups.first()).toHaveAccessibleName("P0");
     await expect(priorityGroups.last()).toHaveAccessibleName("Bez priorytetu");
-    await expect(page.getByRole("group", { name: "P3" }).getByRole("option", { name: /Porzucone/ })).toBeVisible();
+    await expect(page.getByRole("rowgroup", { name: "P3" }).getByRole("row", { name: /Porzucone/ })).toBeVisible();
 
     // The grouping choice survives reload (per-project localStorage); „Brak” restores flat.
     await page.reload();
     await expect(page.getByRole("button", { name: "Priorytet", exact: true })).toHaveAttribute("aria-pressed", "true");
-    await expect(page.getByRole("group", { name: "P0" })).toBeVisible();
+    await expect(page.getByRole("rowgroup", { name: "P0" })).toBeVisible();
     await page.getByRole("button", { name: "Brak", exact: true }).click();
-    await expect(page.getByRole("group")).toHaveCount(0);
-    await expect(page.getByRole("option", { name: /Porzucone/ })).toBeVisible();
+    await expect(page.getByRole("rowgroup")).toHaveCount(0);
+    await expect(page.getByRole("row", { name: /Porzucone/ })).toBeVisible();
 
     await context.close();
   });
