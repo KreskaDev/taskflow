@@ -65,11 +65,11 @@ beforeEach(() => patchSpy.mockReset());
 afterEach(cleanup);
 
 describe("BoardView — four columns, cancelled nowhere (EC-11) [INV-142] [INV-143]", () => {
-  it("renders exactly the four column listboxes in order with their counts", () => {
+  it("renders exactly the four column lists in order with their counts", () => {
     renderBoard(false);
 
-    const listboxes = screen.getAllByRole("listbox");
-    expect(listboxes.map((l) => l.getAttribute("aria-label"))).toEqual([
+    const lists = screen.getAllByRole("list");
+    expect(lists.map((l) => l.getAttribute("aria-label"))).toEqual([
       "Backlog, 1 zadanie",
       "Do zrobienia, 0 zadań",
       "W toku, 1 zadanie",

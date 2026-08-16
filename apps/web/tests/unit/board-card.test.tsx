@@ -39,7 +39,7 @@ function renderCard(task: TaskResponse, actions?: TaskRowActions, assigneeName?:
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      <BoardCard task={task} selected={false} actions={actions} assigneeName={assigneeName} />,
+      <BoardCard task={task} actions={actions} assigneeName={assigneeName} />,
     ),
   );
 }
@@ -47,9 +47,11 @@ function renderCard(task: TaskResponse, actions?: TaskRowActions, assigneeName?:
 afterEach(cleanup);
 
 describe("BoardCard — sanitized content on catalog components (FR-099) [INV-142]", () => {
-  it("renders as a listbox option carrying the task title", () => {
+  it("carries the task title as text on a non-widget card (its listitem wrapper lives in BoardColumn)", () => {
     renderCard(makeTask());
-    expect(screen.getByRole("option", { name: /Zaprojektować tablicę/ })).toBeTruthy();
+    expect(screen.getByText("Zaprojektować tablicę")).toBeTruthy();
+    // No widget role on the card body — focusable controls inside stay legal (nested-interactive).
+    expect(screen.queryByRole("option")).toBeNull();
   });
 
   it("renders a hostile title as INERT TEXT — no element injection (FR-099)", () => {

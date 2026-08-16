@@ -15,12 +15,9 @@
   background: var(--color-bg-hover);
 }
 
-.card.selected {
-  border-color: var(--color-accent);
-}
-
 .card.done .title {
-  color: var(--color-text-tertiary);
+  /* text-secondary, not tertiary: the 13px title needs 4.5:1 in the light palettes (FR-044). */
+  color: var(--color-text-secondary);
   text-decoration: line-through;
 }
 

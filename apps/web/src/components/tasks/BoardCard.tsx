@@ -4,7 +4,6 @@ import { LabelChips } from "@/components/labels/LabelChips";
 import {
   buildMenuItems,
   formatDueDate,
-  taskOptionId,
   type TaskRowActions,
 } from "@/components/tasks/TaskRow";
 import { Avatar } from "@/components/ui/Avatar";
@@ -15,10 +14,6 @@ import styles from "./BoardCard.module.css";
 
 interface BoardCardProps {
   task: TaskResponse;
-  /** Selected (active) option in the column listbox — drives `aria-selected` (D10). */
-  selected: boolean;
-  /** Selects this card on pointer interaction. */
-  onSelect?: () => void;
   /**
    * The wired operation set — the shared `buildMenuItems` architecture (D7): the full
    * standard action set plus `onMoveLeft`/`onMoveRight` mapped by the caller via
@@ -48,10 +43,11 @@ function priorityLabel(priority: string | null | undefined): string | null {
  * only; the title renders as sanitized TEXT (FR-099 posture — no raw-HTML render path);
  * the due chip reuses the List's exact formatter (no new date logic — Principle X); the
  * „⋯” menu is the SHARED `buildMenuItems` (D7), so menu order/copy never drift between
- * the List and the Board. `role="option"` with the stable {@link taskOptionId} keeps the
- * column listbox's `aria-activedescendant` addressing consistent with every other listbox.
+ * the List and the Board. The card body itself is NOT a widget — its listitem wrapper
+ * (BoardColumn) legally carries focusable controls (checkbox, menu — axe
+ * `nested-interactive` forbids them inside an option role).
  */
-export function BoardCard({ task, selected, onSelect, actions, assigneeName }: BoardCardProps) {
+export function BoardCard({ task, actions, assigneeName }: BoardCardProps) {
   const done = task.status === "done";
   const priority = priorityLabel(task.priority);
 
@@ -61,14 +57,8 @@ export function BoardCard({ task, selected, onSelect, actions, assigneeName }: B
 
   return (
     <div
-      id={taskOptionId(task.id)}
-      role="option"
-      aria-selected={selected}
       data-status={task.status}
-      className={[styles.card, done ? styles.done : null, selected ? styles.selected : null]
-        .filter(Boolean)
-        .join(" ")}
-      onClick={onSelect}
+      className={[styles.card, done ? styles.done : null].filter(Boolean).join(" ")}
     >
       <div className={styles.header}>
         {actions?.onToggleDone ? (
