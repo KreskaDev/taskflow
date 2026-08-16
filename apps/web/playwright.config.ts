@@ -50,6 +50,12 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   globalSetup: "./tests/e2e/global-setup.ts",
   globalTeardown: "./tests/e2e/global-teardown.ts",
+  expect: {
+    // [V] baselines: identical image + browser, but font subpixel snapping still shifts a
+    // glyph by 1px between hosts (PR #8: the „⋯” dots, 3px, all 12 grouped-list shots).
+    // Tolerate hairline anti-aliasing drift; a real regression is thousands of pixels.
+    toHaveScreenshot: { maxDiffPixels: 32 },
+  },
   use: {
     baseURL: process.env.APP_URL ?? "http://localhost:3000",
     trace: "on-first-retry",
