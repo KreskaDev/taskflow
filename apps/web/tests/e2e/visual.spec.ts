@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import { expect, test, type Page } from "@playwright/test";
 import { apiAs, ensureUser, insertSession } from "./helpers/seed";
 
@@ -37,6 +39,19 @@ async function forcePalette(page: Page, palette: string): Promise<void> {
   }, palette);
 }
 
+/** The harness runs `next dev` — hide its DevTools badge from every baseline. */
+const SCREENSHOT_STYLE = fileURLToPath(new URL("./visual.hide-dev-overlay.css", import.meta.url));
+
+/**
+ * Deterministic settle: `networkidle` alone races the dev-mode route compile + React
+ * Query resolution (the first run froze loading skeletons into a baseline). Every screen
+ * must have left its skeleton state before the pixels become the CI truth.
+ */
+async function settled(page: Page): Promise<void> {
+  await page.waitForLoadState("networkidle");
+  await expect(page.locator('[class*="Skeleton"]')).toHaveCount(0);
+}
+
 for (const screen of SCREENS) {
   test.describe(`[V] ${screen.slug}`, () => {
     for (const palette of PALETTES) {
@@ -57,13 +72,14 @@ for (const screen of SCREENS) {
           ]);
           const page = await context.newPage();
           await page.goto(screen.path);
-          await page.waitForLoadState("networkidle");
+          await settled(page);
           await forcePalette(page, palette);
 
           await expect(page).toHaveScreenshot(`${screen.slug}-${palette}-${width}.png`, {
             fullPage: true,
             animations: "disabled",
             caret: "hide",
+            stylePath: SCREENSHOT_STYLE,
           });
 
           await context.close();
@@ -84,10 +100,14 @@ test.describe("[V] project board & grouped list (slice 010)", () => {
   for (const palette of PALETTES) {
     for (const width of WIDTHS) {
       for (const projection of ["board", "grouped-list"] as const) {
-        test(`${projection} × ${palette} × ${width}px`, async ({ browser }) => {
+        test(`${projection} × ${palette} × ${width}px`, async ({ browser }, testInfo) => {
+          // ONE user per test × attempt: a shared user would accumulate a „Wizualny”
+          // sidebar entry with every test (and every retry), making each baseline depend
+          // on execution order — the first generation run froze up to 24 of them.
+          const key = `${projection}-${palette}-${width}-r${testInfo.retry}`;
           const profile = await ensureUser({
-            sub: "google-sub-visual-board",
-            email: "visual-board@taskflow.test",
+            sub: `google-sub-visual-${key}`,
+            email: `visual-${key}@taskflow.test`,
             name: "Vis Ualnie",
           });
           const api = apiAs(profile.id);
@@ -125,13 +145,20 @@ test.describe("[V] project board & grouped list (slice 010)", () => {
           );
           const page = await context.newPage();
           await page.goto(`/projects/${project.id}`);
-          await page.waitForLoadState("networkidle");
+          await settled(page);
+          // Settle on the projection's REAL content, not the loading skeleton.
+          if (projection === "board") {
+            await expect(page.getByRole("listitem", { name: "Zadanie w backlogu" })).toBeVisible();
+          } else {
+            await expect(page.getByRole("group", { name: "Anulowane" })).toBeVisible();
+          }
           await forcePalette(page, palette);
 
           await expect(page).toHaveScreenshot(`${projection}-${palette}-${width}.png`, {
             fullPage: true,
             animations: "disabled",
             caret: "hide",
+            stylePath: SCREENSHOT_STYLE,
           });
 
           await context.close();
@@ -158,6 +185,7 @@ test.describe("[V] signin (anonymous)", () => {
           fullPage: true,
           animations: "disabled",
           caret: "hide",
+          stylePath: SCREENSHOT_STYLE,
         });
 
         await context.close();

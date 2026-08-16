@@ -1,0 +1,6 @@
+/* Applied ONLY during [V] toHaveScreenshot (stylePath): the e2e harness runs `next dev`
+   (non-Secure cookies over http), whose DevTools indicator badge would otherwise be baked
+   into every baseline. */
+nextjs-portal {
+  display: none !important;
+}
