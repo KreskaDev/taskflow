@@ -12,8 +12,11 @@ public sealed record ProblemBody(
     string? Type, string? Title, int Status, string? ErrorCode, string? Instance,
     IReadOnlyDictionary<string, string[]>? Errors = null);
 
-/// <summary>The <c>UserProfile</c> response contract (contracts/openapi.yaml).</summary>
-public sealed record ProfileBody(Guid Id, string Email, string DisplayName, string? AvatarUrl, DateTime CreatedAt);
+/// <summary>The <c>UserProfile</c> response contract (contracts/openapi.yaml). <c>CycleDefaultDurationDays</c>
+/// is the slice-011 D8 preference (default 14), optional so pre-011 fixtures stay valid.</summary>
+public sealed record ProfileBody(
+    Guid Id, string Email, string DisplayName, string? AvatarUrl, DateTime CreatedAt,
+    int? CycleDefaultDurationDays = null);
 
 /// <summary>
 /// The lean <c>TaskResponse</c> read model (contracts/openapi.yaml). Only the members the
@@ -32,7 +35,8 @@ public sealed record TaskBody(
     DateTime CreatedAt, DateTime UpdatedAt, DateTime? CompletedAt,
     DateTime? DueDate = null, bool? DueHasTime = null,
     Guid? ProjectId = null, string? Priority = null, string? Description = null,
-    IReadOnlyList<Guid>? Assignees = null, IReadOnlyList<Guid>? Labels = null);
+    IReadOnlyList<Guid>? Assignees = null, IReadOnlyList<Guid>? Labels = null,
+    Guid? CycleId = null, bool? CarriedOver = null);
 
 /// <summary>The <c>LabelResponse</c> read model (slice 006): id + name + optional preset color. No ownerId.</summary>
 public sealed record LabelBody(Guid Id, string Name, string? Color = null);
@@ -54,7 +58,8 @@ public sealed record TodayTaskBody(
     Guid Id, string Title, string Status, string Position, int Version,
     DateTime CreatedAt, DateTime UpdatedAt, DateTime? CompletedAt,
     DateTime? DueDate, bool? DueHasTime, Guid? ProjectId, string? Priority, string? Description,
-    bool IsOverdue, IReadOnlyList<Guid>? Labels = null);
+    bool IsOverdue, IReadOnlyList<Guid>? Labels = null,
+    Guid? CycleId = null, bool? CarriedOver = null);
 
 /// <summary>A Today group (slice 005): the owning project (null = Inbox) and its ordered rows.</summary>
 public sealed record TodayGroupBody(Guid? ProjectId, IReadOnlyList<TodayTaskBody> Tasks);
@@ -98,6 +103,30 @@ public sealed record CommentBody(
 
 /// <summary>The <c>CommentListResponse</c> envelope (slice 009): a task's chronological live thread.</summary>
 public sealed record CommentListBody(Guid TaskId, IReadOnlyList<CommentBody> Comments);
+
+/// <summary>
+/// The per-status breakdown of a cycle's metrics (slice 011, D6). The wire key of
+/// <see cref="InProgress"/> is the task-status token <c>in_progress</c> (contracts/cycles-api.md).
+/// </summary>
+public sealed record CycleBreakdownBody(
+    int Backlog, int Todo,
+    [property: System.Text.Json.Serialization.JsonPropertyName("in_progress")] int InProgress,
+    int Done, int Cancelled);
+
+/// <summary>Computed team-wide metrics of a cycle (slice 011, D6): totals over non-deleted tasks.</summary>
+public sealed record CycleMetricsBody(int Total, int Done, CycleBreakdownBody Breakdown);
+
+/// <summary>
+/// The <c>CycleResponse</c> read model (slice 011, contracts/cycles-api.md). Declared in the test
+/// assembly so the RED specs decode the wire body WITHOUT referencing the production DTO (the
+/// slice-004 convention). <c>CreatedAt</c> is exposed for the D5 tiebreaker.
+/// </summary>
+public sealed record CycleBody(
+    Guid Id, string Name, DateTime StartDate, DateTime EndDate, string Status, int Version,
+    DateTime CreatedAt, CycleMetricsBody Metrics);
+
+/// <summary>The <c>CloseCycleResponse</c> envelope (slice 011, D4): the closed cycle + rollover counts.</summary>
+public sealed record CloseCycleBody(CycleBody Cycle, int RolledToNext, int RolledToBacklog, int Kept);
 
 /// <summary>
 /// Helpers for the allow/deny integration tests: read the typed bodies the API emits using the same
@@ -210,6 +239,27 @@ public static class ApiResponse
         ArgumentNullException.ThrowIfNull(response);
         return (await response.Content.ReadFromJsonAsync<CommentListBody>(Web))
             ?? throw new InvalidOperationException("Expected a CommentListResponse body but the response was empty.");
+    }
+
+    public static async Task<CycleBody> ReadCycleAsync(this HttpResponseMessage response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        return (await response.Content.ReadFromJsonAsync<CycleBody>(Web))
+            ?? throw new InvalidOperationException("Expected a CycleResponse body but the response was empty.");
+    }
+
+    public static async Task<IReadOnlyList<CycleBody>> ReadCyclesAsync(this HttpResponseMessage response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        return (await response.Content.ReadFromJsonAsync<IReadOnlyList<CycleBody>>(Web))
+            ?? throw new InvalidOperationException("Expected a CycleResponse array but the response was empty.");
+    }
+
+    public static async Task<CloseCycleBody> ReadCloseCycleAsync(this HttpResponseMessage response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        return (await response.Content.ReadFromJsonAsync<CloseCycleBody>(Web))
+            ?? throw new InvalidOperationException("Expected a CloseCycleResponse body but the response was empty.");
     }
 
     public static async Task<ProblemBody> ReadProblemAsync(this HttpResponseMessage response)
