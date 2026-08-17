@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { CyclePicker } from "@/components/cycles/CyclePicker";
 import { LabelSelector } from "@/components/labels/LabelSelector";
 import { ProjectSelector } from "@/components/projects/ProjectSelector";
 import { BoardView } from "@/components/tasks/BoardView";
@@ -52,6 +53,7 @@ export default function ProjectView({ params }: { params: Promise<{ id: string }
     moveTaskToProject,
     setTaskLabels,
     setTaskPriority,
+    setTaskCycle,
     rescheduleTask,
     setTaskAssignees,
   } = useTaskMutations();
@@ -71,6 +73,7 @@ export default function ProjectView({ params }: { params: Promise<{ id: string }
   const [movingId, setMovingId] = useState<string | null>(null);
   const [labelingId, setLabelingId] = useState<string | null>(null);
   const [priorityId, setPriorityId] = useState<string | null>(null);
+  const [cyclingId, setCyclingId] = useState<string | null>(null);
   const [reschedulingId, setReschedulingId] = useState<string | null>(null);
   const [assignId, setAssignId] = useState<string | null>(null);
 
@@ -90,6 +93,7 @@ export default function ProjectView({ params }: { params: Promise<{ id: string }
     onOpenPriority: () => setPriorityId(task.id),
     onOpenReschedule: () => setReschedulingId(task.id),
     onOpenLabels: () => setLabelingId(task.id),
+    onOpenCycle: () => setCyclingId(task.id),
     onOpenMove: () => setMovingId(task.id),
     onOpenAssign: () => setAssignId(task.id),
     onDuplicate: () => duplicateTask(task),
@@ -214,6 +218,14 @@ export default function ProjectView({ params }: { params: Promise<{ id: string }
           current={byId(priorityId)!.priority}
           onClose={() => setPriorityId(null)}
           onSelect={(priority) => setTaskPriority(priorityId!, priority)}
+        />
+      ) : null}
+      {byId(cyclingId) ? (
+        <CyclePicker
+          open
+          current={byId(cyclingId)!.cycleId ?? null}
+          onClose={() => setCyclingId(null)}
+          onSelect={(cycleId) => setTaskCycle(cyclingId!, cycleId)}
         />
       ) : null}
       {byId(reschedulingId) ? (

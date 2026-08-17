@@ -1,0 +1,26 @@
+/* CyclePicker — the „Cykl…" selector dialog (slice 011; the PriorityPicker pattern). */
+
+.title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-heading);
+}
+
+.list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.option {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.option[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}

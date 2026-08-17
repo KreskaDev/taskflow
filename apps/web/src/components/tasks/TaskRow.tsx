@@ -47,6 +47,8 @@ export interface TaskRowActions {
   onOpenReschedule?: () => void;
   /** Label selector ("Etykiety…"). */
   onOpenLabels?: () => void;
+  /** Cycle picker ("Cykl…" — slice 011, US-05.AS-01). */
+  onOpenCycle?: () => void;
   /** Move-to-project selector ("Przenieś do projektu…"). */
   onOpenMove?: () => void;
   /** Assignee picker ("Przypisz…") — shared-project tasks only (FR-069). */
@@ -136,6 +138,11 @@ export function buildMenuItems(task: TaskResponse, actions: TaskRowActions): Men
       : null,
     actions.onOpenLabels
       ? { id: "labels", label: "Etykiety…", onSelect: actions.onOpenLabels }
+      : null,
+    // Slice 011 (US-05.AS-01, D12): between „Etykiety…" and „Przenieś do projektu…" on every
+    // surface that wires it — the shared-menu contract keeps List/Board/daily views in sync.
+    actions.onOpenCycle
+      ? { id: "cycle", label: "Cykl…", onSelect: actions.onOpenCycle }
       : null,
     actions.onOpenMove
       ? { id: "move", label: "Przenieś do projektu…", onSelect: actions.onOpenMove }
@@ -272,6 +279,9 @@ export function TaskRow({
         ) : null}
 
         {!isRenaming && isOverdue ? <span className={styles.overdue}>zaległe</span> : null}
+
+        {/* Slice 011 (D7, FR-044): the keep-rollover flag as visible TEXT, never color alone. */}
+        {!isRenaming && task.carriedOver ? <span className={styles.carried}>przeniesione</span> : null}
 
         {!isRenaming && task.assignees.length > 0 ? (
           <span className={styles.assignees}>
