@@ -29,6 +29,9 @@ internal sealed class TaskFlowDocumentTransformer : IOpenApiDocumentTransformer
         "validation_failed", "unauthenticated", "not_admitted", "forbidden",
         "not_found", "conflict_lww", "last_owner", "internal_error",
         "version_conflict", "duplicate_id",
+        // Cycle lifecycle guards (slice 011, contracts/cycles-api.md D16):
+        "no_next_cycle", "cycle_not_planned", "cycle_active_conflict",
+        "cycle_not_active", "cycle_not_empty", "cycle_active_delete_forbidden",
     ];
 
     public Task TransformAsync(
@@ -144,6 +147,25 @@ internal sealed class TaskFlowDocumentTransformer : IOpenApiDocumentTransformer
         SetOperation(document, "/api/tasks/{taskId}/comments", OperationType.Post, "postTaskComment", 403, 404, 422);
         SetOperation(document, "/api/comments/{commentId}", OperationType.Patch, "editComment", 403, 404, 422);
         SetOperation(document, "/api/comments/{commentId}", OperationType.Delete, "deleteComment", 403, 404);
+
+        // Cycle surface (slice 011, contracts/cycles-api.md D16). Lifecycle/read ops are TEAM-WIDE
+        // (any authenticated, admitted user; only the deny-by-default 401 on the reads —
+        // getCycleTasks additionally 404s on an unknown cycle). createCycle is an idempotent PUT
+        // (no 409). The 409 on activateCycle covers version_conflict AND cycle_active_conflict;
+        // the 422s carry the six NEW errorCodes registered in the enum above (cycle_not_planned,
+        // cycle_not_active, cycle_not_empty, cycle_active_delete_forbidden, no_next_cycle) plus
+        // validation_failed. closeCycle 404s on an invisible-task override (D10). setTaskCycle
+        // dispatches by the TASK's visibility (viewer → 403, non-member/foreign → 404), 422s on an
+        // unknown cycle, 409s on a stale version. setUserPreferences 422s out of the 1..90 range.
+        SetOperation(document, "/api/cycles/{id}", OperationType.Put, "createCycle", 422);
+        SetOperation(document, "/api/cycles", OperationType.Get, "listCycles");
+        SetOperation(document, "/api/cycles/{id}/tasks", OperationType.Get, "getCycleTasks", 404);
+        SetOperation(document, "/api/cycles/{id}", OperationType.Patch, "editCycle", 404, 409, 422);
+        SetOperation(document, "/api/cycles/{id}/activate", OperationType.Patch, "activateCycle", 404, 409, 422);
+        SetOperation(document, "/api/cycles/{id}/close", OperationType.Patch, "closeCycle", 404, 409, 422);
+        SetOperation(document, "/api/cycles/{id}", OperationType.Delete, "deleteCycle", 404, 409, 422);
+        SetOperation(document, "/api/tasks/{id}/cycle", OperationType.Patch, "setTaskCycle", 403, 404, 409, 422);
+        SetOperation(document, "/api/users/me/preferences", OperationType.Patch, "setUserPreferences", 422);
 
         return Task.CompletedTask;
     }

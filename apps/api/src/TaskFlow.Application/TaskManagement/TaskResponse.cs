@@ -62,6 +62,12 @@ public sealed record TaskResponse
     /// </summary>
     public required IReadOnlyList<Guid> Labels { get; init; }
 
+    /// <summary>The owning cycle's id (slice 011, D16), or null = the cycle backlog (FR-016). Team-wide, not caller-scoped.</summary>
+    public Guid? CycleId { get; init; }
+
+    /// <summary>The rollover-written "carried over" flag (slice 011, D7). ALWAYS present; drives the „przeniesione" chip.</summary>
+    public required bool CarriedOver { get; init; }
+
     /// <summary>
     /// Projects a <see cref="TaskEntity"/> aggregate to its lean wire model. <paramref name="callerLabelIds"/>
     /// is REQUIRED (slice 006, R6): labels are NOT on the Task aggregate (they are a per-user relation), so
@@ -89,6 +95,8 @@ public sealed record TaskResponse
             Description = task.Description,
             Assignees = task.Assignees.Select(a => a.UserId.Value).ToList(),
             Labels = callerLabelIds,
+            CycleId = task.CycleId,
+            CarriedOver = task.CarriedOver,
         };
     }
 

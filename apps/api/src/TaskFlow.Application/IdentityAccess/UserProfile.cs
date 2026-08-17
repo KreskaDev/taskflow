@@ -22,6 +22,9 @@ public sealed record UserProfile
 
     public required DateTime CreatedAt { get; init; }
 
+    /// <summary>The default cycle duration preference in days (slice 011, FR-015/D8; default 14).</summary>
+    public required int CycleDefaultDurationDays { get; init; }
+
     /// <summary>Projects a <see cref="User"/> aggregate to its wire profile.</summary>
     public static UserProfile From(User user)
     {
@@ -33,6 +36,7 @@ public sealed record UserProfile
             DisplayName = user.DisplayName,
             AvatarUrl = user.AvatarUrl,
             CreatedAt = user.CreatedAt,
+            CycleDefaultDurationDays = user.CycleDefaultDurationDays,
         };
     }
 }

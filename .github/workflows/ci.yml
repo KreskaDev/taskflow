@@ -143,8 +143,10 @@ jobs:
         shard:
           - name: comments
             filter: "FullyQualifiedName~IntegrationTests.Comments"
+          - name: cycles
+            filter: "FullyQualifiedName~IntegrationTests.Cycles"
           - name: identity-labels-infra
-            filter: "FullyQualifiedName!~IntegrationTests.Comments&FullyQualifiedName!~IntegrationTests.TaskManagement"
+            filter: "FullyQualifiedName!~IntegrationTests.Comments&FullyQualifiedName!~IntegrationTests.Cycles&FullyQualifiedName!~IntegrationTests.TaskManagement"
           - name: tasks-core
             filter: "FullyQualifiedName~IntegrationTests.TaskManagement&FullyQualifiedName!~ChangeMemberRole&FullyQualifiedName!~GetProjectMembers&FullyQualifiedName!~InviteMember&FullyQualifiedName!~LeaveProject&FullyQualifiedName!~RemoveMember&FullyQualifiedName!~RoleOperationDenyMatrix&FullyQualifiedName!~SharedProjectReadAccess&FullyQualifiedName!~ShareUnshareProject&FullyQualifiedName!~TransferOwnership&FullyQualifiedName!~SetTaskAssignees&FullyQualifiedName!~GetAssignedToMe&FullyQualifiedName!~TaskAssigneesEagerLoad&FullyQualifiedName!~AssignmentCleanup&FullyQualifiedName!~SetTaskDoneSharedAuthz&FullyQualifiedName!~MoveTaskToProject&FullyQualifiedName!~InboxAndProjectTasks&FullyQualifiedName!~SetPriority&FullyQualifiedName!~RescheduleDueDate&FullyQualifiedName!~EditTask&FullyQualifiedName!~GetUpcoming&FullyQualifiedName!~DailyViewsDst&FullyQualifiedName!~GetTodayTasks&FullyQualifiedName!~GetMyTasks&FullyQualifiedName!~SetTaskDoneTests"
           - name: tasks-daily-triage

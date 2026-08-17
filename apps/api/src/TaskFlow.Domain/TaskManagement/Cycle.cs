@@ -99,6 +99,24 @@ public sealed class Cycle : AggregateRoot<CycleId>
     }
 
     /// <summary>
+    /// Whole-object replace of the editable fields (name + dates) in ONE mutation — a single
+    /// version bump (the Task.EditTask convention; the HTTP edit is one logical operation).
+    /// Legal in EVERY status; <c>start &lt; end</c> re-validated.
+    /// </summary>
+    /// <param name="name">The new name; trimmed-non-empty and ≤ 200 chars.</param>
+    /// <param name="startDate">The new start instant (UTC).</param>
+    /// <param name="endDate">The new end instant (UTC).</param>
+    /// <param name="utcNow">The current UTC time (injected for testability).</param>
+    public void Edit(string name, DateTime startDate, DateTime endDate, DateTime utcNow)
+    {
+        EnsureDateOrder(startDate, endDate);
+        Name = NormalizeName(name);
+        StartDate = startDate;
+        EndDate = endDate;
+        Touch(utcNow);
+    }
+
+    /// <summary>
     /// The manual planned → active transition. Legal ONLY from <see cref="CycleStatus.Planned"/>;
     /// the handler maps the guard to 422 <c>cycle_not_planned</c> and owns the single-active
     /// check (409 <c>cycle_active_conflict</c>; the partial unique index wins races — D3).

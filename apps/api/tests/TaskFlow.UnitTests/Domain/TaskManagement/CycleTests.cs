@@ -140,6 +140,23 @@ public sealed class CycleTests
     }
 
     [Fact]
+    public void Edit_replaces_name_and_dates_with_a_single_version_bump()
+    {
+        var cycle = NewCycle();
+
+        cycle.Edit("  Nowa nazwa  ", Start.AddDays(1), End.AddDays(7), MutateInstant);
+
+        cycle.Name.Should().Be("Nowa nazwa");
+        cycle.StartDate.Should().Be(Start.AddDays(1));
+        cycle.EndDate.Should().Be(End.AddDays(7));
+        cycle.Version.Should().Be(1, "the HTTP edit is ONE logical mutation — exactly one bump");
+        cycle.UpdatedAt.Should().Be(MutateInstant);
+
+        var reversed = () => cycle.Edit("X", End, Start, MutateInstant);
+        reversed.Should().Throw<ArgumentException>("start < end is re-validated on edit");
+    }
+
+    [Fact]
     public void Reschedule_is_legal_in_every_status_and_revalidates_the_order()
     {
         var cycle = NewCycle();
