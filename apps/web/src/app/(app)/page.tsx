@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { CyclePicker } from "@/components/cycles/CyclePicker";
 import { LabelSelector } from "@/components/labels/LabelSelector";
 import { ProjectSelector } from "@/components/projects/ProjectSelector";
 import { PriorityPicker } from "@/components/tasks/PriorityPicker";
@@ -43,6 +44,7 @@ export default function WorkspaceHome() {
     moveTaskToProject,
     setTaskLabels,
     setTaskPriority,
+    setTaskCycle,
     rescheduleTask,
   } = useTaskMutations();
   const { duplicateTask } = useDuplicateTask();
@@ -52,6 +54,7 @@ export default function WorkspaceHome() {
   const [movingId, setMovingId] = useState<string | null>(null);
   const [labelingId, setLabelingId] = useState<string | null>(null);
   const [priorityId, setPriorityId] = useState<string | null>(null);
+  const [cyclingId, setCyclingId] = useState<string | null>(null);
   const [reschedulingId, setReschedulingId] = useState<string | null>(null);
 
   // Keep `selectedIndex` in range as the list shrinks (delete) or grows.
@@ -87,6 +90,7 @@ export default function WorkspaceHome() {
     onOpenPriority: () => setPriorityId(task.id),
     onOpenReschedule: () => setReschedulingId(task.id),
     onOpenLabels: () => setLabelingId(task.id),
+    onOpenCycle: () => setCyclingId(task.id),
     onOpenMove: () => setMovingId(task.id),
     onDuplicate: () => duplicateTask(task),
     onOpenDetails: () => router.push(`/?task=${task.id}`),
@@ -135,6 +139,14 @@ export default function WorkspaceHome() {
           current={byId(priorityId)!.priority}
           onClose={() => setPriorityId(null)}
           onSelect={(priority) => setTaskPriority(priorityId!, priority)}
+        />
+      ) : null}
+      {byId(cyclingId) ? (
+        <CyclePicker
+          open
+          current={byId(cyclingId)!.cycleId ?? null}
+          onClose={() => setCyclingId(null)}
+          onSelect={(cycleId) => setTaskCycle(cyclingId!, cycleId)}
         />
       ) : null}
       {byId(reschedulingId) ? (

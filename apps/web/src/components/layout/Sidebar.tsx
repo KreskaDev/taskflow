@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Inbox,
   Plus,
+  RefreshCw,
   UserCheck,
 } from "lucide-react";
 import { useState } from "react";
@@ -22,8 +23,24 @@ import { Menu } from "@/components/ui/Menu";
 import { useProjectTasks } from "@/hooks/useProjectTasks";
 import { useArchivedProjects, useProjects, type ProjectResponse } from "@/hooks/useProjects";
 import { useProjectMutations } from "@/hooks/useProjectMutations";
+import { useCycles } from "@/hooks/useCycles";
 import { useViewCounts } from "@/hooks/useViewCounts";
+import { isCycleOverdue, type CycleResponse } from "@/lib/cycles";
 import styles from "./Sidebar.module.css";
+
+/**
+ * The sidebar's FR-017 cycle-entry state (slice 011): the entry is ALWAYS present („visible" is
+ * unconditional) — with an active cycle it shows the cycle's NAME, plus the „po terminie" text
+ * badge when the end date passed in Warsaw; otherwise the bare „Cykl" label. Pure — unit-tested.
+ */
+export function cycleEntryState(
+  cycles: CycleResponse[] | undefined,
+  now: Date,
+): { label: string; overdue: boolean } {
+  const active = cycles?.find((c) => c.status === "active");
+  if (!active) return { label: "Cykl", overdue: false };
+  return { label: active.name, overdue: isCycleOverdue(active.endDate, now) };
+}
 
 /** A node in the assembled one-level sidebar tree: a project plus its (at most one level) children. */
 export interface ProjectTreeNode {
@@ -85,6 +102,8 @@ export function Sidebar() {
   const pathname = usePathname();
   const { data: projects } = useProjects();
   const { data: counts } = useViewCounts();
+  const { data: cycles } = useCycles();
+  const cycleEntry = cycleEntryState(cycles, new Date());
   const active = projects ?? [];
   const tree = buildProjectTree(active);
   const { archiveProject } = useProjectMutations();
@@ -148,6 +167,21 @@ export function Sidebar() {
             </li>
           );
         })}
+        {/* Slice 011 (FR-017): the active-cycle entry between the daily views and PROJEKTY —
+            ALWAYS present; the /cycle route is the single management surface (Clarifications). */}
+        <li>
+          <Link
+            className={styles.viewEntry}
+            href="/cycle"
+            aria-current={pathname === "/cycle" ? "page" : undefined}
+          >
+            <span className={styles.icon} aria-hidden="true">
+              <RefreshCw size={16} strokeWidth={1.75} />
+            </span>
+            <span className={styles.name}>{cycleEntry.label}</span>
+            {cycleEntry.overdue ? <span className={styles.cycleOverdue}>po terminie</span> : null}
+          </Link>
+        </li>
       </ul>
 
       <div className={styles.section}>
