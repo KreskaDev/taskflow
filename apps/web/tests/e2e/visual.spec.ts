@@ -1,7 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 import { expect, test, type Page } from "@playwright/test";
-import { apiAs, ensureUser, insertSession } from "./helpers/seed";
+import { apiAs, ensureUser, insertSession, resetCycles } from "./helpers/seed";
 
 /**
  * Visual regression [V] suite (slice 019, T066 — D13, UIT-100): `toHaveScreenshot`
@@ -194,6 +195,96 @@ test.describe("[V] project board & grouped list (slice 010)", () => {
           await assertRealTypography(page);
 
           await expect(page).toHaveScreenshot(`${projection}-${palette}-${width}.png`, {
+            fullPage: true,
+            animations: "disabled",
+            caret: "hide",
+            stylePath: SCREENSHOT_STYLE,
+          });
+
+          await context.close();
+        });
+      }
+    }
+  }
+});
+
+/**
+ * Slice-011 screens (T024): `/cycle` empty + seeded. Determinism (contract ui-cycle.md): the
+ * seeded cycle's dates are RELATIVE to the run day (start = today−7, end = today+7 Warsaw), so
+ * „7 dni pozostało” is a constant; the absolute date-range text carries `data-visual-hide` and is
+ * hidden by the stylePath. One user per test × attempt (the PR-#11 isolation rule).
+ */
+test.describe("[V] cycle view (slice 011)", () => {
+  for (const palette of PALETTES) {
+    for (const width of WIDTHS) {
+      for (const state of ["empty", "seeded"] as const) {
+        test(`cycle-${state} × ${palette} × ${width}px`, async ({ browser }, testInfo) => {
+          // Cycles are TEAM-WIDE (single-active) — both states need a clean cycle slate.
+          await resetCycles();
+          const key = `cycle-${state}-${palette}-${width}-r${testInfo.retry}`;
+          const profile = await ensureUser({
+            sub: `google-sub-visual-${key}`,
+            email: `visual-${key}@taskflow.test`,
+            name: "Vis Ualnie",
+          });
+          if (state === "seeded") {
+            const api = apiAs(profile.id);
+            // Relative dates: 12:00Z sits inside the same Warsaw calendar day at every UTC
+            // offset, so daysRemaining(end, now) is a constant 7.
+            const dayIso = (days: number): string =>
+              `${new Date(Date.now() + days * 24 * 3600 * 1000).toISOString().slice(0, 10)}T12:00:00Z`;
+            const cycleId = randomUUID();
+            const created = await api.request("PUT", `/api/cycles/${cycleId}`, {
+              name: "Cykl wizualny",
+              startDate: dayIso(-7),
+              endDate: dayIso(7),
+            });
+            if (!created.ok) throw new Error(`cycle seed failed (${String(created.status)})`);
+            const { version } = (await created.json()) as { version: number };
+            const activated = await api.request("PATCH", `/api/cycles/${cycleId}/activate`, { version });
+            if (!activated.ok) throw new Error(`activate seed failed (${String(activated.status)})`);
+            const seedTask = async (title: string, position: string, status?: string): Promise<void> => {
+              const task = await api.createTask({ title, position });
+              const cycled = await api.request("PATCH", `/api/tasks/${task.id}/cycle`, {
+                cycleId,
+                version: task.version,
+              });
+              if (!cycled.ok) throw new Error(`task-cycle seed failed (${String(cycled.status)})`);
+              if (status) {
+                const res = await api.request("PATCH", `/api/tasks/${task.id}/status`, {
+                  status,
+                  version: task.version + 1,
+                });
+                if (!res.ok) throw new Error(`status seed failed (${String(res.status)})`);
+              }
+            };
+            await seedTask("Zadanie w backlogu", "a0");
+            await seedTask("Zadanie w toku", "a1", "in_progress");
+            await seedTask("Zadanie zrobione", "a2", "done");
+          }
+
+          const sessionId = await insertSession(profile.id);
+          const context = await browser.newContext({
+            viewport: { width, height: 900 },
+            reducedMotion: "reduce",
+          });
+          await context.addCookies([
+            { name: "taskflow_session", value: sessionId, url: "http://localhost:3000" },
+          ]);
+          const page = await context.newPage();
+          await page.goto("/cycle");
+          await settled(page);
+          await expect(page.getByRole("img", { name: "Vis Ualnie" }).first()).toBeVisible();
+          if (state === "seeded") {
+            await expect(page.getByText("7 dni pozostało")).toBeVisible();
+            await expect(page.getByRole("row").filter({ hasText: "Zadanie w backlogu" })).toBeVisible();
+          } else {
+            await expect(page.locator('[class*="EmptyState"]').first()).toBeVisible();
+          }
+          await forcePalette(page, palette);
+          await assertRealTypography(page);
+
+          await expect(page).toHaveScreenshot(`cycle-${state}-${palette}-${width}.png`, {
             fullPage: true,
             animations: "disabled",
             caret: "hide",

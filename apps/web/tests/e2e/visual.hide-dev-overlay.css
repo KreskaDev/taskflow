@@ -11,3 +11,10 @@ nextjs-portal {
 [class*="Avatar_avatar"] {
   background: var(--avatar-a) !important;
 }
+
+/* Slice 011 (contract ui-cycle.md): the /cycle metrics strip renders the ABSOLUTE Warsaw date
+   range — the one day-dependent text on a relatively-seeded screen (start=today−7, end=today+7).
+   Hide it by its stable attribute so the pixels stay day-independent (the dev-badge precedent). */
+[data-visual-hide] {
+  visibility: hidden !important;
+}

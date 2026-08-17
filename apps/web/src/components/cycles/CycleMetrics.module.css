@@ -30,7 +30,8 @@
 
 .range {
   font-size: var(--text-sm);
-  color: var(--color-text-tertiary);
+  /* text-secondary, NOT tertiary: tertiary on bg-secondary lands at 4.47:1 in dark-warm (< AA). */
+  color: var(--color-text-secondary);
 }
 
 .hint {
