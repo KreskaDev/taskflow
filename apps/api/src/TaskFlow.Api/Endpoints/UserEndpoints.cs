@@ -33,6 +33,17 @@ public static class UserEndpoints
         return bus.InvokeAsync<UserProfile>(new GetCurrentUser());
     }
 
+    /// <summary>
+    /// Update the caller's own account preferences (slice 011, FR-015/D8): the default cycle
+    /// duration (1..90 days; out of range → 422). Returns the widened profile.
+    /// </summary>
+    [WolverinePatch("/api/users/me/preferences")]
+    public static Task<UserProfile> SetPreferences(SetUserPreferences command, IMessageBus bus)
+    {
+        ArgumentNullException.ThrowIfNull(bus);
+        return bus.InvokeAsync<UserProfile>(command);
+    }
+
     /// <summary>Irreversibly erase the current caller's own account (204 No Content).</summary>
     [WolverineDelete("/api/users/me")]
     public static Task DeleteAccount(IMessageBus bus)

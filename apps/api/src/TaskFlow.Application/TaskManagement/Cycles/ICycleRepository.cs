@@ -58,6 +58,12 @@ public interface ICycleRepository
     Task<IReadOnlyList<TaskEntity>> ListTasksInCycleAsync(Guid cycleId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// The single-cycle metrics counts (per-status, non-deleted, team-wide) — the mutation-response
+    /// variant of <see cref="CountTasksByCycleAsync"/>.
+    /// </summary>
+    Task<CycleTaskCounts> CountTasksForCycleAsync(Guid cycleId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// The metrics source (D6): per-cycle, per-status counts over ALL non-deleted assigned tasks,
     /// computed in ONE grouped count query (no N+1). Cycles with no tasks are absent from the map
     /// (use <see cref="CycleTaskCounts.Empty"/>).

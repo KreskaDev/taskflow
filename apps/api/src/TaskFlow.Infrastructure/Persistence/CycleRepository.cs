@@ -51,6 +51,23 @@ public sealed class CycleRepository(AppDbContext db) : ICycleRepository
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
+    public async Task<CycleTaskCounts> CountTasksForCycleAsync(Guid cycleId, CancellationToken cancellationToken)
+    {
+        var rows = await db.Tasks
+            .Where(t => t.CycleId == cycleId && t.DeletedAt == null)
+            .GroupBy(t => t.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return new CycleTaskCounts(
+            Backlog: rows.Where(r => r.Status == TaskStatus.Backlog).Sum(r => r.Count),
+            Todo: rows.Where(r => r.Status == TaskStatus.Todo).Sum(r => r.Count),
+            InProgress: rows.Where(r => r.Status == TaskStatus.InProgress).Sum(r => r.Count),
+            Done: rows.Where(r => r.Status == TaskStatus.Done).Sum(r => r.Count),
+            Cancelled: rows.Where(r => r.Status == TaskStatus.Cancelled).Sum(r => r.Count));
+    }
+
     public async Task<IReadOnlyDictionary<Guid, CycleTaskCounts>> CountTasksByCycleAsync(CancellationToken cancellationToken)
     {
         // ONE grouped count query (D6): per-(cycle, status) counts over non-deleted assigned

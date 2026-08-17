@@ -259,6 +259,26 @@ public static class TaskEndpoints
     }
 
     /// <summary>
+    /// Assign the task to a cycle, or clear the assignment with null (slice 011, US-05.AS-01/02)
+    /// under the optimistic <c>version</c> guard. Authorization is dispatched by the TASK's
+    /// visibility in the handler (the set-priority pattern): personal → ownership (foreign → 404);
+    /// shared → editor/owner (viewer → 403, non-member → 404). Any cycle status is assignable
+    /// (incl. closed); an unknown cycle → 422; every write clears <c>carriedOver</c> (D7).
+    /// </summary>
+    [WolverinePatch("/api/tasks/{id}/cycle")]
+    public static Task<TaskResponse> SetCycle(Guid id, SetTaskCycleRequest request, IMessageBus bus)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(bus);
+        return bus.InvokeAsync<TaskResponse>(new SetTaskCycle
+        {
+            Id = TaskId.From(id),
+            CycleId = request.CycleId,
+            Version = request.Version,
+        });
+    }
+
+    /// <summary>
     /// Set the CALLER's labels on a task — a per-user whole-set replace (slice 006, US-08.AS-04). VERSIONLESS.
     /// Authorized in the handler (two-sided): task write-access by visibility (viewer → 403; non-member /
     /// personal-foreign → 404) AND every label owned by the caller (else 422). Returns the task's read model
