@@ -2,7 +2,12 @@ import { differenceInCalendarDays } from "date-fns";
 
 import type { components } from "@/lib/api/generated/schema";
 import type { ProjectGroup } from "@/lib/board";
-import { toReferenceZone } from "@/lib/timezone";
+import {
+  formatInReferenceZone,
+  fromReferenceZone,
+  startOfReferenceDayPlusUtc,
+  toReferenceZone,
+} from "@/lib/timezone";
 
 export type CycleResponse = components["schemas"]["CycleResponse"];
 type TaskResponse = components["schemas"]["TaskResponse"];
@@ -116,6 +121,44 @@ export function buildCycleGroups(tasks: TaskResponse[], cycles: CycleResponse[])
   });
 
   return groups.filter((g) => g.tasks.length > 0);
+}
+
+/**
+ * The `/cycle` switcher's default selection (contract ui-cycle.md): the active cycle, else the
+ * NEXT planned one (first planned in D5 order), else null — the FR-110 empty state when no cycle
+ * is selectable.
+ */
+export function defaultCycleSelection(cycles: CycleResponse[]): string | null {
+  const ordered = orderCycles(cycles);
+  return ordered.find((c) => c.status === "active")?.id ?? ordered.find((c) => c.status === "planned")?.id ?? null;
+}
+
+/** The create-dialog pre-fill (D18/D8): name „Cykl N”, start = today (Warsaw), end = start + preference. */
+export function cycleFormPrefill(
+  cycles: CycleResponse[],
+  durationDays: number,
+  now: Date,
+): { name: string; startDate: string; endDate: string } {
+  return {
+    name: `Cykl ${cycles.length + 1}`,
+    startDate: startOfReferenceDayPlusUtc(now, 0).toISOString(),
+    endDate: startOfReferenceDayPlusUtc(now, durationDays).toISOString(),
+  };
+}
+
+/** The Warsaw calendar day (`yyyy-MM-dd`) a stored UTC instant falls on — the date-input value. */
+export function utcIsoToDateInput(iso: string): string {
+  return formatInReferenceZone(new Date(iso), "yyyy-MM-dd");
+}
+
+/** A date-input value (`yyyy-MM-dd`) as its Warsaw-midnight UTC instant (the D18 storage convention). */
+export function dateInputToUtcIso(value: string): string {
+  return fromReferenceZone(new Date(`${value}T00:00:00`)).toISOString();
+}
+
+/** The visible Warsaw date range („dd.MM.yyyy – dd.MM.yyyy”) — the [V]-hidden range text. */
+export function formatCycleRange(startIso: string, endIso: string): string {
+  return `${formatInReferenceZone(new Date(startIso), "dd.MM.yyyy")} – ${formatInReferenceZone(new Date(endIso), "dd.MM.yyyy")}`;
 }
 
 /** One CyclePicker option (US-05.AS-01): `id === null` is the „Bez cyklu" clear option. */

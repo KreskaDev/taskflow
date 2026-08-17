@@ -1,0 +1,63 @@
+/* CycleMetrics — the FR-026 strip (slice 011, T018; tokens-only). */
+
+.strip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-surface);
+  background: var(--color-bg-secondary);
+}
+
+.headline {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.percent {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-heading);
+}
+
+.days {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.range {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.breakdown {
+  margin: 0;
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.stat {
+  display: flex;
+  gap: var(--space-1);
+  align-items: baseline;
+}
+
+.stat dt {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.stat dd {
+  margin: 0;
+  font-weight: var(--weight-label);
+}
