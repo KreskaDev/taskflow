@@ -9,7 +9,7 @@ import type { components } from "@/lib/api/generated/schema";
 export type UserProfile = components["schemas"]["UserProfile"];
 
 /** The authenticated user's API profile incl. preferences (widened in slice 011 — D8). */
-export const ME_QUERY_KEY = ["me"] as const;
+const ME_QUERY_KEY = ["me"] as const;
 
 function errorFrom(error: unknown): Error {
   return new Error(mapError((error as ProblemDetails | undefined)?.errorCode).message);
