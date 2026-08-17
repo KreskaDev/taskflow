@@ -52,6 +52,8 @@ function row(overrides: Partial<TaskResponse> & Pick<TaskResponse, "id">): TaskR
     description: overrides.description ?? null,
     assignees: overrides.assignees ?? [],
     labels: overrides.labels ?? [],
+    cycleId: overrides.cycleId ?? null,
+    carriedOver: overrides.carriedOver ?? false,
   };
 }
 

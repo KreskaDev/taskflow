@@ -47,6 +47,14 @@ const ERROR_UX = {
   // slice 019 (FR-112): a DuplicateTask newTaskId already taken by an unrelated row.
   duplicate_id: { message: "Nie udało się zduplikować zadania — spróbuj ponownie.", redirectToSignIn: false },
   internal_error: { message: "Something went wrong. Please try again.", redirectToSignIn: false },
+  // slice 011 (contracts/cycles-api.md D16): the cycle lifecycle guards — each message carries
+  // the FR-049 recovery action.
+  no_next_cycle: { message: "Brak następnego cyklu — najpierw utwórz nowy cykl.", redirectToSignIn: false },
+  cycle_not_planned: { message: "Można aktywować tylko zaplanowany cykl.", redirectToSignIn: false },
+  cycle_active_conflict: { message: "Inny cykl jest już aktywny — najpierw go zamknij.", redirectToSignIn: false },
+  cycle_not_active: { message: "Można zamknąć tylko aktywny cykl.", redirectToSignIn: false },
+  cycle_not_empty: { message: "Cykl zawiera zadania — najpierw przenieś je do innego cyklu lub backlogu.", redirectToSignIn: false },
+  cycle_active_delete_forbidden: { message: "Cyklu nie można usunąć — najpierw go zamknij.", redirectToSignIn: false },
 } satisfies Record<ErrorCode, ErrorUx>;
 
 const FALLBACK: ErrorUx = ERROR_UX.internal_error;

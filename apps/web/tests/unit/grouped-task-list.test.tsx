@@ -27,6 +27,8 @@ function makeTask(overrides: Partial<TaskResponse> & Pick<TaskResponse, "id">): 
     completedAt: null,
     assignees: [],
     labels: [],
+    cycleId: null,
+    carriedOver: false,
     ...overrides,
   };
 }

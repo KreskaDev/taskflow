@@ -39,6 +39,8 @@ function makeTask(overrides: Partial<TaskResponse> & Pick<TaskResponse, "id">): 
     projectId: PROJECT_ID,
     assignees: [],
     labels: [],
+    cycleId: null,
+    carriedOver: false,
     ...overrides,
   };
 }

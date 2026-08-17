@@ -33,6 +33,8 @@ function task(overrides: Partial<TaskResponse> & Pick<TaskResponse, "id">): Task
     description: overrides.description ?? null,
     assignees: overrides.assignees ?? [],
     labels: overrides.labels ?? [],
+    cycleId: overrides.cycleId ?? null,
+    carriedOver: overrides.carriedOver ?? false,
   };
 }
 

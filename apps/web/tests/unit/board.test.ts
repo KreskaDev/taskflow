@@ -31,6 +31,8 @@ function makeTask(
     completedAt: null,
     assignees: [],
     labels: [],
+    cycleId: null,
+    carriedOver: false,
     ...overrides,
   };
 }
