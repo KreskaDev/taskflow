@@ -72,7 +72,7 @@ async function selectedCycleLabel(page: Page): Promise<string> {
 }
 
 test.describe("US-05 Cycles — lifecycle", () => {
-  test("empty state → create ×2 (D18 pre-fills) → activate → single-active refusal → sidebar name [INV-160] [INV-161] [INV-162] [INV-165] [INV-167]", async ({ browser }, testInfo) => {
+  test("empty state → create ×2 (D18 pre-fills) → activate → single-active refusal → edit persists → sidebar name [INV-160] [INV-161] [INV-162] [INV-165] [INV-166] [INV-167]", async ({ browser }, testInfo) => {
     const { page, context } = await signedInPage(browser, `cyc-life-r${testInfo.retry}`);
 
     // FR-017: the sidebar entry is present with the bare label and navigates to /cycle.
@@ -121,6 +121,19 @@ test.describe("US-05 Cycles — lifecycle", () => {
     await page.getByRole("button", { name: "Aktywuj" }).click();
     await expect(page.getByText("Inny cykl jest już aktywny — najpierw go zamknij.").first()).toBeVisible();
     expect(await selectedCycleLabel(page)).toBe("Cykl 2 (planowany)");
+
+    // FR-020 (INV-166): „Edytuj" renames the (planned) cycle under OCC and the change persists.
+    await page.getByRole("button", { name: "Edytuj" }).click();
+    const editDialog = page.getByRole("dialog", { name: "Edytuj cykl" });
+    await expect(editDialog.getByLabel("Nazwa")).toHaveValue("Cykl 2");
+    await editDialog.getByLabel("Nazwa").fill("Cykl 2b");
+    const edited = page.waitForResponse((r) => r.request().method() === "PATCH" && /\/api\/cycles\/[^/]+$/.test(r.url()) && r.ok());
+    await editDialog.getByRole("button", { name: "Zapisz" }).click();
+    await edited;
+    await expect(editDialog).toHaveCount(0);
+    await page.reload();
+    await page.getByLabel("Wybrany cykl").selectOption({ label: "Cykl 2b (planowany)" });
+    expect(await selectedCycleLabel(page)).toBe("Cykl 2b (planowany)");
 
     await context.close();
   });
