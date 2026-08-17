@@ -25,6 +25,8 @@ import {
   type MoveTaskToProjectContext,
   type MoveTaskToProjectVariables,
   moveTaskToProjectMutationOptions,
+  // ── slice 011 (T015): the „Cykl…” assignment recipe ──
+  setTaskCycleMutationOptions,
 } from "@/hooks/useTaskMutations";
 
 /**
@@ -1111,5 +1113,62 @@ describe("toggleDoneMutationOptions — widened setTaskStatus over the project l
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: listKeyFor(PROJECT_A) });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["views", "counts"] });
+  });
+});
+
+describe("setTaskCycleMutationOptions — the „Cykl…” assignment recipe (slice 011) [INV-172] [INV-173]", () => {
+  it("re-stamps cycleId optimistically, clears carriedOver, and issues ONE PATCH to /cycle", async () => {
+    const seed = [makeTask({ id: "11111111-1111-7111-8111-111111111111", position: "a0", carriedOver: true })];
+    const queryClient = primedClient(seed);
+    patchSpy.mockResolvedValueOnce({
+      data: makeTask({ id: seed[0]!.id, position: "a0", cycleId: "c1", version: 1 }),
+      error: undefined,
+    });
+
+    const options = setTaskCycleMutationOptions(queryClient);
+    await options.onMutate({ id: seed[0]!.id, cycleId: "c1", version: 0 });
+
+    const row = queryClient.getQueryData<TaskResponse[]>(TASKS_KEY)![0]!;
+    expect(row.cycleId).toBe("c1");
+    expect(row.carriedOver, "a manual write always clears the rollover flag (D7)").toBe(false);
+
+    await options.mutationFn({ id: seed[0]!.id, cycleId: "c1", version: 0 });
+    expect(patchSpy).toHaveBeenCalledTimes(1);
+    expect(patchSpy).toHaveBeenCalledWith("/api/tasks/{id}/cycle", {
+      params: { path: { id: seed[0]!.id } },
+      body: { cycleId: "c1", version: 0 },
+    });
+  });
+
+  it("null clears the assignment; an error rolls the snapshot back (FR-049 via the global announcer)", async () => {
+    const seed = [makeTask({ id: "11111111-1111-7111-8111-111111111111", position: "a0", cycleId: "c1" })];
+    const queryClient = primedClient(seed);
+
+    const options = setTaskCycleMutationOptions(queryClient);
+    const context = await options.onMutate({ id: seed[0]!.id, cycleId: null, version: 0 });
+    expect(queryClient.getQueryData<TaskResponse[]>(TASKS_KEY)![0]!.cycleId).toBeNull();
+
+    options.onError(versionConflict(), { id: seed[0]!.id, cycleId: null, version: 0 }, context);
+    expect(queryClient.getQueryData<TaskResponse[]>(TASKS_KEY)![0]!.cycleId).toBe("c1");
+  });
+
+  it("onSettled writes the server row back and reconciles the cycles + cycle-tasks caches", async () => {
+    const seed = [makeTask({ id: "11111111-1111-7111-8111-111111111111", position: "a0" })];
+    const queryClient = primedClient(seed);
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const options = setTaskCycleMutationOptions(queryClient);
+    const variables = { id: seed[0]!.id, cycleId: "c1", version: 0 };
+    const context = await options.onMutate(variables);
+    await options.onSettled(
+      makeTask({ id: seed[0]!.id, position: "a0", cycleId: "c1", version: 1 }),
+      null,
+      variables,
+      context,
+    );
+
+    expect(queryClient.getQueryData<TaskResponse[]>(TASKS_KEY)![0]!.version, "the FRESH version lands back").toBe(1);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["cycles"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["cycle-tasks"] });
   });
 });

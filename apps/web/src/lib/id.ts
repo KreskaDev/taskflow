@@ -29,3 +29,12 @@ export function newProjectId(): string {
 export function newLabelId(): string {
   return v7();
 }
+
+/**
+ * Mints a new cycle id as a UUIDv7 (slice 011). Same rationale as {@link newTaskId}: a client-minted,
+ * time-ordered id lets an optimistic cycle create carry its own stable identity into the `['cycles']`
+ * cache and the idempotent `PUT /api/cycles/{id}` request.
+ */
+export function newCycleId(): string {
+  return v7();
+}
