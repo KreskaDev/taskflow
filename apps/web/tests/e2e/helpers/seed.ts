@@ -249,6 +249,24 @@ export async function deleteMembershipRow(projectId: string, userId: string): Pr
   }
 }
 
+/**
+ * Resets the CYCLE world (slice 011). Cycles are TEAM-WIDE with a single-active invariant
+ * (`ix_cycles_single_active` — no per-user scoping), so a leftover active cycle from ANY earlier
+ * test makes every later `activate` 409 and breaks the „empty state”/„Cykl N” pre-fill facts.
+ * DB-direct like {@link insertSession}: cycle-seeding tests call this FIRST (workers=1 keeps it
+ * race-free); task rows merely lose their cycle assignment, which no other suite asserts.
+ */
+export async function resetCycles(): Promise<void> {
+  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  await client.connect();
+  try {
+    await client.query(`UPDATE tasks SET cycle_id = NULL, carried_over = false WHERE cycle_id IS NOT NULL OR carried_over`);
+    await client.query(`DELETE FROM cycles`);
+  } finally {
+    await client.end();
+  }
+}
+
 /** Reads a session row's invalidation flag (used to assert server-side sign-out). */
 export async function isSessionInvalidated(sessionId: string): Promise<boolean | null> {
   const client = new Client({ connectionString: process.env.DATABASE_URL });
