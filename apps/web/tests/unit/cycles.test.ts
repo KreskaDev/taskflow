@@ -4,12 +4,17 @@ import type { components } from "@/lib/api/generated/schema";
 import {
   buildCycleGroups,
   buildCyclePickerOptions,
+  cycleFormPrefill,
   cycleStatusLabel,
+  dateInputToUtcIso,
   daysRemaining,
   daysRemainingLabel,
+  defaultCycleSelection,
+  formatCycleRange,
   isCycleOverdue,
   orderCycles,
   percentDone,
+  utcIsoToDateInput,
 } from "@/lib/cycles";
 
 type CycleResponse = components["schemas"]["CycleResponse"];
@@ -205,5 +210,67 @@ describe("buildCyclePickerOptions — ALL cycles + „Bez cyklu” (US-05.AS-01)
 
     const backlog = buildCyclePickerOptions([active, planned], null);
     expect(backlog.find((o) => o.checked)?.id).toBeNull();
+  });
+});
+
+describe("defaultCycleSelection — the /cycle default (active → next planned → null) [INV-162]", () => {
+  it("prefers the ACTIVE cycle over an earlier planned one", () => {
+    const planned = cycle({ id: "p", status: "planned", startDate: "2026-01-01T00:00:00Z" });
+    const active = cycle({ id: "a", status: "active", startDate: "2026-02-01T00:00:00Z" });
+    expect(defaultCycleSelection([planned, active])).toBe("a");
+  });
+
+  it("falls back to the FIRST planned cycle in D5 order when none is active", () => {
+    const later = cycle({ id: "later", status: "planned", startDate: "2026-03-01T00:00:00Z" });
+    const sooner = cycle({ id: "sooner", status: "planned", startDate: "2026-02-01T00:00:00Z" });
+    const closed = cycle({ id: "z", status: "closed", startDate: "2026-01-01T00:00:00Z" });
+    expect(defaultCycleSelection([later, sooner, closed])).toBe("sooner");
+  });
+
+  it("returns null with only closed cycles or an empty list (FR-110 empty state)", () => {
+    expect(defaultCycleSelection([cycle({ id: "z", status: "closed" })])).toBeNull();
+    expect(defaultCycleSelection([])).toBeNull();
+  });
+});
+
+describe("cycleFormPrefill — the D18 create defaults [INV-165]", () => {
+  it("pre-fills name „Cykl N” (count+1), start = today Warsaw midnight, end = start + duration", () => {
+    // 2026-06-21T15:00:00Z is 17:00 CEST — today (Warsaw) is the 21st; its midnight = 22:00Z on the 20th.
+    const now = new Date("2026-06-21T15:00:00Z");
+    const prefill = cycleFormPrefill([cycle({ id: "a" }), cycle({ id: "b" })], 14, now);
+    expect(prefill.name).toBe("Cykl 3");
+    expect(prefill.startDate).toBe("2026-06-20T22:00:00.000Z");
+    expect(prefill.endDate).toBe("2026-07-04T22:00:00.000Z");
+  });
+
+  it("crosses the autumn DST seam without a fixed-offset slip (FR-092)", () => {
+    // Start 2026-10-20 (CEST, +02:00), +14 days lands 2026-11-03 (CET, +01:00): midnight = 23:00Z.
+    const now = new Date("2026-10-20T12:00:00Z");
+    const prefill = cycleFormPrefill([], 14, now);
+    expect(prefill.name).toBe("Cykl 1");
+    expect(prefill.startDate).toBe("2026-10-19T22:00:00.000Z");
+    expect(prefill.endDate).toBe("2026-11-02T23:00:00.000Z");
+  });
+});
+
+describe("date-only input conversions — the Warsaw-midnight convention (D18)", () => {
+  it("utcIsoToDateInput renders the Warsaw calendar day (summer + winter)", () => {
+    expect(utcIsoToDateInput("2026-06-20T22:00:00Z")).toBe("2026-06-21");
+    expect(utcIsoToDateInput("2026-01-14T23:00:00Z")).toBe("2026-01-15");
+  });
+
+  it("dateInputToUtcIso emits the Warsaw-midnight UTC instant (summer + winter)", () => {
+    expect(dateInputToUtcIso("2026-06-21")).toBe("2026-06-20T22:00:00.000Z");
+    expect(dateInputToUtcIso("2026-01-15")).toBe("2026-01-14T23:00:00.000Z");
+  });
+
+  it("round-trips: input → ISO → input", () => {
+    expect(utcIsoToDateInput(dateInputToUtcIso("2026-03-29"))).toBe("2026-03-29");
+  });
+});
+
+describe("formatCycleRange — the visible Warsaw date range", () => {
+  it("formats dd.MM.yyyy – dd.MM.yyyy on the Warsaw calendar", () => {
+    expect(formatCycleRange("2026-06-20T22:00:00Z", "2026-07-04T22:00:00Z")).toBe("21.06.2026 – 05.07.2026");
   });
 });
