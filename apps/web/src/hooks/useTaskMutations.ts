@@ -262,6 +262,8 @@ export function createTaskMutationOptions(queryClient: QueryClient): OptimisticC
         dueHasTime: variables.dueHasTime ?? null,
         assignees: [], // a freshly captured (Inbox) task has no assignees (slice 008)
         labels: [], // a freshly captured task has no labels (slice 006)
+        cycleId: null, // a freshly captured task sits in the cycle backlog (slice 011, FR-016)
+        carriedOver: false,
       };
 
       // Newest-first: the rank already sorts before the current head, so prepend verbatim.

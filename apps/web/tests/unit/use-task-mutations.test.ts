@@ -91,6 +91,8 @@ function makeTask(overrides: Partial<TaskResponse> & Pick<TaskResponse, "id" | "
     completedAt: overrides.completedAt ?? null,
     assignees: overrides.assignees ?? [],
     labels: overrides.labels ?? [],
+    cycleId: overrides.cycleId ?? null,
+    carriedOver: overrides.carriedOver ?? false,
   };
 }
 

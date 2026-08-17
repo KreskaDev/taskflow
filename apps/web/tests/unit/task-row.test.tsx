@@ -35,6 +35,8 @@ function makeTask(overrides: Partial<TaskResponse> = {}): TaskResponse {
     dueHasTime: null,
     assignees: [],
     labels: [],
+    cycleId: null,
+    carriedOver: false,
     ...overrides,
   };
 }

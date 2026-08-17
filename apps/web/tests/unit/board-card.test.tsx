@@ -29,6 +29,8 @@ function makeTask(overrides: Partial<TaskResponse> = {}): TaskResponse {
     projectId: "33333333-3333-7333-8333-333333333333",
     assignees: [],
     labels: [],
+    cycleId: null,
+    carriedOver: false,
     ...overrides,
   };
 }
