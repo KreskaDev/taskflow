@@ -54,8 +54,9 @@ pnpm --dir apps/web e2e tasks daily-planning board   # touched menu/grouping sur
    cyklu" → confirm (AS-05); counts in the toast. Tasks now sit in cycle 2.
 6. Close cycle 2 with NO planned cycle and rollover „next" → the „Najpierw utwórz nowy cykl"
    prompt (AS-06).
-7. Activate a cycle, try „Usuń" → item absent; delete a non-empty closed cycle → refused with
-   recovery copy (AS-07/EC-04/FR-020); empty planned cycle deletes fine.
+7. Activate a cycle, invoke „Usuń" (VISIBLE also on active) → refused with
+   „Cyklu nie można usunąć — najpierw go zamknij" (AS-07 verbatim); delete a non-empty closed
+   cycle → refused with recovery copy (EC-04/FR-020); empty planned cycle deletes fine.
 8. /settings: change „Domyślna długość cyklu (dni)" → create form pre-fill follows.
 
 ## Visual baselines
