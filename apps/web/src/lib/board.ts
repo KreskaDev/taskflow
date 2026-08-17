@@ -60,8 +60,8 @@ export function adjacentStatus(status: string, direction: "left" | "right"): Boa
   return neighbour?.status ?? null;
 }
 
-/** The List's group-by choices (FR-024; „wg cyklu” arrives with slice 011, not here). */
-export type ProjectGroupBy = "none" | "status" | "priority";
+/** The List's group-by choices (FR-024; „cycle” completed the set in slice 011). */
+export type ProjectGroupBy = "none" | "status" | "priority" | "cycle";
 
 export interface ProjectGroup {
   /** Stable render key (e.g. `status:todo`, `priority:none`). */

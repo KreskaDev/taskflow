@@ -83,8 +83,17 @@ describe("usePersistedProjectView — per-project group-by persistence (D9) [INV
   });
 
   it("an invalid stored grouping falls back to 'none'", () => {
-    localStorage.setItem(`taskflow.project-groupby.${PROJECT_A}`, "cycle");
+    localStorage.setItem(`taskflow.project-groupby.${PROJECT_A}`, "sprint");
     const { result } = renderHook(() => usePersistedProjectView(PROJECT_A));
     expect(result.current.groupBy).toBe("none");
+  });
+
+  it("accepts and round-trips the slice-011 'cycle' dimension [INV-174]", () => {
+    localStorage.setItem(`taskflow.project-groupby.${PROJECT_A}`, "cycle");
+    const { result } = renderHook(() => usePersistedProjectView(PROJECT_A));
+    expect(result.current.groupBy).toBe("cycle");
+
+    act(() => result.current.setGroupBy("cycle"));
+    expect(localStorage.getItem(`taskflow.project-groupby.${PROJECT_A}`)).toBe("cycle");
   });
 });

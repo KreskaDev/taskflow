@@ -8,7 +8,7 @@ import type { ProjectGroupBy } from "@/lib/board";
 export type ProjectViewMode = "list" | "board";
 
 const MODE_VALUES: readonly ProjectViewMode[] = ["list", "board"];
-const GROUP_BY_VALUES: readonly ProjectGroupBy[] = ["none", "status", "priority"];
+const GROUP_BY_VALUES: readonly ProjectGroupBy[] = ["none", "status", "priority", "cycle"];
 
 const modeKey = (projectId: string): string => `taskflow.project-view.${projectId}`;
 const groupByKey = (projectId: string): string => `taskflow.project-groupby.${projectId}`;

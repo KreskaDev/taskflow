@@ -26,6 +26,8 @@ import { useProjectTasks } from "@/hooks/useProjectTasks";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
 import type { TaskResponse } from "@/hooks/useTasks";
 import { buildProjectGroups } from "@/lib/board";
+import { buildCycleGroups } from "@/lib/cycles";
+import { useCycles } from "@/hooks/useCycles";
 import styles from "./project.module.css";
 
 const CAPTURE_INPUT_ID = "project-capture";
@@ -46,6 +48,8 @@ export default function ProjectView({ params }: { params: Promise<{ id: string }
   const project = (projects ?? []).find((p) => p.id === id);
   const { data: tasks, isPending, isError, refetch } = useProjectTasks(id);
   const { mode, setMode, groupBy, setGroupBy } = usePersistedProjectView(id);
+  // The by-cycle grouping's D5-ordered group skeleton (slice 011, FR-024 — „Bez cyklu" LAST).
+  const { data: cycles } = useCycles();
   const {
     renameTask,
     setTaskDone,
@@ -122,7 +126,7 @@ export default function ProjectView({ params }: { params: Promise<{ id: string }
 
   const groupedList = (
     <GroupedTaskList
-      groups={buildProjectGroups(rows, groupBy)}
+      groups={groupBy === "cycle" ? buildCycleGroups(rows, cycles ?? []) : buildProjectGroups(rows, groupBy)}
       selectedIndex={selectedIndex}
       onSelectedIndexChange={setSelectedIndex}
       renamingId={renamingId}

@@ -93,13 +93,13 @@ const GROUP_BY_OPTIONS: readonly { value: ProjectGroupBy; label: string }[] = [
   { value: "none", label: "Brak" },
   { value: "status", label: "Status" },
   { value: "priority", label: "Priorytet" },
+  { value: "cycle", label: "Cykl" },
 ];
 
 /**
- * The visible group-by control (US-03.AS-07): „Grupuj: Brak | Status | Priorytet” as
+ * The visible group-by control (US-03.AS-07): „Grupuj: Brak | Status | Priorytet | Cykl” as
  * `aria-pressed` toggle buttons (each an ordinary tab stop — keyboard-operable without a
- * composite-widget pattern). „wg cyklu” deliberately does NOT render — it arrives with
- * slice 011 (spec scope note).
+ * composite-widget pattern). „Cykl” completed the set in slice 011 (FR-024).
  */
 export function GroupByControl({
   value,
