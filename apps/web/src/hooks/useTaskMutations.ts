@@ -918,6 +918,66 @@ export function setPriorityMutationOptions(queryClient: QueryClient): ViewMutati
   };
 }
 
+/* ─────────────────────────── SET CYCLE (PATCH /cycle) ─────────────────────────── */
+
+export interface SetTaskCycleVariables {
+  id: string;
+  /** The target cycle (any status, incl. closed), or null = back to the cycle backlog (FR-016). */
+  cycleId: string | null;
+  version: number;
+}
+
+/**
+ * Optimistic SET-CYCLE recipe (slice 011, US-05.AS-01/02, contracts/task-cycle.md). Re-stamps
+ * `cycleId` on the target row (and clears `carriedOver` — the server ALWAYS clears it on a manual
+ * write, D7); cycle assignment changes no view membership/order, so the caches map in place via
+ * `applyTaskToViewCaches`. Like set-priority there is NO once-only 409 reapply — a 409/422/network
+ * error is a PLAIN rollback with the FR-049 message via the global announcer. `onSettled`
+ * additionally reconciles the `['cycles']` metrics and the `['cycle-tasks']` rows the move touched.
+ */
+export function setTaskCycleMutationOptions(queryClient: QueryClient): ViewMutationOptions<SetTaskCycleVariables> {
+  return {
+    mutationFn: async ({ id, cycleId, version }: SetTaskCycleVariables): Promise<TaskResponse> => {
+      const { data, error } = await apiClient.PATCH("/api/tasks/{id}/cycle", {
+        params: { path: { id } },
+        body: { cycleId, version },
+      });
+      if (error || !data) {
+        const errorCode = (error as ProblemDetails | undefined)?.errorCode;
+        throw new TaskMutationError(errorCode ?? "internal_error", mapError(errorCode).message);
+      }
+      return data;
+    },
+    onMutate: async (variables: SetTaskCycleVariables): Promise<ViewCachesSnapshot> => {
+      await queryClient.cancelQueries({ queryKey: TASKS_QUERY_KEY });
+      await queryClient.cancelQueries({ queryKey: TODAY_QUERY_KEY });
+      await queryClient.cancelQueries({ queryKey: UPCOMING_QUERY_KEY });
+      const snapshot = snapshotViewCaches(queryClient);
+      const row = findTaskInViewCaches(queryClient, variables.id);
+      if (row) {
+        applyTaskToViewCaches(
+          queryClient,
+          { ...row, cycleId: variables.cycleId, carriedOver: false },
+          new Date(),
+        );
+      }
+      return snapshot;
+    },
+    onError: (_error, _variables, context): void => {
+      if (context) rollbackViewCaches(queryClient, context);
+    },
+    onSettled: async (data): Promise<void> => {
+      // Write the server row (FRESH version) back so a rapid second op reads the current version.
+      if (data) applyTaskToViewCaches(queryClient, data, new Date());
+      await settleViewCaches(queryClient);
+      // The assignment moved the task between cycles — reconcile the team-wide metrics and the
+      // per-cycle row lists (both the source and target cycle's keys; a prefix invalidate covers them).
+      await queryClient.invalidateQueries({ queryKey: ["cycles"] });
+      await queryClient.invalidateQueries({ queryKey: ["cycle-tasks"] });
+    },
+  };
+}
+
 /* ─────────────────────────── RESCHEDULE (PATCH /due-date) ─────────────────────────── */
 
 export interface RescheduleDueDateVariables {
@@ -1190,6 +1250,9 @@ export function useTaskMutations() {
   const setPriorityMutation = useMutation<TaskResponse, Error, SetPriorityVariables, ViewCachesSnapshot>(
     setPriorityMutationOptions(queryClient),
   );
+  const setCycleMutation = useMutation<TaskResponse, Error, SetTaskCycleVariables, ViewCachesSnapshot>(
+    setTaskCycleMutationOptions(queryClient),
+  );
   const rescheduleMutation = useMutation<TaskResponse, Error, RescheduleDueDateVariables, ViewCachesSnapshot>(
     rescheduleDueDateMutationOptions(queryClient),
   );
@@ -1365,6 +1428,13 @@ export function useTaskMutations() {
     setAssigneesMutation.mutate({ id, assigneeIds: parsed, version: row.version });
   };
 
+  /** Assigns the task to a cycle, or clears the assignment — the „Cykl…" picker commit (slice 011, US-05.AS-02). */
+  const setTaskCycle = (id: string, cycleId: string | null): void => {
+    const row = findTaskInViewCaches(queryClient, id);
+    if (!row) return;
+    setCycleMutation.mutate({ id, cycleId, version: row.version });
+  };
+
   /** Sets the caller's labels on a task — the `L` selector commit (slice 006, US-08.AS-04). Versionless. */
   const setTaskLabels = (id: string, labelIds: string[]): void => {
     const parsed = labelSetSchema.parse(labelIds); // boundary parse (Constitution VI)
@@ -1384,5 +1454,6 @@ export function useTaskMutations() {
     editTask,
     setTaskAssignees,
     setTaskLabels,
+    setTaskCycle,
   };
 }
