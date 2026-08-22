@@ -64,9 +64,42 @@ Web monorepo per plan.md: `apps/web` (Next.js 15) + `apps/api` (.NET 9). Feature
 
 - [X] T025 Run `pnpm --dir apps/web test` and drive the inventory-coverage gate green — every slice-011 `INV-###` row has an `[INV-###]`-tagged covering test and vice versa; reconcile as needed
 - [X] T026 [P] `pnpm --dir apps/web audit:dead` (zero dead modules) + hex audit clean (tokens-only in all new .module.css) + `pnpm --dir apps/web lint` + `typecheck`
-- [ ] T027 Regenerate [V] baselines via apps/web/tests/e2e/update-visual-baselines.ps1 (docker; prereqs per the runbook: Debug API build, port 55432 free) — new cycle baselines committed for human approval per palette; existing baselines must NOT drift
-- [ ] T028 Run the full suites per quickstart.md: web unit, `dotnet test` (verify the new `cycles` shard filter partitions correctly — D15), full `pnpm --dir apps/web e2e` (incl. axe + tasks/daily/board regression), `gen:api` diff clean
-- [ ] T029 Walk quickstart.md manual steps 1–8 against the interactive stack and record the outcome in this file
+- [X] T027 Regenerate [V] baselines via apps/web/tests/e2e/update-visual-baselines.ps1 (docker; prereqs per the runbook: Debug API build, port 55432 free) — new cycle baselines committed for human approval per palette; existing baselines must NOT drift
+- [X] T028 Run the full suites per quickstart.md: web unit, `dotnet test` (verify the new `cycles` shard filter partitions correctly — D15), full `pnpm --dir apps/web e2e` (incl. axe + tasks/daily/board regression), `gen:api` diff clean
+- [X] T029 Walk quickstart.md manual steps 1–8 against the interactive stack and record the outcome in this file
+
+### T028 — full-regression record (2026-08-22)
+
+- Web unit: 57 files / **580 passed** (incl. the INV inventory gate).
+- Backend: unit **157 passed**; integration run shard-by-shard with the six ci.yml filters
+  (the full-suite single run OOM-kills a 24 GB box — container-per-fact capacity, matches the
+  CI sharding rationale): comments **48**, cycles **72**, identity-labels-infra **62**,
+  tasks-core **126**, tasks-daily-triage **61**, sharing-assignment **100** — all green.
+- D15 partition check: shard sums 469 = `--list-tests` total **469**; TaskManagement split
+  126+61+100 = **287** = namespace total → filters are disjoint and exhaustive.
+- Full E2E: **130 passed, 0 failed** (7.8 min; 120 `[V]` skipped — linux-only baselines).
+- `gen:api` against the live :4311 API: schema regenerated with **zero diff**.
+
+### T029 — manual walk record (2026-08-22, fresh user via fake-IdP sign-in)
+
+1. ✅ Sidebar „Cykl” → `/cycle` empty state → „Nowy cykl” pre-filled „Cykl 1”,
+   end = start + 14 (settings default); second later cycle created (D18 pre-fills OK).
+2. ✅ „Aktywuj” Cykl 1 → sidebar entry renamed to „Cykl 1”; „Aktywuj” on Cykl 2 refused —
+   server 409 ×3, state unchanged (toast copy „Inny cykl jest już aktywny…” asserted by
+   the green E2E INV-165; toast auto-dismiss outpaced the MCP snapshot round-trip).
+3. ✅ Row „⋯” → „Cykl…” picker → assigned to the active cycle; project List „Grupuj: Cykl”
+   shows the „Cykl 1” group with „Bez cyklu” last (and the choice persists across navigation).
+4. ✅ `/cycle` metrics: 0% → completed one of two tasks → **50%**, breakdown Zrobione 1 /
+   Backlog 1, days-remaining and date range shown.
+5. ✅ „Zamknij cykl” review listed the 1 incomplete task; rollover „do następnego cyklu” →
+   toast „Cykl zamknięty — przeniesione do następnego cyklu: 1.”; task landed in Cykl 2.
+6. ✅ Closing Cykl 2 with rollover „next” and no planned cycle → inline alert
+   „Najpierw utwórz nowy cykl, aby przenieść do niego zadania.” + „Nowy cykl” button; close blocked.
+7. ✅ „Usuń” visible on the active cycle, refused with the verbatim toast
+   „Cyklu nie można usunąć — najpierw go zamknij.”; non-empty closed Cykl 1 delete refused
+   (422, cycle intact); empty planned Cykl 3 deleted cleanly.
+8. ✅ `/settings` „Domyślna długość cyklu (dni)” 14 → 7 saved; create-form end pre-fill
+   followed (2026-08-22 → 2026-08-29).
 
 ## Dependencies & Execution Order
 
