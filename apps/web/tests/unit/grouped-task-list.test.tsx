@@ -27,6 +27,8 @@ function makeTask(overrides: Partial<TaskResponse> & Pick<TaskResponse, "id">): 
     completedAt: null,
     assignees: [],
     labels: [],
+    cycleId: null,
+    carriedOver: false,
     ...overrides,
   };
 }
@@ -90,12 +92,13 @@ describe("GroupedTaskList — grouped grid with a flat index (FR-024, D9) [INV-1
 describe("GroupByControl — the visible „Grupuj” control (US-03.AS-07) [INV-146] [INV-147]", () => {
   afterEach(cleanup);
 
-  it("renders the three choices as toggle buttons with aria-pressed reflecting the value", () => {
+  it("renders the four choices as toggle buttons with aria-pressed reflecting the value", () => {
     render(<GroupByControl value="status" onChange={() => {}} />);
 
     expect(screen.getByRole("button", { name: "Brak" }).getAttribute("aria-pressed")).toBe("false");
     expect(screen.getByRole("button", { name: "Status" }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByRole("button", { name: "Priorytet" }).getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByRole("button", { name: "Cykl" }).getAttribute("aria-pressed")).toBe("false");
   });
 
   it("reports the chosen grouping through onChange", () => {
@@ -106,9 +109,14 @@ describe("GroupByControl — the visible „Grupuj” control (US-03.AS-07) [INV
     expect(onChange).toHaveBeenCalledWith("priority");
   });
 
-  it("does NOT offer „wg cyklu” (by-cycle waits for slice 011)", () => {
-    render(<GroupByControl value="none" onChange={() => {}} />);
+  it("offers the „Cykl” dimension (slice 011, FR-024 completion) and reports it [INV-174]", () => {
+    const onChange = vi.fn();
+    render(<GroupByControl value="cycle" onChange={onChange} />);
 
-    expect(screen.queryByRole("button", { name: /cykl/i })).toBeNull();
+    const cycleButton = screen.getByRole("button", { name: "Cykl" });
+    expect(cycleButton.getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(cycleButton);
+    expect(onChange).toHaveBeenCalledWith("cycle");
   });
 });

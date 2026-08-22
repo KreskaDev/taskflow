@@ -35,6 +35,8 @@ function makeTask(overrides: Partial<TaskResponse> = {}): TaskResponse {
     dueHasTime: null,
     assignees: [],
     labels: [],
+    cycleId: null,
+    carriedOver: false,
     ...overrides,
   };
 }
@@ -174,5 +176,34 @@ describe("buildMenuItems — the shared „⋯” action architecture gains colu
     const ids = items.map((i) => i.id);
     expect(ids).not.toContain("move-left");
     expect(ids).not.toContain("move-right");
+  });
+
+  describe("„Cykl…” item (slice 011, US-05.AS-01) [INV-172]", () => {
+    it("appears between „Etykiety…” and „Przenieś do projektu…” when wired", () => {
+      const items = buildMenuItems(makeTask(), { ...allStandardActions(), onOpenCycle: noop });
+
+      const ids = items.map((i) => i.id);
+      expect(ids).toContain("cycle");
+      expect(ids.indexOf("cycle")).toBe(ids.indexOf("labels") + 1);
+      expect(ids.indexOf("move")).toBe(ids.indexOf("cycle") + 1);
+      expect(items.find((i) => i.id === "cycle")!.label).toBe("Cykl…");
+    });
+
+    it("is absent when onOpenCycle is not wired", () => {
+      const items = buildMenuItems(makeTask(), allStandardActions());
+      expect(items.map((i) => i.id)).not.toContain("cycle");
+    });
+  });
+});
+
+describe("TaskRow „przeniesione” chip (slice 011, D7/FR-044) [INV-164]", () => {
+  it("renders the visible text chip when carriedOver is true", () => {
+    renderRow(makeTask({ carriedOver: true }));
+    expect(screen.getByText("przeniesione")).toBeTruthy();
+  });
+
+  it("renders no chip when carriedOver is false", () => {
+    renderRow(makeTask({ carriedOver: false }));
+    expect(screen.queryByText("przeniesione")).toBeNull();
   });
 });

@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto";
+
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { apiAs, ensureUser, insertSession } from "./helpers/seed";
+import { apiAs, ensureUser, insertSession, resetCycles } from "./helpers/seed";
 
 /**
  * Per-palette accessibility suite (T028, slice 019 — UIT-010, SC-008, D12).
@@ -217,6 +219,69 @@ test.describe("axe AA — project grouped list (slice 010)", () => {
       await expect(page.getByText("Wiersz anulowany").first()).toBeVisible();
       await setPalette(page, palette);
       await auditCurrentPage(page, `grouped list × ${palette}`);
+      await context.close();
+    });
+  }
+});
+
+/**
+ * Slice 011 (T023): the `/cycle` management surface joins the walk — seeded cycles + task rows,
+ * plus the CyclePicker and the close-review dialog in their OPEN states [INV-162] [INV-173].
+ */
+test.describe("axe AA — cycle view (slice 011)", () => {
+  for (const palette of PALETTES) {
+    test(`/cycle (+ picker + close review open) in ${palette}: zero WCAG 2.1 AA violations`, async ({ browser }) => {
+      // Cycles are TEAM-WIDE with a single-active invariant — start each palette iteration clean.
+      await resetCycles();
+      const { page, context, profile } = await signedInPage(browser, `axe-cycle-${palette}`);
+      const api = apiAs(profile.id);
+      const cycleId = randomUUID();
+      const created = await api.request("PUT", `/api/cycles/${cycleId}`, {
+        name: "Cykl AA",
+        startDate: "2026-01-05T00:00:00Z",
+        endDate: "2126-01-19T00:00:00Z",
+      });
+      if (!created.ok) throw new Error(`cycle seed failed (${String(created.status)})`);
+      const { version } = (await created.json()) as { version: number };
+      const activated = await api.request("PATCH", `/api/cycles/${cycleId}/activate`, { version });
+      if (!activated.ok) throw new Error(`activate seed failed (${String(activated.status)})`);
+      const nextId = randomUUID();
+      const next = await api.request("PUT", `/api/cycles/${nextId}`, {
+        name: "Cykl następny",
+        startDate: "2126-01-20T00:00:00Z",
+        endDate: "2126-02-03T00:00:00Z",
+      });
+      if (!next.ok) throw new Error(`next-cycle seed failed (${String(next.status)})`);
+      const task = await api.createTask({ title: "Zadanie w cyklu AA", position: "a0" });
+      const cycled = await api.request("PATCH", `/api/tasks/${task.id}/cycle`, {
+        cycleId,
+        version: task.version,
+      });
+      if (!cycled.ok) throw new Error(`task-cycle seed failed (${String(cycled.status)})`);
+
+      // 1) The seeded /cycle surface (switcher + metrics + rows + lifecycle buttons).
+      await page.goto("/cycle");
+      await page.waitForLoadState("networkidle");
+      // Generous timeout: the run's FIRST /cycle hit compiles the route on demand in `next dev`.
+      await expect(page.getByText("Zadanie w cyklu AA").first()).toBeVisible({ timeout: 30_000 });
+      await setPalette(page, palette);
+      await auditCurrentPage(page, `/cycle × ${palette}`);
+
+      // 2) The close review in its OPEN state (radios + per-task list + footer note).
+      await page.getByRole("button", { name: "Zamknij cykl" }).click();
+      await expect(page.getByRole("dialog", { name: /Zamknij cykl/ })).toBeVisible();
+      await auditCurrentPage(page, `/cycle close review × ${palette}`);
+      await page.keyboard.press("Escape");
+
+      // 3) The CyclePicker in its OPEN state (from the Inbox row's „⋯" menu).
+      await page.goto("/");
+      await page.waitForLoadState("networkidle");
+      await setPalette(page, palette);
+      await page.getByRole("button", { name: "Więcej akcji: Zadanie w cyklu AA" }).click();
+      await page.getByRole("menu", { name: "Akcje taska" }).getByRole("menuitem", { name: "Cykl…" }).click();
+      await expect(page.getByRole("dialog", { name: "Cykl" })).toBeVisible();
+      await auditCurrentPage(page, `cycle picker × ${palette}`);
+
       await context.close();
     });
   }

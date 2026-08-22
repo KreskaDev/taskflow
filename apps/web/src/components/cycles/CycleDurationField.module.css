@@ -1,0 +1,20 @@
+/* CycleDurationField — the /settings FR-015 preference (slice 011, T021; tokens-only). */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 20rem;
+}
+
+.label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-label);
+  color: var(--color-text-secondary);
+}
+
+.controls {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}

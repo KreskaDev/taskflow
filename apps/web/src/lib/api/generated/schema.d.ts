@@ -52,6 +52,114 @@ export interface paths {
         patch: operations["editComment"];
         trace?: never;
     };
+    "/api/cycles/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * PUT_api_cycles_id
+         * @description PUT_api_cycles_id
+         */
+        put: operations["createCycle"];
+        post?: never;
+        /**
+         * DELETE_api_cycles_id
+         * @description DELETE_api_cycles_id
+         */
+        delete: operations["deleteCycle"];
+        options?: never;
+        head?: never;
+        /**
+         * PATCH_api_cycles_id
+         * @description PATCH_api_cycles_id
+         */
+        patch: operations["editCycle"];
+        trace?: never;
+    };
+    "/api/cycles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GET_api_cycles
+         * @description GET_api_cycles
+         */
+        get: operations["listCycles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cycles/{id}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GET_api_cycles_id_tasks
+         * @description GET_api_cycles_id_tasks
+         */
+        get: operations["getCycleTasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cycles/{id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * PATCH_api_cycles_id_activate
+         * @description PATCH_api_cycles_id_activate
+         */
+        patch: operations["activateCycle"];
+        trace?: never;
+    };
+    "/api/cycles/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * PATCH_api_cycles_id_close
+         * @description PATCH_api_cycles_id_close
+         */
+        patch: operations["closeCycle"];
+        trace?: never;
+    };
     "/api/internal/auth-check": {
         parameters: {
             query?: never;
@@ -640,6 +748,26 @@ export interface paths {
         patch: operations["setTaskAssignees"];
         trace?: never;
     };
+    "/api/tasks/{id}/cycle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * PATCH_api_tasks_id_cycle
+         * @description PATCH_api_tasks_id_cycle
+         */
+        patch: operations["setTaskCycle"];
+        trace?: never;
+    };
     "/api/tasks/{id}/labels": {
         parameters: {
             query?: never;
@@ -704,6 +832,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/users/me/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * PATCH_api_users_me_preferences
+         * @description PATCH_api_users_me_preferences
+         */
+        patch: operations["setUserPreferences"];
+        trace?: never;
+    };
     "/api/views/counts": {
         parameters: {
             query?: never;
@@ -750,7 +898,7 @@ export interface components {
              * @description Stable machine-readable error code.
              * @enum {string}
              */
-            errorCode: "validation_failed" | "unauthenticated" | "not_admitted" | "forbidden" | "not_found" | "conflict_lww" | "last_owner" | "internal_error" | "version_conflict" | "duplicate_id";
+            errorCode: "validation_failed" | "unauthenticated" | "not_admitted" | "forbidden" | "not_found" | "conflict_lww" | "last_owner" | "internal_error" | "version_conflict" | "duplicate_id" | "no_next_cycle" | "cycle_not_planned" | "cycle_active_conflict" | "cycle_not_active" | "cycle_not_empty" | "cycle_active_delete_forbidden";
             /** @description Field-level validation errors (field path -> messages). */
             errors?: {
                 [key: string]: string[];
@@ -773,6 +921,26 @@ export interface components {
             role: string;
             /** Format: int32 */
             version: number;
+        };
+        CloseCycleOverride: {
+            /** Format: uuid */
+            taskId: string;
+            choice: string;
+        };
+        CloseCycleRequest: {
+            rollover?: string | null;
+            overrides?: components["schemas"]["CloseCycleOverride"][] | null;
+            /** Format: int32 */
+            version: number;
+        };
+        CloseCycleResponse: {
+            cycle: components["schemas"]["CycleResponse"];
+            /** Format: int32 */
+            rolledToNext: number;
+            /** Format: int32 */
+            rolledToBacklog: number;
+            /** Format: int32 */
+            kept: number;
         };
         CommentListResponse: {
             /** Format: uuid */
@@ -800,6 +968,13 @@ export interface components {
             editedAt?: string | null;
             canEdit: boolean;
         };
+        CreateCycleRequest: {
+            name: string;
+            /** Format: date-time */
+            startDate?: string | null;
+            /** Format: date-time */
+            endDate?: string | null;
+        };
         CreateLabelRequest: {
             name: string;
             color?: string | null;
@@ -818,6 +993,40 @@ export interface components {
             dueDate?: string | null;
             dueHasTime?: boolean | null;
         };
+        CycleBreakdownResponse: {
+            /** Format: int32 */
+            backlog: number;
+            /** Format: int32 */
+            todo: number;
+            /** Format: int32 */
+            in_progress: number;
+            /** Format: int32 */
+            done: number;
+            /** Format: int32 */
+            cancelled: number;
+        };
+        CycleMetricsResponse: {
+            /** Format: int32 */
+            total: number;
+            /** Format: int32 */
+            done: number;
+            breakdown: components["schemas"]["CycleBreakdownResponse"];
+        };
+        CycleResponse: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: date-time */
+            startDate: string;
+            /** Format: date-time */
+            endDate: string;
+            status: string;
+            /** Format: int32 */
+            version: number;
+            /** Format: date-time */
+            createdAt: string;
+            metrics: components["schemas"]["CycleMetricsResponse"];
+        };
         DuplicateTaskRequest: {
             /** Format: uuid */
             newTaskId: string;
@@ -825,6 +1034,15 @@ export interface components {
         EditCommentRequest: {
             body: string;
             mentionedUserIds?: string[] | null;
+        };
+        EditCycleRequest: {
+            name: string;
+            /** Format: date-time */
+            startDate?: string | null;
+            /** Format: date-time */
+            endDate?: string | null;
+            /** Format: int32 */
+            version: number;
         };
         EditProjectRequest: {
             name: string;
@@ -942,6 +1160,12 @@ export interface components {
             /** Format: int32 */
             version: number;
         };
+        SetTaskCycleRequest: {
+            /** Format: uuid */
+            cycleId: string | null;
+            /** Format: int32 */
+            version: number;
+        };
         SetTaskLabelsRequest: {
             labelIds: string[];
         };
@@ -949,6 +1173,10 @@ export interface components {
             status: string;
             /** Format: int32 */
             version: number;
+        };
+        SetUserPreferences: {
+            /** Format: int32 */
+            cycleDefaultDurationDays: number;
         };
         TaskResponse: {
             /** Format: uuid */
@@ -973,6 +1201,9 @@ export interface components {
             description?: string | null;
             assignees: string[];
             labels: string[];
+            /** Format: uuid */
+            cycleId?: string | null;
+            carriedOver: boolean;
         };
         TodayGroup: {
             /** Format: uuid */
@@ -1005,6 +1236,9 @@ export interface components {
             description?: string | null;
             assignees: string[];
             labels: string[];
+            /** Format: uuid */
+            cycleId?: string | null;
+            carriedOver: boolean;
             isOverdue: boolean;
         };
         TransferOwnershipRequest: {
@@ -1032,6 +1266,8 @@ export interface components {
             avatarUrl?: string | null;
             /** Format: date-time */
             createdAt: string;
+            /** Format: int32 */
+            cycleDefaultDurationDays: number;
         };
         VersionOnlyRequest: {
             /** Format: int32 */
@@ -1252,6 +1488,383 @@ export interface operations {
             };
             /** @description The resource does not exist, is soft-deleted, or the caller is not permitted to observe it (errorCode = not_found). */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Request validation failed (errorCode = validation_failed). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    createCycle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCycleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CycleResponse"];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Request validation failed (errorCode = validation_failed). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    deleteCycle: {
+        parameters: {
+            query?: {
+                version?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The resource does not exist, is soft-deleted, or the caller is not permitted to observe it (errorCode = not_found). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description A state conflict: a stale version (errorCode = version_conflict) or the last-owner guard (errorCode = last_owner). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Request validation failed (errorCode = validation_failed). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    editCycle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditCycleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CycleResponse"];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The resource does not exist, is soft-deleted, or the caller is not permitted to observe it (errorCode = not_found). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description A state conflict: a stale version (errorCode = version_conflict) or the last-owner guard (errorCode = last_owner). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Request validation failed (errorCode = validation_failed). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    listCycles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CycleResponse"][];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    getCycleTasks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"][];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The resource does not exist, is soft-deleted, or the caller is not permitted to observe it (errorCode = not_found). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    activateCycle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionOnlyRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CycleResponse"];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The resource does not exist, is soft-deleted, or the caller is not permitted to observe it (errorCode = not_found). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description A state conflict: a stale version (errorCode = version_conflict) or the last-owner guard (errorCode = last_owner). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Request validation failed (errorCode = validation_failed). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    closeCycle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CloseCycleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CloseCycleResponse"];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The resource does not exist, is soft-deleted, or the caller is not permitted to observe it (errorCode = not_found). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description A state conflict: a stale version (errorCode = version_conflict) or the last-owner guard (errorCode = last_owner). */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3193,6 +3806,77 @@ export interface operations {
             };
         };
     };
+    setTaskCycle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetTaskCycleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The caller is a member but lacks the required role for this operation (errorCode = forbidden). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The resource does not exist, is soft-deleted, or the caller is not permitted to observe it (errorCode = not_found). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description A state conflict: a stale version (errorCode = version_conflict) or the last-owner guard (errorCode = last_owner). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Request validation failed (errorCode = validation_failed). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     setTaskLabels: {
         parameters: {
             query?: never;
@@ -3355,6 +4039,57 @@ export interface operations {
             };
             /** @description Missing or invalid identity carrier (deny-by-default). */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    setUserPreferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetUserPreferences"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserProfile"];
+                };
+            };
+            /** @description Missing or invalid identity carrier (deny-by-default). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Request validation failed (errorCode = validation_failed). */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

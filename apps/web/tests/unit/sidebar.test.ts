@@ -1,7 +1,8 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import type { components } from "@/lib/api/generated/schema";
-import { buildProjectTree, type ProjectTreeNode } from "@/components/layout/Sidebar";
+import { buildProjectTree, cycleEntryState, type ProjectTreeNode } from "@/components/layout/Sidebar";
+import type { CycleResponse } from "@/lib/cycles";
 
 /**
  * Sidebar tree assembly (T027, RED — drives T028; research R16). The API returns a FLAT
@@ -78,5 +79,49 @@ describe("buildProjectTree — one-level tree assembly from the flat list (R16) 
 
   it("returns an empty tree for an empty list", () => {
     expect(buildProjectTree([])).toEqual([]);
+  });
+});
+
+/**
+ * cycleEntryState (slice 011, T017 — FR-017/FR-044): the sidebar entry is ALWAYS present; with an
+ * active cycle it carries the cycle's NAME plus the „po terminie" TEXT badge once the end date
+ * passed in Europe/Warsaw; otherwise the bare „Cykl" label.
+ */
+function makeCycle(overrides: Partial<CycleResponse> & Pick<CycleResponse, "id">): CycleResponse {
+  return {
+    id: overrides.id,
+    name: overrides.name ?? "Sprint 1",
+    startDate: overrides.startDate ?? "2026-01-05T00:00:00Z",
+    endDate: overrides.endDate ?? "2026-01-19T00:00:00Z",
+    status: overrides.status ?? "active",
+    version: overrides.version ?? 0,
+    createdAt: overrides.createdAt ?? "2026-01-01T00:00:00Z",
+    metrics: overrides.metrics ?? {
+      total: 0,
+      done: 0,
+      breakdown: { backlog: 0, todo: 0, in_progress: 0, done: 0, cancelled: 0 },
+    },
+  };
+}
+
+describe("cycleEntryState — the sidebar „Cykl” entry (FR-017) [INV-160] [INV-161]", () => {
+  it("shows the bare „Cykl” label with no cycles (or an undefined list)", () => {
+    expect(cycleEntryState(undefined, new Date("2026-01-10T12:00:00Z"))).toEqual({ label: "Cykl", overdue: false });
+    expect(cycleEntryState([], new Date("2026-01-10T12:00:00Z"))).toEqual({ label: "Cykl", overdue: false });
+  });
+
+  it("shows the bare „Cykl” label when only planned/closed cycles exist", () => {
+    const cycles = [makeCycle({ id: "p", status: "planned" }), makeCycle({ id: "z", status: "closed" })];
+    expect(cycleEntryState(cycles, new Date("2026-01-10T12:00:00Z"))).toEqual({ label: "Cykl", overdue: false });
+  });
+
+  it("shows the ACTIVE cycle's name while its end date is ahead (no badge)", () => {
+    const cycles = [makeCycle({ id: "a", name: "Sprint 7", status: "active", endDate: "2026-01-19T00:00:00Z" })];
+    expect(cycleEntryState(cycles, new Date("2026-01-10T12:00:00Z"))).toEqual({ label: "Sprint 7", overdue: false });
+  });
+
+  it("flags „po terminie” once the end date passed in Warsaw (FR-044 text badge)", () => {
+    const cycles = [makeCycle({ id: "a", name: "Sprint 7", status: "active", endDate: "2026-01-19T00:00:00Z" })];
+    expect(cycleEntryState(cycles, new Date("2026-01-20T12:00:00Z"))).toEqual({ label: "Sprint 7", overdue: true });
   });
 });

@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { CyclePicker } from "@/components/cycles/CyclePicker";
 import { LabelSelector } from "@/components/labels/LabelSelector";
 import { ProjectSelector } from "@/components/projects/ProjectSelector";
 import { BoardView } from "@/components/tasks/BoardView";
@@ -25,6 +26,8 @@ import { useProjectTasks } from "@/hooks/useProjectTasks";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
 import type { TaskResponse } from "@/hooks/useTasks";
 import { buildProjectGroups } from "@/lib/board";
+import { buildCycleGroups } from "@/lib/cycles";
+import { useCycles } from "@/hooks/useCycles";
 import styles from "./project.module.css";
 
 const CAPTURE_INPUT_ID = "project-capture";
@@ -45,6 +48,8 @@ export default function ProjectView({ params }: { params: Promise<{ id: string }
   const project = (projects ?? []).find((p) => p.id === id);
   const { data: tasks, isPending, isError, refetch } = useProjectTasks(id);
   const { mode, setMode, groupBy, setGroupBy } = usePersistedProjectView(id);
+  // The by-cycle grouping's D5-ordered group skeleton (slice 011, FR-024 — „Bez cyklu" LAST).
+  const { data: cycles } = useCycles();
   const {
     renameTask,
     setTaskDone,
@@ -52,6 +57,7 @@ export default function ProjectView({ params }: { params: Promise<{ id: string }
     moveTaskToProject,
     setTaskLabels,
     setTaskPriority,
+    setTaskCycle,
     rescheduleTask,
     setTaskAssignees,
   } = useTaskMutations();
@@ -71,6 +77,7 @@ export default function ProjectView({ params }: { params: Promise<{ id: string }
   const [movingId, setMovingId] = useState<string | null>(null);
   const [labelingId, setLabelingId] = useState<string | null>(null);
   const [priorityId, setPriorityId] = useState<string | null>(null);
+  const [cyclingId, setCyclingId] = useState<string | null>(null);
   const [reschedulingId, setReschedulingId] = useState<string | null>(null);
   const [assignId, setAssignId] = useState<string | null>(null);
 
@@ -90,6 +97,7 @@ export default function ProjectView({ params }: { params: Promise<{ id: string }
     onOpenPriority: () => setPriorityId(task.id),
     onOpenReschedule: () => setReschedulingId(task.id),
     onOpenLabels: () => setLabelingId(task.id),
+    onOpenCycle: () => setCyclingId(task.id),
     onOpenMove: () => setMovingId(task.id),
     onOpenAssign: () => setAssignId(task.id),
     onDuplicate: () => duplicateTask(task),
@@ -118,7 +126,7 @@ export default function ProjectView({ params }: { params: Promise<{ id: string }
 
   const groupedList = (
     <GroupedTaskList
-      groups={buildProjectGroups(rows, groupBy)}
+      groups={groupBy === "cycle" ? buildCycleGroups(rows, cycles ?? []) : buildProjectGroups(rows, groupBy)}
       selectedIndex={selectedIndex}
       onSelectedIndexChange={setSelectedIndex}
       renamingId={renamingId}
@@ -214,6 +222,14 @@ export default function ProjectView({ params }: { params: Promise<{ id: string }
           current={byId(priorityId)!.priority}
           onClose={() => setPriorityId(null)}
           onSelect={(priority) => setTaskPriority(priorityId!, priority)}
+        />
+      ) : null}
+      {byId(cyclingId) ? (
+        <CyclePicker
+          open
+          current={byId(cyclingId)!.cycleId ?? null}
+          onClose={() => setCyclingId(null)}
+          onSelect={(cycleId) => setTaskCycle(cyclingId!, cycleId)}
         />
       ) : null}
       {byId(reschedulingId) ? (

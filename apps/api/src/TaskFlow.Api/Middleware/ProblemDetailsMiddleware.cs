@@ -94,6 +94,14 @@ internal sealed class ProblemDetailsMiddleware(RequestDelegate next, ILogger<Pro
         // duplicate_id (slice 019): a DuplicateTask newTaskId already taken by an unrelated row.
         // The create path still catches this exception internally; it surfaces ONLY from duplicateTask.
         DuplicateTaskIdException => (StatusCodes.Status409Conflict, "duplicate_id", "Duplicate id", null),
+        // Cycle lifecycle guards (slice 011, contracts/cycles-api.md): recoverable STATE errors with
+        // dedicated codes so the web ERROR_UX map can render the FR-049 recovery copy per case.
+        CycleActiveConflictException => (StatusCodes.Status409Conflict, "cycle_active_conflict", "Another cycle is active", null),
+        CycleNotPlannedException => (StatusCodes.Status422UnprocessableEntity, "cycle_not_planned", "Cycle is not planned", null),
+        CycleNotActiveException => (StatusCodes.Status422UnprocessableEntity, "cycle_not_active", "Cycle is not active", null),
+        CycleNotEmptyException => (StatusCodes.Status422UnprocessableEntity, "cycle_not_empty", "Cycle is not empty", null),
+        CycleActiveDeleteForbiddenException => (StatusCodes.Status422UnprocessableEntity, "cycle_active_delete_forbidden", "Active cycle cannot be deleted", null),
+        NoNextCycleException => (StatusCodes.Status422UnprocessableEntity, "no_next_cycle", "No next cycle", null),
         ValidationException ve => (StatusCodes.Status422UnprocessableEntity, "validation_failed", "Validation failed", ToErrors(ve)),
         _ => (StatusCodes.Status500InternalServerError, "internal_error", "An unexpected error occurred", null),
     };

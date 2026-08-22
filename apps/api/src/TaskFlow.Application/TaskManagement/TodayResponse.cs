@@ -59,6 +59,15 @@ public sealed record TodayTaskResponse
     /// </summary>
     public required IReadOnlyList<Guid> Labels { get; init; }
 
+    /// <summary>
+    /// The owning cycle's id (slice 011, D16), or null. Hand-copied like every flattened field —
+    /// the slice-006 flattening gap must not recur, so <see cref="From"/> threads it explicitly.
+    /// </summary>
+    public Guid? CycleId { get; init; }
+
+    /// <summary>The rollover-written "carried over" flag (slice 011, D7). ALWAYS present.</summary>
+    public required bool CarriedOver { get; init; }
+
     /// <summary>True when <c>due_date</c> is before the start of today-Warsaw (overdue incomplete). Today-only.</summary>
     public required bool IsOverdue { get; init; }
 
@@ -84,6 +93,8 @@ public sealed record TodayTaskResponse
             Description = t.Description,
             Assignees = t.Assignees,
             Labels = t.Labels,
+            CycleId = t.CycleId,
+            CarriedOver = t.CarriedOver,
             IsOverdue = isOverdue,
         };
     }

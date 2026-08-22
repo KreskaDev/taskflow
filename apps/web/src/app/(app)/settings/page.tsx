@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "@/hooks/useSession";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
+import { CycleDurationField } from "@/components/cycles/CycleDurationField";
 import { DeleteAccountDialog } from "@/components/ui/DeleteAccountDialog";
 import styles from "./settings.module.css";
 
@@ -56,6 +57,8 @@ export default function SettingsPage() {
           {/* Sign-out (INV-005; re-homed here from the pre-019 header during the shell
               rebuild): a plain form POST to the BFF route — works without client JS
               (Constitution I, FR-054). */}
+          {/* Slice 011 (FR-015/D8): the per-user default cycle duration under the profile section. */}
+          <CycleDurationField />
           <form method="post" action="/api/auth/signout">
             <Button type="submit" variant="secondary">
               Wyloguj

@@ -8,6 +8,7 @@ import { TaskEditor, type TaskEditorFields } from "@/components/tasks/TaskEditor
 import { RescheduleInput } from "@/components/tasks/RescheduleInput";
 import { AssigneePicker } from "@/components/tasks/AssigneePicker";
 import { PriorityPicker } from "@/components/tasks/PriorityPicker";
+import { CyclePicker } from "@/components/cycles/CyclePicker";
 import { LabelSelector } from "@/components/labels/LabelSelector";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -54,8 +55,16 @@ interface DailyViewProps {
 export function DailyView({ label, groups, projectName, emptyMessage, emptyAction, loading = false }: DailyViewProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { setTaskDone, setTaskPriority, rescheduleTask, editTask, setTaskAssignees, setTaskLabels, deleteTask } =
-    useTaskMutations();
+  const {
+    setTaskDone,
+    setTaskPriority,
+    rescheduleTask,
+    editTask,
+    setTaskAssignees,
+    setTaskLabels,
+    setTaskCycle,
+    deleteTask,
+  } = useTaskMutations();
   const { duplicateTask } = useDuplicateTask();
 
   const flat = useMemo(() => groups.flatMap((g) => g.tasks), [groups]);
@@ -65,6 +74,7 @@ export function DailyView({ label, groups, projectName, emptyMessage, emptyActio
   const [assignId, setAssignId] = useState<string | null>(null);
   const [labelId, setLabelId] = useState<string | null>(null);
   const [priorityId, setPriorityId] = useState<string | null>(null);
+  const [cycleId, setCycleId] = useState<string | null>(null);
 
   // Keep the selection in range as the list changes.
   useEffect(() => {
@@ -87,6 +97,7 @@ export function DailyView({ label, groups, projectName, emptyMessage, emptyActio
     onOpenPriority: () => setPriorityId(task.id),
     onOpenReschedule: () => setRescheduleId(task.id),
     onOpenLabels: () => setLabelId(task.id),
+    onOpenCycle: () => setCycleId(task.id),
     onOpenAssign: task.projectId != null ? () => setAssignId(task.id) : undefined,
     onDuplicate: () => duplicateTask(task),
     onOpenDetails: () => router.push(`${pathname}?task=${task.id}`),
@@ -200,6 +211,15 @@ export function DailyView({ label, groups, projectName, emptyMessage, emptyActio
           current={byId(priorityId)!.priority}
           onClose={() => setPriorityId(null)}
           onSelect={(priority) => setTaskPriority(priorityId!, priority)}
+        />
+      ) : null}
+
+      {byId(cycleId) ? (
+        <CyclePicker
+          open
+          current={byId(cycleId)!.cycleId ?? null}
+          onClose={() => setCycleId(null)}
+          onSelect={(target) => setTaskCycle(cycleId!, target)}
         />
       ) : null}
     </div>
