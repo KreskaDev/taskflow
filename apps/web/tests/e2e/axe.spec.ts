@@ -293,8 +293,9 @@ test.describe("axe AA — cycle view (slice 011)", () => {
  */
 test.describe("axe AA — recurrence field (slice 012)", () => {
   for (const palette of PALETTES) {
-    test(`editor + drawer with „Powtarzanie” open in ${palette}: zero WCAG 2.1 AA violations`, async ({ browser }) => {
-      const { page, context, profile } = await signedInPage(browser, `axe-recurrence-${palette}`);
+    test(`editor + drawer with „Powtarzanie” open in ${palette}: zero WCAG 2.1 AA violations`, async ({ browser }, testInfo) => {
+      // Unique user per test × attempt — a CI retry must not see the first attempt's seeded row.
+      const { page, context, profile } = await signedInPage(browser, `axe-recurrence-${palette}-r${testInfo.retry}`);
       const api = apiAs(profile.id);
       const noon = `${new Date().toISOString().slice(0, 10)}T12:00:00Z`;
       const task = await api.createTask({ title: "Zadanie cykliczne AA", position: "a0", dueDate: noon, dueHasTime: false });
@@ -313,7 +314,7 @@ test.describe("axe AA — recurrence field (slice 012)", () => {
       // 1) Today's editor with „Co N dni" (number input) — then the weekday checkboxes and the due guard.
       await page.goto("/today");
       await page.waitForLoadState("networkidle");
-      await expect(page.getByRole("row").filter({ hasText: "Zadanie cykliczne AA" })).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByRole("row").filter({ hasText: "Zadanie cykliczne AA" }).first()).toBeVisible({ timeout: 30_000 });
       await setPalette(page, palette);
       await page.getByRole("button", { name: "Edytuj „Zadanie cykliczne AA”" }).click();
       const dialog = page.getByRole("dialog", { name: "Edytuj zadanie" });
@@ -335,6 +336,9 @@ test.describe("axe AA — recurrence field (slice 012)", () => {
       // Park the pointer: the row title's HOVER accent (a pre-slice-010 token pairing, 4.49:1 on the dark
       // palettes) is not this slice's surface — the audit targets the drawer's resting state.
       await page.mouse.move(0, 0);
+      // The `?task=` drawer route update briefly re-renders <head> under `next dev` — audit once the title has settled
+      // (axe's document-title rule otherwise flags the transient empty title).
+      await expect(page).toHaveTitle(/TaskFlow/);
       await auditCurrentPage(page, `drawer recurrence × ${palette}`);
 
       await context.close();
