@@ -60,6 +60,34 @@ public sealed class TaskRepository(AppDbContext db) : ITaskRepository
             .ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Slice 013 (D4): dispatch on the CONTAINING resource — <c>(project_id IS NULL AND created_by = caller) OR
+    /// project_id ∈ readableProjectIds</c>, as an OR-of-equalities over the value-converted nullable FK (never
+    /// Contains/IN — the slice-005 trap). Unlike the Today predicate, authorship alone does NOT keep a projected
+    /// task readable once its project is gone from the caller's set (FR-066: provenance only).
+    /// </summary>
+    private static System.Linq.Expressions.Expression<Func<TaskEntity, bool>> BuildSearchVisibilityPredicate(
+        UserId caller, IReadOnlyCollection<ProjectId> readableProjectIds)
+    {
+        var t = System.Linq.Expressions.Expression.Parameter(typeof(TaskEntity), "t");
+        var projectId = System.Linq.Expressions.Expression.Property(t, nameof(TaskEntity.ProjectId));
+
+        System.Linq.Expressions.Expression body = System.Linq.Expressions.Expression.AndAlso(
+            System.Linq.Expressions.Expression.Equal(projectId, System.Linq.Expressions.Expression.Constant(null, typeof(ProjectId?))),
+            System.Linq.Expressions.Expression.Equal(
+                System.Linq.Expressions.Expression.Property(t, nameof(TaskEntity.CreatedBy)),
+                System.Linq.Expressions.Expression.Constant(caller, typeof(UserId))));
+
+        foreach (var id in readableProjectIds)
+        {
+            body = System.Linq.Expressions.Expression.OrElse(
+                body,
+                System.Linq.Expressions.Expression.Equal(projectId, System.Linq.Expressions.Expression.Constant((ProjectId?)id, typeof(ProjectId?))));
+        }
+
+        return System.Linq.Expressions.Expression.Lambda<Func<TaskEntity, bool>>(body, t);
+    }
+
     private static System.Linq.Expressions.Expression<Func<TaskEntity, bool>> BuildReadableVisibilityPredicate(
         UserId caller, IReadOnlyCollection<ProjectId> sharedProjectIds)
     {
@@ -139,6 +167,39 @@ public sealed class TaskRepository(AppDbContext db) : ITaskRepository
         db.Database.ExecuteSqlInterpolatedAsync(
             $"DELETE FROM task_assignees ta USING tasks t WHERE ta.task_id = t.id AND t.project_id = {projectId.Value} AND ta.user_id = {userId.Value}",
             cancellationToken);
+
+    public async Task<IReadOnlyList<TaskEntity>> SearchReadableAsync(
+        UserId caller,
+        IReadOnlyCollection<ProjectId> readableProjectIds,
+        IReadOnlyList<string> tokens,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(readableProjectIds);
+        ArgumentNullException.ThrowIfNull(tokens);
+        if (tokens.Count == 0)
+        {
+            return [];
+        }
+
+        var query = db.Tasks
+            .Where(t => t.DeletedAt == null)
+            .Where(BuildSearchVisibilityPredicate(caller, readableProjectIds));
+
+        // Token-AND: one ILIKE pair per token (title OR description); patterns are literal (metacharacters escaped).
+        foreach (var token in tokens)
+        {
+            var pattern = TaskFlow.Application.TaskManagement.Search.SearchTokens.ContainsPattern(token);
+            query = query.Where(t => EF.Functions.ILike(t.Title, pattern, "\\") || EF.Functions.ILike(t.Description ?? "", pattern, "\\"));
+        }
+
+        return await query
+            .OrderByDescending(t => t.UpdatedAt)
+            .ThenBy(t => t.Id)
+            .Take(limit)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
 
     public Task<TaskEntity?> FindLiveSuccessorAsync(TaskId predecessorId, CancellationToken cancellationToken)
     {

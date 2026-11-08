@@ -114,6 +114,20 @@ public interface ITaskRepository
     /// </summary>
     Task<TaskEntity?> FindLiveSuccessorAsync(TaskId predecessorId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Caller-readable, non-deleted tasks whose title OR description contains EVERY token (case-insensitive
+    /// <c>ILIKE</c>, literal — slice 013 D2/D4), capped at <paramref name="limit"/> candidates for in-memory ranking.
+    /// Readability dispatches on the CONTAINING resource (FR-065/066): an unprojected task is readable iff
+    /// <c>created_by = caller</c>; a projected task iff its project is in <paramref name="readableProjectIds"/>
+    /// (owned ∪ current memberships) — a former member's own-authored tasks of a left project are NOT readable.
+    /// </summary>
+    Task<IReadOnlyList<TaskEntity>> SearchReadableAsync(
+        UserId caller,
+        IReadOnlyCollection<ProjectId> readableProjectIds,
+        IReadOnlyList<string> tokens,
+        int limit,
+        CancellationToken cancellationToken);
+
     void Add(TaskEntity task);
 
     /// <summary>Stages an existing task for HARD deletion (physical row removal).</summary>

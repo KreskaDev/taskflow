@@ -46,6 +46,21 @@ public interface IProjectRepository
     /// </summary>
     Task<Project?> FindByIdAsync(ProjectId id, CancellationToken cancellationToken);
 
+    /// <summary>The ids of every live project the owner owns (personal AND shared-owned, both archive states) — slice 013 D4.</summary>
+    Task<IReadOnlyList<ProjectId>> ListOwnedProjectIdsAsync(UserId owner, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Live (not soft-deleted) projects the caller owns OR is a current member of (<paramref name="sharedProjectIds"/>),
+    /// BOTH archive states (US-10.AS-06), whose name contains every token (slice 013 D2/D4/D5), capped at
+    /// <paramref name="limit"/> candidates for in-memory ranking.
+    /// </summary>
+    Task<IReadOnlyList<Project>> SearchReadableAsync(
+        UserId caller,
+        IReadOnlyCollection<ProjectId> sharedProjectIds,
+        IReadOnlyList<string> tokens,
+        int limit,
+        CancellationToken cancellationToken);
+
     /// <summary>
     /// Loads the NON-deleted projects whose ids are in <paramref name="ids"/>, filtered to the ACTIVE set
     /// (<paramref name="includeArchived"/> = false) or the ARCHIVED set (true) — the two disjoint sidebar

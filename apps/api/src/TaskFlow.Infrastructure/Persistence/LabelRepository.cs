@@ -18,6 +18,28 @@ public sealed class LabelRepository(AppDbContext db) : ILabelRepository
     public Task<Label?> FindOwnedAsync(LabelId id, UserId owner, CancellationToken cancellationToken) =>
         db.Labels.FirstOrDefaultAsync(l => l.Id == id && l.OwnerId == owner, cancellationToken);
 
+    public async Task<IReadOnlyList<Label>> SearchForOwnerAsync(UserId owner, IReadOnlyList<string> tokens, int limit, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(tokens);
+        if (tokens.Count == 0)
+        {
+            return [];
+        }
+
+        var query = db.Labels.Where(l => l.OwnerId == owner);
+        foreach (var token in tokens)
+        {
+            var pattern = TaskFlow.Application.TaskManagement.Search.SearchTokens.ContainsPattern(token);
+            query = query.Where(l => EF.Functions.ILike(l.Name, pattern, "\\"));
+        }
+
+        return await query
+            .OrderBy(l => l.Name)
+            .Take(limit)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public async Task<IReadOnlyList<Label>> ListForOwnerAsync(UserId owner, CancellationToken cancellationToken) =>
         await db.Labels
             .Where(l => l.OwnerId == owner)

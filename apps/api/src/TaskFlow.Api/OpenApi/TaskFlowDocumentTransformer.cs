@@ -48,6 +48,8 @@ internal sealed class TaskFlowDocumentTransformer : IOpenApiDocumentTransformer
 
         // Stable operationIds + a documented 401 on the authenticated user endpoints (deny-by-default).
         SetOperation(document, "/api/users/ensure", OperationType.Post, "ensureUser");
+        // slice 013 (contracts/search-api.md): the access-scoped palette search — a blank q is a 200 with empty buckets.
+        SetOperation(document, "/api/search", OperationType.Get, "search", 422);
         SetOperation(document, "/api/users/me", OperationType.Get, "getCurrentUser");
         SetOperation(document, "/api/users/me", OperationType.Delete, "deleteAccount");
 
