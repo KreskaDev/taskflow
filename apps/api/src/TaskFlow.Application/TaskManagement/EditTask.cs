@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using FluentValidation;
 using TaskFlow.Application.Authorization;
 using TaskFlow.Application.Errors;
+using TaskFlow.Application.TaskManagement.Recurrence;
 using ProjectId = TaskFlow.Domain.TaskManagement.ProjectId;
 using TaskId = TaskFlow.Domain.TaskManagement.TaskId;
 
@@ -41,6 +42,9 @@ public sealed record EditTask
 
     /// <summary>The owning project, or null for the Inbox.</summary>
     public required ProjectId? ProjectId { get; init; }
+
+    /// <summary>The recurrence rule (slice 012, ENT-05), or null — part of the whole-object replace (D11).</summary>
+    public required RecurrenceRuleDto? RecurrenceRule { get; init; }
 
     /// <summary>The caller's last-seen optimistic-concurrency token (R4).</summary>
     public required int Version { get; init; }
@@ -87,6 +91,11 @@ public sealed class EditTaskValidator : AbstractValidator<EditTask>
         RuleFor(x => x.DueDate)
             .Must(DueDateRules.IsWithinPlausibleRange)
             .WithMessage(DueDateRules.RangeMessage);
+
+        // slice 012 (D1): the closed recurrence union — unknown type / foreign member / out-of-range value → 422.
+        RuleFor(x => x.RecurrenceRule)
+            .Must(RecurrenceRuleDto.IsValid)
+            .WithMessage("RecurrenceRule must be one of: daily, every_n_days (interval 2..365), weekdays (ISO 1..7, distinct, non-empty), monthly (dayOfMonth 1..31).");
     }
 }
 
@@ -156,7 +165,7 @@ public static class EditTaskHandler
 
         task.EditTask(
             command.Title, command.Description, command.Priority,
-            command.DueDate, command.DueHasTime, command.ProjectId, DateTime.UtcNow);
+            command.DueDate, command.DueHasTime, command.ProjectId, command.RecurrenceRule?.ToDomain(), DateTime.UtcNow);
         await tasks.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         var labelIds = await taskLabels.ListLabelIdsForTaskAsync(task.Id, currentUser.Id, cancellationToken).ConfigureAwait(false);

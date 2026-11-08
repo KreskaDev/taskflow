@@ -32,6 +32,9 @@ public sealed record EditTaskRequest
     /// <summary>The owning project, or null for the Inbox. Reuses the move-to-project ownership check on an actual move.</summary>
     public required Guid? ProjectId { get; init; }
 
+    /// <summary>The recurrence rule (slice 012, ENT-05) or null; REQUIRED so every caller carries the current rule through (D11).</summary>
+    public required Recurrence.RecurrenceRuleDto? RecurrenceRule { get; init; }
+
     /// <summary>The caller's last-seen optimistic-concurrency token (R4); a stale value → 409.</summary>
     public required int Version { get; init; }
 }

@@ -140,6 +140,13 @@ public sealed class TaskRepository(AppDbContext db) : ITaskRepository
             $"DELETE FROM task_assignees ta USING tasks t WHERE ta.task_id = t.id AND t.project_id = {projectId.Value} AND ta.user_id = {userId.Value}",
             cancellationToken);
 
+    public Task<TaskEntity?> FindLiveSuccessorAsync(TaskId predecessorId, CancellationToken cancellationToken)
+    {
+        // Equality over the value-converted nullable link (D2 — the ProjectId precedent translates; only
+        // Contains/IN is the slice-005 trap). The partial unique index guarantees ≤ 1 row.
+        return db.Tasks.FirstOrDefaultAsync(t => t.SpawnedFromId == predecessorId && t.DeletedAt == null, cancellationToken);
+    }
+
     public void Add(TaskEntity task)
     {
         ArgumentNullException.ThrowIfNull(task);
@@ -169,6 +176,18 @@ public sealed class TaskRepository(AppDbContext db) : ITaskRepository
             // interleaved-race backstop the in-handler version compare cannot close on its own (R4).
             throw new VersionConflictException(
                 "The task was modified by another request; reload and retry.", ex);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "ux_tasks_spawned_from_live" })
+        {
+            // slice 012 (D2/D7): a LIVE successor of this predecessor already exists — the deferred job and an
+            // interleaved spawn raced. Detach the staged successor so Wolverine's commit-flush cannot re-attempt
+            // the insert (the TaskLabelRepository lesson), then signal the handler to no-op.
+            foreach (var entry in db.ChangeTracker.Entries<TaskEntity>().Where(e => e.State == EntityState.Added).ToList())
+            {
+                entry.State = EntityState.Detached;
+            }
+
+            throw new SuccessorAlreadyExistsException("A live successor of this recurring instance already exists.", ex);
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {

@@ -236,6 +236,7 @@ public static class TaskEndpoints
             DueDate = request.DueDate,
             DueHasTime = request.DueHasTime,
             ProjectId = request.ProjectId is { } projectId ? ProjectId.From(projectId) : null,
+            RecurrenceRule = request.RecurrenceRule,
             Version = request.Version,
         });
     }

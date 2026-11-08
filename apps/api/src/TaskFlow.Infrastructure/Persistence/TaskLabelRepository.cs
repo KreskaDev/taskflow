@@ -129,4 +129,40 @@ public sealed class TaskLabelRepository(AppDbContext db) : ITaskLabelRepository
             .GroupBy(r => r.TaskId)
             .ToDictionary(g => g.Key, g => (IReadOnlyList<Guid>)g.Select(x => x.LabelId).ToList());
     }
+
+    public async Task CopyAllAsync(TaskId sourceTaskId, TaskId targetTaskId, CancellationToken cancellationToken)
+    {
+        // EVERY owner's rows (slice 012, D5): a recurrence spawn has no caller, so each member's own labels follow.
+        var sourceLabelIds = await db.TaskLabels
+            .Where(tl => tl.TaskId == sourceTaskId)
+            .Select(tl => tl.LabelId)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var existing = await db.TaskLabels
+            .Where(tl => tl.TaskId == targetTaskId)
+            .Select(tl => tl.LabelId)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var toAdd = sourceLabelIds.Except(existing).ToList();
+        if (toAdd.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var labelId in toAdd)
+        {
+            db.TaskLabels.Add(new TaskLabel(targetTaskId, labelId));
+        }
+
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation or PostgresErrorCodes.ForeignKeyViolation })
+        {
+            // A concurrent apply or a concurrently deleted label: the copy is best-effort and idempotent — detach the
+            // pending rows so the commit-flush cannot re-attempt them (the SetForOwnerAsync lesson).
+            DetachPendingTaskLabels();
+        }
+    }
 }

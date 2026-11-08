@@ -6,4 +6,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- slice 012 (D3): the recurrence calendar (Europe/Warsaw, DST via tzdb) lives in the Domain value object. -->
+    <PackageReference Include="NodaTime" Version="3.2.0" />
+  </ItemGroup>
+
 </Project>

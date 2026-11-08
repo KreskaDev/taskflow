@@ -116,6 +116,11 @@ builder.Host.UseWolverine(opts =>
     // outbox-backed, transactional destination — the Constitution VII 30s-undo window (R5).
     opts.PublishMessage<ReapDeletedComment>().ToLocalQueue("comment-reaper");
 
+    // slice 012: SpawnRecurrenceSuccessor is published (ScheduledTime = start of the due day in Warsaw) from an
+    // EARLY completion in SetTaskStatus and processed off a durable local queue (mirrors task-reaper) so the
+    // deferred spawn is outbox-enrolled with the status write and survives restarts (FR-009 / EC-05, D4/D7).
+    opts.PublishMessage<SpawnRecurrenceSuccessor>().ToLocalQueue("recurrence-spawn");
+
     // Single-node deployment (one VPS, ~10 users): Solo durability skips the distributed
     // leader-election/agent machinery, giving faster, cleaner startup/shutdown (also avoids a
     // background-agent logger race during WebApplicationFactory teardown in integration tests).
@@ -146,7 +151,10 @@ builder.Host.UseWolverine(opts =>
             // no caller) are processed off the durable queue (no HttpContext) — same exemption as
             // ReapDeletedTask / the membership events (R5/R7).
             && chain.MessageType != typeof(UserMentioned)
-            && chain.MessageType != typeof(ReapDeletedComment));
+            && chain.MessageType != typeof(ReapDeletedComment)
+            // slice 012: the deferred recurrence spawn runs off the durable queue (no HttpContext, no caller — it
+            // acts in the predecessor's context, D7) — same exemption as the reapers.
+            && chain.MessageType != typeof(SpawnRecurrenceSuccessor));
 });
 
 // --- Built-in .NET 9 OpenAPI document at /openapi/v1.json (R5) ---

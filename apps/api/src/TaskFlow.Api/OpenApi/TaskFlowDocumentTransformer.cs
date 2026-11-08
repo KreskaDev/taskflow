@@ -32,6 +32,8 @@ internal sealed class TaskFlowDocumentTransformer : IOpenApiDocumentTransformer
         // Cycle lifecycle guards (slice 011, contracts/cycles-api.md D16):
         "no_next_cycle", "cycle_not_planned", "cycle_active_conflict",
         "cycle_not_active", "cycle_not_empty", "cycle_active_delete_forbidden",
+        // Recurrence due-date guard (slice 012, contracts/recurrence-api.md D16):
+        "recurrence_requires_due_date",
     ];
 
     public Task TransformAsync(

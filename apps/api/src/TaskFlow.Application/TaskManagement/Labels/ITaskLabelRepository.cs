@@ -33,4 +33,11 @@ public interface ITaskLabelRepository
     /// </summary>
     Task<IReadOnlyDictionary<TaskId, IReadOnlyList<Guid>>> ListLabelIdsForTasksAsync(
         IReadOnlyCollection<TaskId> taskIds, UserId owner, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Copies EVERY owner's label rows of <paramref name="sourceTaskId"/> onto <paramref name="targetTaskId"/> (slice 012, FR-008
+    /// carry-forward, research D5): the per-user relation means each member's own labels follow the successor.
+    /// Idempotent (an already-present pair is a no-op). Saves immediately.
+    /// </summary>
+    Task CopyAllAsync(TaskId sourceTaskId, TaskId targetTaskId, CancellationToken cancellationToken);
 }

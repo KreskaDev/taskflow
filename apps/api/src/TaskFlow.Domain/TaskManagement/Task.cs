@@ -122,8 +122,23 @@ public sealed class Task : AggregateRoot<TaskId>
     /// </summary>
     public bool CarriedOver { get; private set; }
 
-    /// <summary>Reserved (slice 012) — recurrence rule (jsonb). Mapped but unused this slice.</summary>
-    public string? RecurrenceRule { get; private set; }
+    /// <summary>
+    /// The recurrence rule (ENT-05, slice 012, FR-007) or null for a one-off task. Persisted as JSON in
+    /// the <c>recurrence_rule</c> jsonb column through a value converter (research D1). Invariant (D9):
+    /// a rule REQUIRES a due date — <see cref="SetRecurrence"/>, <see cref="EditTask"/> and
+    /// <see cref="Reschedule"/> all enforce it via <see cref="RecurrenceRequiresDueDateException"/>.
+    /// </summary>
+    public RecurrenceRule? RecurrenceRule { get; private set; }
+
+    /// <summary>
+    /// The instance this task was spawned from by recurrence (slice 012, research D2), or null. A
+    /// value-converted <c>TaskId?</c> on the <see cref="ProjectId"/> precedent (the self-FK needs the PK's CLR
+    /// type); it is only ever compared by EQUALITY — never <c>Contains</c>/IN (the slice-005 Npgsql trap).
+    /// Backed by the partial unique index <c>ux_tasks_spawned_from_live</c> (one LIVE successor per predecessor —
+    /// FR-009 idempotency); cleared by <see cref="DetachSuccessorLink"/> when the predecessor is reopened
+    /// after this successor was already completed.
+    /// </summary>
+    public TaskId? SpawnedFromId { get; private set; }
 
     /// <summary>Creates a new task with no due date. The id and position are client-supplied (FR-001).</summary>
     /// <param name="id">Client-generated identity.</param>
@@ -288,8 +303,85 @@ public sealed class Task : AggregateRoot<TaskId>
     /// <param name="utcNow">The current UTC time (injected for testability).</param>
     public void Reschedule(DateTime? dueDate, bool? dueHasTime, DateTime utcNow)
     {
+        // slice 012 (D9): clearing the due of a recurring task is refused — the rule anchors on it.
+        if (dueDate is null && RecurrenceRule is not null)
+        {
+            throw new RecurrenceRequiresDueDateException();
+        }
+
         DueDate = dueDate;
         DueHasTime = dueHasTime;
+        Touch(utcNow);
+    }
+
+    /// <summary>
+    /// Sets or clears the recurrence rule (slice 012, US-06.AS-01, research D9). A non-null rule requires a
+    /// due date (<see cref="RecurrenceRequiresDueDateException"/> otherwise). Same rule = idempotent no-op.
+    /// </summary>
+    /// <param name="rule">The new rule, or null to stop recurring (existing successors are untouched — D8).</param>
+    /// <param name="utcNow">The current UTC time (injected for testability).</param>
+    public void SetRecurrence(RecurrenceRule? rule, DateTime utcNow)
+    {
+        if (rule is not null && DueDate is null)
+        {
+            throw new RecurrenceRequiresDueDateException();
+        }
+
+        if (Equals(RecurrenceRule, rule))
+        {
+            return;
+        }
+
+        RecurrenceRule = rule;
+        Touch(utcNow);
+    }
+
+    /// <summary>
+    /// Builds the NEXT instance of a recurring task (slice 012, FR-008, research D5 / data-model.md successor
+    /// matrix): title, description, priority, project, rule (anchor included) and the due-time flag are
+    /// copied; the due date becomes <see cref="RecurrenceRule.NextDueAfter"/>; status resets to
+    /// <see cref="TaskStatus.Backlog"/> with no <c>completedAt</c>; fresh timestamps and version 0; NO cycle
+    /// assignment and no carried-over flag; <see cref="SpawnedFromId"/> links back to the predecessor.
+    /// Assignees are NOT copied here — the Application helper re-validates them against current membership.
+    /// </summary>
+    /// <param name="predecessor">The completed recurring instance (must carry a rule and a due date).</param>
+    /// <param name="id">The successor's identity (server-generated).</param>
+    /// <param name="position">The successor's fractional rank (adjacent after the predecessor).</param>
+    /// <param name="utcNow">The current UTC time (injected for testability).</param>
+    public static Task SpawnSuccessor(Task predecessor, TaskId id, string position, DateTime utcNow)
+    {
+        ArgumentNullException.ThrowIfNull(predecessor);
+        if (predecessor.RecurrenceRule is not { } rule || predecessor.DueDate is not { } due)
+        {
+            throw new InvalidOperationException("Only a recurring task with a due date can spawn a successor.");
+        }
+
+        var hasTime = predecessor.DueHasTime ?? false;
+        var successor = new Task(id, predecessor.CreatedBy, predecessor.Title, position, utcNow, rule.NextDueAfter(due, hasTime), hasTime)
+        {
+            Description = predecessor.Description,
+            Priority = predecessor.Priority,
+            ProjectId = predecessor.ProjectId,
+            RecurrenceRule = rule,
+            SpawnedFromId = predecessor.Id,
+        };
+        return successor;
+    }
+
+    /// <summary>
+    /// Severs this successor's link to its predecessor (slice 012, research D6): called when the predecessor
+    /// is reopened AFTER this successor was already completed — the chain has moved on, so the successor
+    /// stays and the predecessor's slot frees up for a fresh spawn. Idempotent.
+    /// </summary>
+    /// <param name="utcNow">The current UTC time (injected for testability).</param>
+    public void DetachSuccessorLink(DateTime utcNow)
+    {
+        if (SpawnedFromId is null)
+        {
+            return;
+        }
+
+        SpawnedFromId = null;
         Touch(utcNow);
     }
 
@@ -307,10 +399,18 @@ public sealed class Task : AggregateRoot<TaskId>
     /// <param name="dueDate">The resolved due-date UTC instant, or null.</param>
     /// <param name="dueHasTime">The <c>DueDate.has_time</c> flag, or null.</param>
     /// <param name="projectId">The owning project, or null for the Inbox.</param>
+    /// <param name="recurrenceRule">The recurrence rule (slice 012), or null; requires <paramref name="dueDate"/> when set (D9).</param>
     /// <param name="utcNow">The current UTC time (injected for testability).</param>
-    public void EditTask(string title, string? description, string? priority, DateTime? dueDate, bool? dueHasTime, ProjectId? projectId, DateTime utcNow)
+    public void EditTask(string title, string? description, string? priority, DateTime? dueDate, bool? dueHasTime, ProjectId? projectId, RecurrenceRule? recurrenceRule, DateTime utcNow)
     {
+        // slice 012 (D9): the whole-object save may not leave a rule without a due date.
+        if (recurrenceRule is not null && dueDate is null)
+        {
+            throw new RecurrenceRequiresDueDateException();
+        }
+
         Title = NormalizeTitle(title);
+        RecurrenceRule = recurrenceRule;
         Description = NormalizeDescription(description);
         Priority = NormalizePriority(priority);
         DueDate = dueDate;

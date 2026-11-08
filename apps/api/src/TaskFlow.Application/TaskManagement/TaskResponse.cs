@@ -68,6 +68,9 @@ public sealed record TaskResponse
     /// <summary>The rollover-written "carried over" flag (slice 011, D7). ALWAYS present; drives the „przeniesione" chip.</summary>
     public required bool CarriedOver { get; init; }
 
+    /// <summary>The recurrence rule (slice 012, ENT-05) or null (D12). Nullable; NOT in <c>required[]</c>.</summary>
+    public Recurrence.RecurrenceRuleDto? RecurrenceRule { get; init; }
+
     /// <summary>
     /// Projects a <see cref="TaskEntity"/> aggregate to its lean wire model. <paramref name="callerLabelIds"/>
     /// is REQUIRED (slice 006, R6): labels are NOT on the Task aggregate (they are a per-user relation), so
@@ -97,6 +100,7 @@ public sealed record TaskResponse
             Labels = callerLabelIds,
             CycleId = task.CycleId,
             CarriedOver = task.CarriedOver,
+            RecurrenceRule = Recurrence.RecurrenceRuleDto.FromDomain(task.RecurrenceRule),
         };
     }
 
