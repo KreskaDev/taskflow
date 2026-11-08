@@ -62,6 +62,20 @@ Web monorepo per plan.md: `apps/web` (Next.js 15) + `apps/api` (.NET 9). Feature
 - [ ] T026 Run the full suites per quickstart.md: web unit, `dotnet test` (verify the new `recurrence` shard filter partitions correctly — D14), full `pnpm --dir apps/web e2e` (incl. axe + tasks/daily/board/cycles regression), `gen:api` diff clean
 - [ ] T027 Walk quickstart.md manual steps 1–8 against the interactive stack and record the outcome in this file
 
+### T026 — verification record (2026-11-08, IN PROGRESS — run interrupted by host memory pressure)
+
+Layers 1–2 (static + web unit): lint 0 errors (20 pre-existing warnings on main), typecheck clean, audit:dead clean, web unit 638/638 (inventory gate + hex audit green).
+Layer 3 (API, Release): build green; unit 202/202; integration shards run sequentially:
+comments 48/48 · recurrence 46/47 (ONE failure: `UndoAndDeferredSpawnTests.Deferred_job_with_a_stale_completed_at_no_ops_and_the_re_completions_own_message_spawns` — passed in the two earlier Debug runs; suspected timing flake under memory pressure, NOT yet re-run) · identity-labels-infra 62/62 · tasks-core 126/126 · tasks-daily-triage 61/61 · sharing-assignment 100/100 · cycles: the run returned no result after 8 s (must be re-run; expected 60 → partition check vs `--list-tests` total 504 pending).
+Layer 4 (E2E full): NOT run — the chain was killed by the harness for low host memory before it started. Earlier targeted runs this day: recurrence 6/6, axe recurrence 4/4, drawer+daily-planning+tasks+board 40/40, [V] 144/144 in the linux image.
+`gen:api` diff clean after the T014 regeneration.
+
+Open before PR: re-run `cycles` + `recurrence` shards, run `pnpm --dir apps/web e2e` in full, then re-issue `/speckit-verify`.
+
+### T027 — manual walk (NOT yet executed)
+
+Quickstart steps 1–8 are covered 1:1 by the UI-driven `recurrence.spec.ts` journey (6 green); the interactive-stack walk is still owed.
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
