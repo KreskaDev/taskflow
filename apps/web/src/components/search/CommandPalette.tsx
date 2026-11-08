@@ -138,7 +138,7 @@ export function CommandPalette({ open, onClose, onNavigate, onAction }: CommandP
     projectId ? (projects ?? []).find((p) => p.id === projectId)?.name ?? "Projekt" : "Inbox";
 
   return (
-    <Dialog open={open} onClose={onClose} titleId={TITLE_ID}>
+    <Dialog open={open} onClose={onClose} titleId={TITLE_ID} size="wide">
       <div className={styles.palette}>
         <DialogTitle id={TITLE_ID}>{PALETTE_TITLE}</DialogTitle>
 
