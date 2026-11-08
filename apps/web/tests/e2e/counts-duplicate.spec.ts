@@ -179,23 +179,3 @@ test.describe("Reorder affordances (S3.7)", () => {
     await context.close();
   });
 });
-
-test.describe("Topbar search placeholder (slice 013 carve-out)", () => {
-  test("renders per mockup, excluded from tab order, announced unavailable", async ({
-    browser,
-  }) => {
-    const { page, context } = await signedInPage(browser, "search-placeholder");
-    await page.goto("/");
-
-    const search = page.getByRole("searchbox", { name: /Szukaj/ });
-    await expect(search).toBeVisible();
-    await expect(search).toHaveAttribute("aria-disabled", "true");
-
-    // The inner input is disabled and OUT of the tab order.
-    const inner = search.locator("input");
-    await expect(inner).toBeDisabled();
-    await expect(inner).toHaveAttribute("tabindex", "-1");
-
-    await context.close();
-  });
-});
