@@ -207,3 +207,25 @@ describe("TaskRow „przeniesione” chip (slice 011, D7/FR-044) [INV-164]", () 
     expect(screen.queryByText("przeniesione")).toBeNull();
   });
 });
+
+describe("TaskRow recurrence chip [INV-182]", () => {
+  it("renders the rule label as visible text with a 'powtarzanie:' qualifier (icon decorative)", () => {
+    renderRow(makeTask({ recurrenceRule: { type: "every_n_days", interval: 3 } } as Partial<TaskResponse>));
+    expect(screen.getByText("co 3 dni")).toBeTruthy();
+    expect(screen.getByRole("row", { name: /powtarzanie: co 3 dni/ })).toBeTruthy();
+  });
+
+  it("renders the weekday and monthly labels", () => {
+    renderRow(makeTask({ recurrenceRule: { type: "weekdays", weekdays: [1, 3] } } as Partial<TaskResponse>));
+    expect(screen.getByText("pn, śr")).toBeTruthy();
+    cleanup();
+    renderRow(makeTask({ recurrenceRule: { type: "monthly", dayOfMonth: 31 } } as Partial<TaskResponse>));
+    expect(screen.getByText("co miesiąc, 31.")).toBeTruthy();
+  });
+
+  it("renders no chip for a task without a rule", () => {
+    renderRow(makeTask());
+    expect(screen.queryByText(/powtarzanie:/)).toBeNull();
+    expect(screen.queryByText("codziennie")).toBeNull();
+  });
+});

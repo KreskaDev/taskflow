@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { RecurrenceField, type RecurrenceFieldChange } from "@/components/tasks/RecurrenceField";
 import { Button } from "@/components/ui/Button";
 import { Dialog, DialogActions, DialogTitle } from "@/components/ui/Dialog";
 import dialogStyles from "@/components/ui/Dialog.module.css";
@@ -9,11 +10,14 @@ import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import type { components } from "@/lib/api/generated/schema";
 import { useProjects } from "@/hooks/useProjects";
+import { parseRecurrenceRule, type RecurrenceRule } from "@/lib/recurrence";
 import type { Priority } from "@/lib/validation/task";
 
 type TaskResponse = components["schemas"]["TaskResponse"];
 
 const TITLE_ID = "task-editor-title";
+
+export const RECURRENCE_DUE_GUARD = "Zadanie cykliczne musi mieć termin — wyłącz powtarzanie albo ustaw termin";
 
 export interface TaskEditorFields {
   title: string;
@@ -22,6 +26,8 @@ export interface TaskEditorFields {
   dueDate: Date | null;
   dueHasTime: boolean | null;
   projectId: string | null;
+  /** The recurrence rule (slice 012, ENT-05) or null — rides the whole-object save (D11). */
+  recurrenceRule: RecurrenceRule | null;
 }
 
 interface TaskEditorProps {
@@ -51,6 +57,14 @@ export function TaskEditor({ open, task, onClose, onSave }: TaskEditorProps) {
   const [priority, setPriority] = useState<Priority>((task.priority as Priority) ?? null);
   const [clearDue, setClearDue] = useState(false);
   const [projectId, setProjectId] = useState<string | null>(task.projectId ?? null);
+  // slice 012: the recurrence draft — seeded from the task; the field reports rule + blocking error.
+  const [recurrence, setRecurrence] = useState<RecurrenceFieldChange>({
+    rule: parseRecurrenceRule(task.recurrenceRule),
+    error: null,
+  });
+  // Clarifications Q4 (D9): clearing the due of a recurring task is blocked — inline message, save disabled.
+  const dueGuard = clearDue && recurrence.rule !== null ? RECURRENCE_DUE_GUARD : null;
+  const canSave = recurrence.error === null && dueGuard === null;
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     // Ctrl+Enter (or Cmd+Enter) saves the whole object atomically (AS-07).
@@ -61,6 +75,7 @@ export function TaskEditor({ open, task, onClose, onSave }: TaskEditorProps) {
   };
 
   const save = () => {
+    if (!canSave) return;
     onSave({
       title: title.trim(),
       description: description.trim().length === 0 ? null : description.trim(),
@@ -69,6 +84,7 @@ export function TaskEditor({ open, task, onClose, onSave }: TaskEditorProps) {
       dueDate: clearDue ? null : task.dueDate ? new Date(task.dueDate) : null,
       dueHasTime: clearDue ? null : task.dueHasTime ?? null,
       projectId,
+      recurrenceRule: recurrence.rule,
     });
   };
 
@@ -132,6 +148,14 @@ export function TaskEditor({ open, task, onClose, onSave }: TaskEditorProps) {
           </select>
         </label>
 
+        {/* slice 012 (D10): the shared „Powtarzanie" field — disabled with a hint when the task has no due. */}
+        <RecurrenceField
+          rule={recurrence.rule}
+          dueDate={task.dueDate ? new Date(task.dueDate) : null}
+          dueHasTime={task.dueHasTime ?? false}
+          onChange={setRecurrence}
+        />
+
         {task.dueDate ? (
           <label className={dialogStyles.inlineRow}>
             <input type="checkbox" checked={clearDue} onChange={(event) => setClearDue(event.target.checked)} />
@@ -139,8 +163,16 @@ export function TaskEditor({ open, task, onClose, onSave }: TaskEditorProps) {
           </label>
         ) : null}
 
+        {dueGuard ? (
+          <p className={dialogStyles.guard} role="alert">
+            {dueGuard}
+          </p>
+        ) : null}
+
         <DialogActions>
-          <Button onClick={save}>Zapisz (Ctrl+Enter)</Button>
+          <Button onClick={save} disabled={!canSave}>
+            Zapisz (Ctrl+Enter)
+          </Button>
           <Button variant="secondary" onClick={onClose}>
             Anuluj (Esc)
           </Button>

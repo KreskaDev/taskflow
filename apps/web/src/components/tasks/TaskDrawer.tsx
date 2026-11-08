@@ -9,6 +9,8 @@ import { ProjectSelector } from "@/components/projects/ProjectSelector";
 import { AssigneePicker } from "@/components/tasks/AssigneePicker";
 import { CommentThread } from "@/components/tasks/CommentThread";
 import { PriorityPicker } from "@/components/tasks/PriorityPicker";
+import { RecurrenceField, type RecurrenceFieldChange } from "@/components/tasks/RecurrenceField";
+import { RECURRENCE_DUE_GUARD } from "@/components/tasks/TaskEditor";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -22,6 +24,7 @@ import { useProjects } from "@/hooks/useProjects";
 import { useSession } from "@/hooks/useSession";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
 import type { TaskResponse } from "@/hooks/useTasks";
+import { parseRecurrenceRule, type RecurrenceRule } from "@/lib/recurrence";
 import { taskTitleSchema } from "@/lib/validation/task";
 import styles from "./TaskDrawer.module.css";
 
@@ -61,6 +64,9 @@ export function TaskDrawer({ task, onClose }: TaskDrawerProps) {
   const [labelsOpen, setLabelsOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
+  // slice 012 (Clarifications Q4): clearing „Termin" on a recurring task is blocked with an inline message.
+  const [dueGuard, setDueGuard] = useState<string | null>(null);
+  const currentRule = parseRecurrenceRule(task.recurrenceRule);
 
   // Re-seed drafts when the drawer switches tasks (deep link / another row opened).
   useEffect(() => {
@@ -81,17 +87,38 @@ export function TaskDrawer({ task, onClose }: TaskDrawerProps) {
     renameTask(task.id, parsed.data);
   };
 
+  /** The whole-object edit body for the task as it stands, with one field overridden (slice 012 D11 — the rule rides along). */
+  const wholeObject = (overrides: { description?: string | null; recurrenceRule?: RecurrenceRule | null }) => ({
+    title: task.title,
+    description: overrides.description !== undefined ? overrides.description : (task.description ?? null),
+    priority: (task.priority ?? null) as "P0" | "P1" | "P2" | "P3" | null,
+    dueDate: task.dueDate ? new Date(task.dueDate) : null,
+    dueHasTime: task.dueDate ? (task.dueHasTime ?? false) : null,
+    projectId: task.projectId ?? null,
+    recurrenceRule: overrides.recurrenceRule !== undefined ? overrides.recurrenceRule : currentRule,
+  });
+
   const commitDescription = () => {
     const next = descriptionDraft.trim().length === 0 ? null : descriptionDraft;
     if ((task.description ?? null) === next) return;
-    editTask(task.id, {
-      title: task.title,
-      description: next,
-      priority: (task.priority ?? null) as "P0" | "P1" | "P2" | "P3" | null,
-      dueDate: task.dueDate ? new Date(task.dueDate) : null,
-      dueHasTime: task.dueDate ? (task.dueHasTime ?? false) : null,
-      projectId: task.projectId ?? null,
-    });
+    editTask(task.id, wholeObject({ description: next }));
+  };
+
+  /** slice 012 (D10): a valid field change saves through the SAME whole-object replace as the editor. */
+  const commitRecurrence = (change: RecurrenceFieldChange) => {
+    if (change.error !== null) return;
+    if (JSON.stringify(change.rule) === JSON.stringify(currentRule)) return;
+    setDueGuard(null);
+    editTask(task.id, wholeObject({ recurrenceRule: change.rule }));
+  };
+
+  const commitDue = (dueDate: Date | null, dueHasTime: boolean | null) => {
+    if (dueDate === null && currentRule !== null) {
+      setDueGuard(RECURRENCE_DUE_GUARD);
+      return;
+    }
+    setDueGuard(null);
+    rescheduleTask(task.id, dueDate, dueHasTime);
   };
 
   return (
@@ -162,7 +189,24 @@ export function TaskDrawer({ task, onClose }: TaskDrawerProps) {
             <DateInput
               id="drawer-due"
               label="Nowy termin (np. jutro, piątek, 30.06)"
-              onCommit={(dueDate, dueHasTime) => rescheduleTask(task.id, dueDate, dueHasTime)}
+              onCommit={commitDue}
+            />
+            {dueGuard ? (
+              <p className={styles.guard} role="alert">
+                {dueGuard}
+              </p>
+            ) : null}
+          </dd>
+        </div>
+
+        <div className={styles.field}>
+          <dt>Powtarzanie</dt>
+          <dd>
+            <RecurrenceField
+              rule={currentRule}
+              dueDate={task.dueDate ? new Date(task.dueDate) : null}
+              dueHasTime={task.dueHasTime ?? false}
+              onChange={commitRecurrence}
             />
           </dd>
         </div>
