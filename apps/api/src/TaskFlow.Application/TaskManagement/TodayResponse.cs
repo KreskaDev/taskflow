@@ -68,6 +68,9 @@ public sealed record TodayTaskResponse
     /// <summary>The rollover-written "carried over" flag (slice 011, D7). ALWAYS present.</summary>
     public required bool CarriedOver { get; init; }
 
+    /// <summary>The recurrence rule (slice 012) — the flattened row carries it so the daily views render the chip (D12).</summary>
+    public Recurrence.RecurrenceRuleDto? RecurrenceRule { get; init; }
+
     /// <summary>True when <c>due_date</c> is before the start of today-Warsaw (overdue incomplete). Today-only.</summary>
     public required bool IsOverdue { get; init; }
 
@@ -95,6 +98,7 @@ public sealed record TodayTaskResponse
             Labels = t.Labels,
             CycleId = t.CycleId,
             CarriedOver = t.CarriedOver,
+            RecurrenceRule = t.RecurrenceRule,
             IsOverdue = isOverdue,
         };
     }

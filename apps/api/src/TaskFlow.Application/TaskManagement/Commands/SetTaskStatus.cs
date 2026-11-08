@@ -2,7 +2,12 @@ using System.Diagnostics.CodeAnalysis;
 using FluentValidation;
 using TaskFlow.Application.Authorization;
 using TaskFlow.Application.Errors;
+using TaskFlow.Application.TaskManagement.Recurrence;
+using TaskFlow.Application.Time;
+using TaskFlow.Domain.TaskManagement.Events;
+using Wolverine;
 using DomainTaskStatus = TaskFlow.Domain.TaskManagement.TaskStatus;
+using TaskEntity = TaskFlow.Domain.TaskManagement.Task;
 using TaskId = TaskFlow.Domain.TaskManagement.TaskId;
 
 namespace TaskFlow.Application.TaskManagement.Commands;
@@ -86,6 +91,9 @@ public sealed class SetTaskStatusValidator : AbstractValidator<SetTaskStatus>
     Justification = "Wolverine-discovered handler; public concrete types are required for codegen (mirrors slice-002 CreateTaskHandler).")]
 public static class SetTaskStatusHandler
 {
+    /// <summary>The slice-014 undo window — the soft-deleted successor's reaper delay (mirrors DeleteTask).</summary>
+    private static readonly TimeSpan ReaperDelay = TimeSpan.FromSeconds(30);
+
     public static async Task<TaskResponse> Handle(
         SetTaskStatus command,
         ICurrentUser currentUser,
@@ -94,12 +102,16 @@ public static class SetTaskStatusHandler
         IProjectMembershipRepository members,
         IResourceAuthorizationPolicy authorization,
         Labels.ITaskLabelRepository taskLabels,
+        IMessageContext messages,
+        TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(currentUser);
         ArgumentNullException.ThrowIfNull(tasks);
         ArgumentNullException.ThrowIfNull(taskLabels);
+        ArgumentNullException.ThrowIfNull(messages);
+        ArgumentNullException.ThrowIfNull(timeProvider);
 
         var task = await TaskAccessGuards
             .LoadWritableTaskAsync(command.Id, EffectiveRole.Editor, currentUser, tasks, projects, members, authorization, cancellationToken)
@@ -110,11 +122,104 @@ public static class SetTaskStatusHandler
             throw new VersionConflictException();
         }
 
-        task.SetStatus(ToDomainStatus(command.Status), DateTime.UtcNow);
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var previous = task.Status;
+        var target = ToDomainStatus(command.Status);
+        task.SetStatus(target, now);
+
+        // slice 012 — recurrence side effects ride the SAME transaction as the status write (D4/D6). Only an
+        // ACTUAL transition counts: the same-status retry stays a pure no-op (never spawns, never deletes).
+        TaskEntity? spawned = null;
+        if (previous != target)
+        {
+            if (target == DomainTaskStatus.Done)
+            {
+                spawned = await HandleCompletionAsync(task, now, tasks, projects, members, messages, cancellationToken).ConfigureAwait(false);
+            }
+            else if (previous == DomainTaskStatus.Done)
+            {
+                await HandleReopenAsync(task, now, tasks, messages, cancellationToken).ConfigureAwait(false);
+            }
+        }
 
         await tasks.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        if (spawned is not null)
+        {
+            // The successor row exists now — copy every owner's label rows (FK on task_labels.task_id).
+            await RecurrenceSuccessor.StageLabelsAsync(task, spawned, taskLabels, cancellationToken).ConfigureAwait(false);
+        }
+
         var labelIds = await taskLabels.ListLabelIdsForTaskAsync(task.Id, currentUser.Id, cancellationToken).ConfigureAwait(false);
         return TaskResponse.From(task, labelIds);
+    }
+
+    /// <summary>
+    /// FR-008/FR-009: on or after the due DAY (Europe/Warsaw, day granularity for timed dues too) spawn now; before
+    /// it, schedule <see cref="SpawnRecurrenceSuccessor"/> for the start of the due day (EC-05 — never spawn early).
+    /// </summary>
+    private static async Task<TaskEntity?> HandleCompletionAsync(
+        TaskEntity task,
+        DateTime now,
+        ITaskRepository tasks,
+        IProjectRepository projects,
+        IProjectMembershipRepository members,
+        IMessageContext messages,
+        CancellationToken cancellationToken)
+    {
+        if (task.RecurrenceRule is null || task.DueDate is not { } due)
+        {
+            return null;
+        }
+
+        var dueDay = WarsawDayBounds.WarsawLocalDate(due);
+        var today = WarsawDayBounds.WarsawLocalDate(now);
+        if (today < dueDay)
+        {
+            await messages
+                .PublishAsync(
+                    new SpawnRecurrenceSuccessor(task.Id, task.CompletedAt!.Value),
+                    new DeliveryOptions { ScheduledTime = new DateTimeOffset(WarsawDayBounds.StartOfDayUtc(dueDay), TimeSpan.Zero) })
+                .ConfigureAwait(false);
+            return null;
+        }
+
+        if (await tasks.FindLiveSuccessorAsync(task.Id, cancellationToken).ConfigureAwait(false) is not null)
+        {
+            return null; // ≤ 1 live successor (FR-009) — nothing to do.
+        }
+
+        return await RecurrenceSuccessor.BuildAndAddAsync(task, tasks, projects, members, now, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// "Undo" (Clarifications Q1, D6): leaving <c>done</c> soft-deletes the live successor (restorable through the
+    /// reaper window) unless it is already done — then only the link is severed. Either way the slot is free again.
+    /// </summary>
+    private static async Task HandleReopenAsync(
+        TaskEntity task,
+        DateTime now,
+        ITaskRepository tasks,
+        IMessageContext messages,
+        CancellationToken cancellationToken)
+    {
+        var successor = await tasks.FindLiveSuccessorAsync(task.Id, cancellationToken).ConfigureAwait(false);
+        if (successor is null)
+        {
+            return;
+        }
+
+        if (successor.Status == DomainTaskStatus.Done)
+        {
+            successor.DetachSuccessorLink(now);
+            return;
+        }
+
+        successor.SoftDelete(now);
+        await messages
+            .PublishAsync(
+                new ReapDeletedTask(successor.Id, now),
+                new DeliveryOptions { ScheduleDelay = ReaperDelay })
+            .ConfigureAwait(false);
     }
 
     /// <summary>The wire→domain status map (the inverse of <c>TaskResponse.ToWireStatus</c>).</summary>

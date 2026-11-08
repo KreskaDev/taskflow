@@ -405,6 +405,10 @@ namespace TaskFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("recurrence_rule");
 
+                    b.Property<Guid?>("SpawnedFromId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("spawned_from_id");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -431,6 +435,11 @@ namespace TaskFlow.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ProjectId");
+
+                    b.HasIndex("SpawnedFromId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_tasks_spawned_from_live")
+                        .HasFilter("deleted_at IS NULL");
 
                     b.HasIndex("CreatedBy", "Position")
                         .HasDatabaseName("ix_tasks_created_by_position")
@@ -556,6 +565,11 @@ namespace TaskFlow.Infrastructure.Persistence.Migrations
                     b.HasOne("TaskFlow.Domain.TaskManagement.Project", null)
                         .WithMany()
                         .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("TaskFlow.Domain.TaskManagement.Task", null)
+                        .WithMany()
+                        .HasForeignKey("SpawnedFromId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.OwnsMany("TaskFlow.Domain.TaskManagement.TaskAssignee", "Assignees", b1 =>

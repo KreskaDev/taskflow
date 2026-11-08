@@ -48,6 +48,9 @@ public static class WarsawDayBounds
     /// </summary>
     public static LocalDate WarsawLocalDate(DateTime utcInstant) => ToInstant(utcInstant).InZone(Zone).Date;
 
+    /// <summary>The UTC instant at which the given Warsaw calendar date starts (slice 012 — the deferred-spawn trigger, D4).</summary>
+    public static DateTime StartOfDayUtc(LocalDate warsawDate) => Zone.AtStartOfDay(warsawDate).ToInstant().ToDateTimeUtc();
+
     private static Instant ToInstant(DateTime utc) =>
         // Treat the input as a UTC instant. EF reads timestamptz back with Kind=Utc and DateTime.UtcNow is
         // Utc; SpecifyKind normalizes a test-supplied Unspecified value so FromDateTimeUtc never throws.

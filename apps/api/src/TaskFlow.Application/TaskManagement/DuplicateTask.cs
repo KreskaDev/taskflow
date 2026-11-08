@@ -89,13 +89,14 @@ public static class DuplicateTaskHandler
         }
 
         // 3. Adjacency (D7): position directly after the source, before its context successor.
-        var successorPosition = await FindSuccessorPositionAsync().ConfigureAwait(false);
-        var position = PositionRank.BetweenAfter(source.Position, successorPosition);
+        var position = await AdjacentPosition.AfterAsync(source, tasks, cancellationToken).ConfigureAwait(false);
 
         // 4. Assemble the duplicate: fresh identity/status/timestamps, copied editable fields.
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var duplicate = TaskEntity.Create(command.NewTaskId, caller, source.Title, position, now);
-        duplicate.EditTask(source.Title, source.Description, source.Priority, source.DueDate, source.DueHasTime, source.ProjectId, now);
+        // slice 012: the duplicate copies the recurrence rule too (a duplicate of a recurring task recurs) —
+        // it is an independent chain (no spawned_from link), anchored on the same due date.
+        duplicate.EditTask(source.Title, source.Description, source.Priority, source.DueDate, source.DueHasTime, source.ProjectId, source.RecurrenceRule, now);
 
         if (source.ProjectId is { } projectId && source.Assignees.Count > 0)
         {
@@ -166,27 +167,6 @@ public static class DuplicateTaskHandler
                 .ListLabelIdsForTaskAsync(row.Id, caller, cancellationToken)
                 .ConfigureAwait(false);
             return TaskResponse.From(row, labels);
-        }
-
-        async Task<string?> FindSuccessorPositionAsync()
-        {
-            IReadOnlyList<TaskEntity> context;
-            if (source.ProjectId is { } pid)
-            {
-                // Project-scoped (D4): the successor search must see MEMBER-authored rows, else the
-                // duplicate can land on/past a member task instead of directly after its source.
-                context = await tasks.ListByProjectAsync(pid, cancellationToken).ConfigureAwait(false);
-            }
-            else
-            {
-                context = await tasks.ListOwnedAsync(caller, cancellationToken).ConfigureAwait(false);
-            }
-
-            return context
-                .Select(t => t.Position)
-                .Where(p => string.CompareOrdinal(p, source.Position) > 0)
-                .OrderBy(p => p, StringComparer.Ordinal)
-                .FirstOrDefault();
         }
     }
 }

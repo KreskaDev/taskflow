@@ -109,9 +109,34 @@ public sealed class TaskConfiguration : IEntityTypeConfiguration<TaskEntity>
             .HasDefaultValue(false)
             .IsRequired();
 
+        // slice 012 (D1): ENT-05 stored as JSON in the reserved jsonb column through the Domain value object's
+        // own (de)serialization — a malformed document throws at materialization, never silently coerces (VI).
         builder.Property(t => t.RecurrenceRule)
             .HasColumnName("recurrence_rule")
-            .HasColumnType("jsonb");
+            .HasColumnType("jsonb")
+            .HasConversion(
+                rule => rule!.ToJson(),
+                json => RecurrenceRule.Parse(json));
+
+        // slice 012 (D2): the predecessor link — value-converted TaskId? on the ProjectId precedent (equality-only
+        // comparisons; the slice-005 trap is Contains/IN over such a column, which nothing here does).
+        builder.Property(t => t.SpawnedFromId)
+            .HasColumnName("spawned_from_id")
+            .HasConversion(
+                id => id == null ? (Guid?)null : id.Value.Value,
+                value => value == null ? (TaskId?)null : TaskId.From(value.Value));
+
+        builder.HasOne<TaskEntity>()
+            .WithMany()
+            .HasForeignKey(t => t.SpawnedFromId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // ≤ 1 LIVE successor per predecessor (FR-009 idempotency); the partial predicate lets a re-completion
+        // after an undo (soft-deleted successor) insert a fresh one (Clarifications Q1).
+        builder.HasIndex(t => t.SpawnedFromId)
+            .IsUnique()
+            .HasDatabaseName("ux_tasks_spawned_from_live")
+            .HasFilter("deleted_at IS NULL");
 
         // created_by → users(id), ON DELETE CASCADE (NOT the EF default Restrict): slice-001's
         // hard-delete of the User row erases the user's personal tasks atomically (Constitution XI).

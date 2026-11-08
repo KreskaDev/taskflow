@@ -108,6 +108,12 @@ public interface ITaskRepository
     Task ClearAssigneesForUserInProjectAsync(ProjectId projectId, UserId userId, CancellationToken cancellationToken);
 
     /// <summary>Stages a newly created task for insertion.</summary>
+    /// <summary>
+    /// The LIVE (not soft-deleted) successor spawned from <paramref name="predecessorId"/> by recurrence, or null
+    /// (slice 012, research D2/D6). At most one exists — <c>ux_tasks_spawned_from_live</c>.
+    /// </summary>
+    Task<TaskEntity?> FindLiveSuccessorAsync(TaskId predecessorId, CancellationToken cancellationToken);
+
     void Add(TaskEntity task);
 
     /// <summary>Stages an existing task for HARD deletion (physical row removal).</summary>

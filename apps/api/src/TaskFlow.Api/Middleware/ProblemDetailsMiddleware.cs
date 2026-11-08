@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using TaskFlow.Application.Authorization;
 using TaskFlow.Application.Errors;
 using LastOwnerException = TaskFlow.Domain.TaskManagement.LastOwnerException;
+using RecurrenceRequiresDueDateException = TaskFlow.Domain.TaskManagement.RecurrenceRequiresDueDateException;
 
 namespace TaskFlow.Api.Middleware;
 
@@ -102,6 +103,8 @@ internal sealed class ProblemDetailsMiddleware(RequestDelegate next, ILogger<Pro
         CycleNotEmptyException => (StatusCodes.Status422UnprocessableEntity, "cycle_not_empty", "Cycle is not empty", null),
         CycleActiveDeleteForbiddenException => (StatusCodes.Status422UnprocessableEntity, "cycle_active_delete_forbidden", "Active cycle cannot be deleted", null),
         NoNextCycleException => (StatusCodes.Status422UnprocessableEntity, "no_next_cycle", "No next cycle", null),
+        // slice 012 (Clarifications Q4, D9): a recurring task must keep a due date — FR-049 recovery copy on the web.
+        RecurrenceRequiresDueDateException => (StatusCodes.Status422UnprocessableEntity, "recurrence_requires_due_date", "Recurring task requires a due date", null),
         ValidationException ve => (StatusCodes.Status422UnprocessableEntity, "validation_failed", "Validation failed", ToErrors(ve)),
         _ => (StatusCodes.Status500InternalServerError, "internal_error", "An unexpected error occurred", null),
     };
