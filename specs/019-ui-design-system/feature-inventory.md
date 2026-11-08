@@ -243,6 +243,30 @@ editor (daily views), the task details drawer (every surface), task rows on Inbo
 
 ---
 
+## P. Command palette & search (slice 013)
+
+New behaviors of slice 013 (contract `specs/013-command-palette-search/contracts/ui-palette.md`);
+rows added BEFORE their covering tests per the 019 gate convention. Screens: the topbar (every
+view), the command palette dialog, and the list headers of Inbox / Dziś / Nadchodzące /
+Przypisane / project List+Board / `/cycle`. No keyboard binding is introduced (FR-027 deferred).
+
+| ID | Given / When / Then | Realizes | Level |
+|---|---|---|---|
+| INV-188 | Given any signed-in view, When the topbar renders, Then a „Szukaj…" button (aria-label „Szukaj", aria-haspopup dialog) is present IN the tab order and activating it (click / Enter / Space) opens the command palette with its input focused; pressing `Ctrl+K` or `/` does nothing. | US-04 AS-01 (reinterpreted), FR-103, FR-027 deferred | [E]+[C] |
+| INV-189 | Given the palette is open, When the user presses Esc or clicks the overlay, Then it closes and focus returns to the „Szukaj…" button; while open focus is trapped inside the dialog. | US-04 AS-06, FR-101 | [E]+[C] |
+| INV-190 | Given the palette input, When the user types, Then the input is a combobox whose listbox of options follows `↑/↓` via aria-activedescendant and Enter activates the active option; every option is also a click target. | FR-043, FR-046, FR-103 | [C]+[A] |
+| INV-191 | Given an EMPTY query, When the palette renders, Then only the Akcje group shows the fixed catalogue — Nowy task, Nowy projekt, Nowy cykl, Przejdź: Inbox / Dziś / Nadchodzące / Przypisane / Cykl / Ustawienia — with NO shortcut column. | FR-032, FR-033 deferred | [C]+[E] |
+| INV-192 | Given tasks whose title OR description contains the query, When the user types it (any case; several tokens = all must match), Then they appear under Zadania with a location chip (Inbox / project name) and a due chip when due; selecting one navigates to `/?task=<id>` (Inbox) or `/projects/<pid>?task=<id>` (project) with the task's drawer open. | US-04 AS-02, AS-03, FR-032, FR-034 | [E]+[C] |
+| INV-193 | Given the user types „create project" (or „nowy projekt"), When results render, Then the „Nowy projekt" action appears; Enter executes it — the palette closes and the project form opens. „Nowy task" opens the capture dialog; „Nowy cykl" navigates to `/cycle` with its create dialog open. | US-04 AS-04, FR-034 | [E]+[C] |
+| INV-194 | Given a project name is typed, When results render, Then matching projects appear under Projekty and selecting one navigates to its view; an ARCHIVED project appears with the suffix „(zarchiwizowany)" and an inline „Przywróć" button that restores it in place. | US-04 AS-05, US-10 AS-06 | [E]+[C] |
+| INV-195 | Given a label name is typed, When results render, Then the caller's matching labels appear under Etykiety („Szukaj zadań z etykietą"); selecting one replaces the query with the label's name. | FR-032, FR-034 | [C] |
+| INV-196 | Given a non-empty query with no match in any bucket, When results settle, Then the empty state „Brak wyników dla „<q>"" with the hint „Spróbuj innego słowa" renders; on a failed search the FR-049 copy „Nie udało się wyszukać — spróbuj ponownie" renders with a „Spróbuj ponownie" action. After each settled fetch the polite live region announces „N wyników" / „Brak wyników". | FR-049, FR-101, FR-110 | [C] |
+| INV-197 | Given a task/project the caller cannot access (another user's personal task, a shared project they are not or no longer a member of), When they search its title/name, Then it never appears in results. | FR-065, FR-066, FR-067, FR-068, SC-013 | [C]+[E] |
+| INV-198 | Given any list view (Inbox, Dziś, Nadchodzące, Przypisane, project List and Board, `/cycle`), When its header renders, Then a visible „Filtruj…" input (aria-label „Filtruj zadania w tym widoku") is present; typing narrows the rows to those whose title/description contains every token, case- AND diacritic-insensitively („sro" keeps „Środa…"); groups/columns without rows collapse; a „Wyczyść filtr" button restores the full view. | US-08 AS-08 (reinterpreted), FR-103 | [E]+[C] |
+| INV-199 | Given a non-empty view and a filter that matches nothing, When the view renders, Then the hint „Brak zadań pasujących do filtru" with a „Wyczyść filtr" action appears instead of the empty-view state. | FR-110 | [C]+[E] |
+
+---
+
 ## Transfer notes (D11 — rows asserting UNSHIPPED capabilities move to their owning slices)
 
 | UIT row | Assertion | Disposition |
