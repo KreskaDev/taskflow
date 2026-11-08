@@ -60,7 +60,7 @@ Web monorepo per plan.md: `apps/web` (Next.js 15) + `apps/api` (.NET 9). Feature
 - [X] T024 [P] `pnpm --dir apps/web audit:dead` (zero dead modules) + hex audit clean (tokens-only in RecurrenceField.module.css and touched .module.css) + `pnpm --dir apps/web lint` + `typecheck`
 - [X] T025 Regenerate [V] baselines via apps/web/tests/e2e/update-visual-baselines.ps1 (docker; prereqs per the runbook: Debug API build, port 55432 free) — new recurrence baselines committed for human approval per palette; existing baselines must NOT drift (the chip changes row layout ONLY on rows that have a rule — none in prior seeds)
 - [X] T026 Run the full suites per quickstart.md: web unit, `dotnet test` (verify the new `recurrence` shard filter partitions correctly — D14), full `pnpm --dir apps/web e2e` (incl. axe + tasks/daily/board/cycles regression), `gen:api` diff clean
-- [ ] T027 Walk quickstart.md manual steps 1–8 against the interactive stack and record the outcome in this file
+- [X] T027 Walk quickstart.md manual steps 1–8 against the interactive stack and record the outcome in this file
 
 ### T026 — verification record (2026-11-08)
 
@@ -69,9 +69,18 @@ Layer 3 (API, Release): build green; unit 202/202; integration shards run SEQUEN
 Layer 4 (E2E, self-booted stack): 140 passed, 0 failed, 144 skipped (the [V] suite is linux-gated; its 144 baselines were generated green in the CI image, T025).
 `gen:api` diff clean after the T014 regeneration.
 
-### T027 — manual walk (NOT yet executed)
+### T027 — manual walk record (2026-11-08, interactive stack: PG :55432 + API :4311 + fake IdP :4321 + BFF :3000, fresh admitted user via fake-IdP sign-in, Playwright-driven real browser)
 
-Quickstart steps 1–8 are covered 1:1 by the UI-driven `recurrence.spec.ts` journey (6 green); the interactive-stack walk is still owed.
+1. Inbox → quick-add „Podlej kwiaty dziś" → drawer („Szczegóły") → „Powtarzanie" = „Codziennie" → preview „Następne wystąpienie: 09.11.2026" → row shows the „codziennie" chip. ✅
+2. Complete the row → a second „Podlej kwiaty" row appears with due 09.11.2026 and the same chip (AS-02). ✅ (the toast had already auto-dismissed by the time the screenshot was taken; its text is asserted by the E2E journey)
+3. „W wybrane dni tygodnia" Pn + Śr on a task due Tue 02.11.2027 → inline „Wybierz co najmniej jeden dzień" until a day is picked → preview „Następne wystąpienie: 03.11.2027" (Tue → Wed). ✅ The past-Monday late-completion half of the step (AS-05) cannot be set up from the UI: the slice-003 date grammar rolls a bare `dd.MM` forward and rejects `dd.MM.yyyy` („Nie rozpoznano daty"); it is covered by the E2E journey (API-seeded past due) and the integration facts.
+4. „Jutro jutro" (due tomorrow) + „Codziennie" → complete → NO new row (AS-04). ✅
+5. Reopen the completed „Podlej kwiaty" (checkbox) → the 09.11 instance disappears (undo). ✅ Note: Playwright refuses a pointer click on a CHECKED catalog checkbox („Checkbox_box intercepts pointer events") — a real pointer click still toggles via the label; Space on the focused checkbox works. Pre-existing catalog behaviour (slice 019), not touched here.
+6. Cancel: the UI has no cancel affordance (slice-010 scope); AS-06 is proven by the integration facts + the E2E API-driven case. (not walked)
+7. Today → „Edytuj „Podlej kwiaty"" → „Usuń termin" → inline guard „Zadanie cykliczne musi mieć termin — wyłącz powtarzanie albo ustaw termin", „Zapisz" disabled → „Powtarzanie" = „Nie powtarza się" → „Zapisz" → the task leaves Today („Brak zadań na dziś."). ✅
+8. Drawer on „Bez terminu" → „Powtarzanie" disabled with „Ustaw najpierw termin". ✅
+
+Observed, out of this slice's scope (candidates for the backlog): (a) the date grammar cannot express a past date or a full `dd.MM.yyyy` (slice 003); (b) the row title's hover colour is 4.49:1 on the dark palettes (slice 019 token pairing); (c) no UI cancel affordance for the `cancelled` status (slice 010).
 
 ## Dependencies & Execution Order
 
