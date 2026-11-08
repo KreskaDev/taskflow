@@ -58,7 +58,7 @@ Web monorepo per plan.md: `apps/web` (Next.js 15) + `apps/api` (.NET 9). Feature
 
 - [X] T023 Run `pnpm --dir apps/web test` and drive the inventory-coverage gate green — every slice-012 `INV-###` row has an `[INV-###]`-tagged covering test and vice versa; reconcile as needed
 - [X] T024 [P] `pnpm --dir apps/web audit:dead` (zero dead modules) + hex audit clean (tokens-only in RecurrenceField.module.css and touched .module.css) + `pnpm --dir apps/web lint` + `typecheck`
-- [ ] T025 Regenerate [V] baselines via apps/web/tests/e2e/update-visual-baselines.ps1 (docker; prereqs per the runbook: Debug API build, port 55432 free) — new recurrence baselines committed for human approval per palette; existing baselines must NOT drift (the chip changes row layout ONLY on rows that have a rule — none in prior seeds)
+- [X] T025 Regenerate [V] baselines via apps/web/tests/e2e/update-visual-baselines.ps1 (docker; prereqs per the runbook: Debug API build, port 55432 free) — new recurrence baselines committed for human approval per palette; existing baselines must NOT drift (the chip changes row layout ONLY on rows that have a rule — none in prior seeds)
 - [ ] T026 Run the full suites per quickstart.md: web unit, `dotnet test` (verify the new `recurrence` shard filter partitions correctly — D14), full `pnpm --dir apps/web e2e` (incl. axe + tasks/daily/board/cycles regression), `gen:api` diff clean
 - [ ] T027 Walk quickstart.md manual steps 1–8 against the interactive stack and record the outcome in this file
 
