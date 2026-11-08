@@ -58,6 +58,19 @@ describe("TaskEditor — recurrence field [INV-176]", () => {
     expect(onSave.mock.calls[0]![0].dueDate?.toISOString()).toBe("2026-06-09T22:00:00.000Z");
   });
 
+  it("„W wybrane dni tygodnia” keeps its checkboxes while no day is chosen (the host echoes null) and saves the picked days", () => {
+    const { onSave } = renderEditor(makeTask());
+    fireEvent.change(screen.getByRole("combobox", { name: "Powtarzanie" }), { target: { value: "weekdays" } });
+    expect(screen.getByRole("checkbox", { name: "poniedziałek" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Zapisz (Ctrl+Enter)" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "poniedziałek" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "środa" }));
+    fireEvent.click(screen.getByRole("button", { name: "Zapisz (Ctrl+Enter)" }));
+
+    expect(onSave.mock.calls[0]![0].recurrenceRule).toEqual({ type: "weekdays", weekdays: [1, 3] });
+  });
+
   it("a non-recurring task saves recurrenceRule: null", () => {
     const { onSave } = renderEditor(makeTask());
     fireEvent.click(screen.getByRole("button", { name: "Zapisz (Ctrl+Enter)" }));

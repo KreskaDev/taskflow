@@ -108,17 +108,24 @@ export function RecurrenceField({ rule, dueDate, dueHasTime, onChange, disabled 
 
   // Re-seed when the host switches tasks or the rule changes underneath (drawer deep link / server settle).
   // Keyed by VALUE (the hosts rebuild `rule`/`dueDate` objects every render) so an in-progress draft is not reset.
+  // A controlled host echoes what this field just reported (incl. `null` while a draft is still invalid —
+  // „W wybrane dni tygodnia" with no day yet); that echo must NOT reset the draft, only an EXTERNAL change may.
   const ruleKey = JSON.stringify(rule);
   const dueKey = dueDate?.getTime() ?? null;
   const latest = useRef({ rule, dueDate });
   latest.current = { rule, dueDate };
+  const lastEmitted = useRef<string>(ruleKey);
   useEffect(() => {
+    if (ruleKey === lastEmitted.current) return;
+    lastEmitted.current = ruleKey;
     setDraft(draftFrom(latest.current.rule, latest.current.dueDate));
   }, [ruleKey, dueKey]);
 
   const update = (next: Draft): void => {
     setDraft(next);
-    onChange(resolveRecurrenceDraft(next));
+    const resolved = resolveRecurrenceDraft(next);
+    lastEmitted.current = JSON.stringify(resolved.rule);
+    onChange(resolved);
   };
 
   const noDue = dueDate === null;
