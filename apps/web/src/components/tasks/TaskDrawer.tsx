@@ -207,6 +207,7 @@ export function TaskDrawer({ task, onClose }: TaskDrawerProps) {
               dueDate={task.dueDate ? new Date(task.dueDate) : null}
               dueHasTime={task.dueHasTime ?? false}
               onChange={commitRecurrence}
+              hideLabel
             />
           </dd>
         </div>

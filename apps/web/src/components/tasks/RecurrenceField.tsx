@@ -32,6 +32,8 @@ interface RecurrenceFieldProps {
   onChange: (change: RecurrenceFieldChange) => void;
   /** Extra disabled state imposed by the host (e.g. a pending save). */
   disabled?: boolean;
+  /** Visually hide the field's own label when the host already renders one (the drawer's `<dt>`); the accessible name stays. */
+  hideLabel?: boolean;
 }
 
 const WEEKDAYS: ReadonlyArray<{ iso: number; short: string; full: string }> = [
@@ -102,7 +104,7 @@ function resolveRecurrenceDraft(draft: Draft): RecurrenceFieldChange {
  * (recurrence requires a due date). Every control is a native element (WCAG keyboard operability,
  * FR-042/FR-043); the error is inline text (FR-049), never color-only.
  */
-export function RecurrenceField({ rule, dueDate, dueHasTime, onChange, disabled = false }: RecurrenceFieldProps) {
+export function RecurrenceField({ rule, dueDate, dueHasTime, onChange, disabled = false, hideLabel = false }: RecurrenceFieldProps) {
   const id = useId();
   const [draft, setDraft] = useState<Draft>(() => draftFrom(rule, dueDate));
 
@@ -137,7 +139,7 @@ export function RecurrenceField({ rule, dueDate, dueHasTime, onChange, disabled 
 
   return (
     <div className={styles.field} data-testid="recurrence-field">
-      <label className={styles.label} htmlFor={selectId}>
+      <label className={hideLabel ? "sr-only" : styles.label} htmlFor={selectId}>
         Powtarzanie
       </label>
       <select
