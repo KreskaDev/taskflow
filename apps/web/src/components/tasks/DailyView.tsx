@@ -10,7 +10,10 @@ import { AssigneePicker } from "@/components/tasks/AssigneePicker";
 import { PriorityPicker } from "@/components/tasks/PriorityPicker";
 import { CyclePicker } from "@/components/cycles/CyclePicker";
 import { LabelSelector } from "@/components/labels/LabelSelector";
+import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { VIEW_FILTER_EMPTY_HINT, ViewFilterInput } from "@/components/search/ViewFilterInput";
+import { filterTasks, isFilterActive } from "@/lib/filter";
 import { Skeleton } from "@/components/ui/Skeleton";
 import type { components } from "@/lib/api/generated/schema";
 import { listboxKeyDown } from "@/lib/listboxKeys";
@@ -67,7 +70,15 @@ export function DailyView({ label, groups, projectName, emptyMessage, emptyActio
   } = useTaskMutations();
   const { duplicateTask } = useDuplicateTask();
 
-  const flat = useMemo(() => groups.flatMap((g) => g.tasks), [groups]);
+  // slice 013 (US-08.AS-08 reinterpreted, D11): the visible view filter narrows the loaded rows; empty groups collapse.
+  const [filter, setFilter] = useState("");
+  const visibleGroups = useMemo(
+    () => groups.map((g) => ({ ...g, tasks: filterTasks(g.tasks, filter) })).filter((g) => g.tasks.length > 0),
+    [groups, filter],
+  );
+  const total = useMemo(() => groups.reduce((n, g) => n + g.tasks.length, 0), [groups]);
+  const flat = useMemo(() => visibleGroups.flatMap((g) => g.tasks), [visibleGroups]);
+  const isFilteredEmpty = isFilterActive(filter) && flat.length === 0 && total > 0;
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [editorId, setEditorId] = useState<string | null>(null);
   const [rescheduleId, setRescheduleId] = useState<string | null>(null);
@@ -108,8 +119,19 @@ export function DailyView({ label, groups, projectName, emptyMessage, emptyActio
     <div className={styles.view}>
       <h1 className={styles.heading}>{label}</h1>
 
-      {loading && flat.length === 0 ? (
+      <ViewFilterInput id={`${label}-filter`} value={filter} onChange={setFilter} />
+
+      {loading && total === 0 ? (
         <Skeleton variant="row" count={4} />
+      ) : isFilteredEmpty ? (
+        <EmptyState
+          hint={VIEW_FILTER_EMPTY_HINT}
+          action={
+            <Button variant="secondary" onClick={() => setFilter("")}>
+              Wyczyść filtr
+            </Button>
+          }
+        />
       ) : flat.length === 0 ? (
         <EmptyState hint={emptyMessage} action={emptyAction} />
       ) : (
@@ -129,7 +151,7 @@ export function DailyView({ label, groups, projectName, emptyMessage, emptyActio
             onActivateSelected: selected ? () => router.push(`${pathname}?task=${selected.id}`) : undefined,
           })}
         >
-          {groups.map((group) => (
+          {visibleGroups.map((group) => (
             <div key={group.key} role="rowgroup" aria-label={group.label} className={styles.group}>
               <div className={styles.groupHeading} aria-hidden="true">
                 {group.label}

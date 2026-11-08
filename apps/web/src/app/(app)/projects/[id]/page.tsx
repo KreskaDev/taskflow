@@ -17,6 +17,8 @@ import { ViewModeSwitch } from "@/components/tasks/ViewModeSwitch";
 import { AssigneePicker } from "@/components/tasks/AssigneePicker";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { VIEW_FILTER_EMPTY_HINT, ViewFilterInput } from "@/components/search/ViewFilterInput";
+import { filterTasks, isFilterActive } from "@/lib/filter";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useDuplicateTask } from "@/hooks/useDuplicateTask";
 import { usePersistedProjectView } from "@/hooks/usePersistedProjectView";
@@ -71,7 +73,11 @@ export default function ProjectView({ params }: { params: Promise<{ id: string }
   const assigneeName = (userId: string): string | null =>
     members?.members.find((m) => m.userId === userId)?.displayName ?? null;
 
-  const rows = tasks ?? [];
+  const allRows = tasks ?? [];
+  // slice 013 (D11): one visible filter narrows BOTH the List and the Board; empty groups/columns collapse.
+  const [filter, setFilter] = useState("");
+  const rows = filterTasks(allRows, filter);
+  const isFilteredEmpty = allRows.length > 0 && rows.length === 0 && isFilterActive(filter);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [movingId, setMovingId] = useState<string | null>(null);
@@ -164,6 +170,7 @@ export default function ProjectView({ params }: { params: Promise<{ id: string }
     <section aria-labelledby="project-heading">
       <div className={styles.header}>
         <h1 id="project-heading">{project?.name ?? "Projekt"}</h1>
+        <ViewFilterInput id="project-filter" value={filter} onChange={setFilter} />
         <ViewModeSwitch mode={mode} onChange={setMode} />
       </div>
 
@@ -178,6 +185,15 @@ export default function ProjectView({ params }: { params: Promise<{ id: string }
         </div>
       ) : isPending ? (
         <Skeleton variant="row" count={4} />
+      ) : isFilteredEmpty ? (
+        <EmptyState
+          hint={VIEW_FILTER_EMPTY_HINT}
+          action={
+            <Button variant="secondary" onClick={() => setFilter("")}>
+              Wyczyść filtr
+            </Button>
+          }
+        />
       ) : mode === "board" ? (
         <BoardView
           tasks={rows}

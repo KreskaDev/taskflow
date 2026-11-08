@@ -263,7 +263,7 @@ Przypisane / project List+Board / `/cycle`. No keyboard binding is introduced (F
 | INV-196 | Given a non-empty query with no match in any bucket, When results settle, Then the empty state „Brak wyników dla „<q>"" with the hint „Spróbuj innego słowa" renders; on a failed search the FR-049 copy „Nie udało się wyszukać — spróbuj ponownie" renders with a „Spróbuj ponownie" action. After each settled fetch the polite live region announces „N wyników" / „Brak wyników". | FR-049, FR-101, FR-110 | [C] |
 | INV-197 | Given a task/project the caller cannot access (another user's personal task, a shared project they are not or no longer a member of), When they search its title/name, Then it never appears in results. | FR-065, FR-066, FR-067, FR-068, SC-013 | [C]+[E] |
 | INV-198 | Given any list view (Inbox, Dziś, Nadchodzące, Przypisane, project List and Board, `/cycle`), When its header renders, Then a visible „Filtruj…" input (aria-label „Filtruj zadania w tym widoku") is present; typing narrows the rows to those whose title/description contains every token, case- AND diacritic-insensitively („sro" keeps „Środa…"); groups/columns without rows collapse; a „Wyczyść filtr" button restores the full view. | US-08 AS-08 (reinterpreted), FR-103 | [E]+[C] |
-| INV-199 | Given a non-empty view and a filter that matches nothing, When the view renders, Then the hint „Brak zadań pasujących do filtru" with a „Wyczyść filtr" action appears instead of the empty-view state. | FR-110 | [C]+[E] |
+| INV-199 | Given a non-empty view and a filter that matches nothing, When the view renders, Then the hint „Brak zadań pasujących do filtru" with a „Wyczyść filtr" action appears instead of the empty-view state. | FR-110 | [E] |
 
 ---
 
