@@ -2,7 +2,9 @@
 
 import { type QueryClient, useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { useOptionalToast } from "@/components/ui/Toast";
 import { invalidateViewCounts } from "@/hooks/useViewCounts";
+import { isDueDayReached, toWireRule, type RecurrenceRule, type RecurrenceRuleWire } from "@/lib/recurrence";
 import { apiClient, mapError, type ProblemDetails } from "@/lib/api/client";
 import type { components } from "@/lib/api/generated/schema";
 import { buildTodayGroups, buildUpcomingGroups, flattenToday, flattenUpcoming } from "@/lib/dailyViews";
@@ -1034,6 +1036,9 @@ export function rescheduleDueDateMutationOptions(
 
 /* ──────────────────────────────── EDIT (PATCH /edit) ──────────────────────────────── */
 
+/** The FR-101 confirmation shown when a completion spawned the next instance (contracts/ui-recurrence.md). */
+const RECURRENCE_SPAWNED_TOAST = "Utworzono kolejne wystąpienie";
+
 export interface EditTaskVariables {
   id: string;
   title: string;
@@ -1042,6 +1047,8 @@ export interface EditTaskVariables {
   dueDate: string | null;
   dueHasTime: boolean | null;
   projectId: string | null;
+  /** slice 012 (ENT-05, D11): the recurrence rule in its wire shape, or null — REQUIRED by the server contract. */
+  recurrenceRule: RecurrenceRuleWire | null;
   version: number;
 }
 
@@ -1050,13 +1057,13 @@ export interface EditTaskVariables {
  * editable fields and recomputes view membership/order. Plain rollback on error. `onSettled` additionally
  * invalidates the source + target project caches when the edit moved the task across projects.
  */
-function editTaskMutationOptions(queryClient: QueryClient): ViewMutationOptions<EditTaskVariables> {
+export function editTaskMutationOptions(queryClient: QueryClient): ViewMutationOptions<EditTaskVariables> {
   return {
     mutationFn: async (variables: EditTaskVariables): Promise<TaskResponse> => {
-      const { id, title, description, priority, dueDate, dueHasTime, projectId, version } = variables;
+      const { id, title, description, priority, dueDate, dueHasTime, projectId, recurrenceRule, version } = variables;
       const { data, error } = await apiClient.PATCH("/api/tasks/{id}/edit", {
         params: { path: { id } },
-        body: { title, description, priority, dueDate, dueHasTime, projectId, version },
+        body: { title, description, priority, dueDate, dueHasTime, projectId, recurrenceRule, version },
       });
       if (error || !data) {
         const errorCode = (error as ProblemDetails | undefined)?.errorCode;
@@ -1081,6 +1088,7 @@ function editTaskMutationOptions(queryClient: QueryClient): ViewMutationOptions<
             dueDate: variables.dueDate,
             dueHasTime: variables.dueHasTime,
             projectId: variables.projectId,
+            recurrenceRule: variables.recurrenceRule,
           },
           new Date(),
         );
@@ -1229,6 +1237,8 @@ export function setTaskLabelsMutationOptions(queryClient: QueryClient): ViewMuta
  */
 export function useTaskMutations() {
   const queryClient = useQueryClient();
+  // slice 012 (D13/FR-101): the completion toast is optional so bare harnesses (no ToastProvider) still work.
+  const toast = useOptionalToast();
   const createMutation = useMutation<TaskResponse, Error, CreateTaskVariables, CreateTaskContext>(
     createTaskMutationOptions(queryClient),
   );
@@ -1332,7 +1342,23 @@ export function useTaskMutations() {
   const setTaskStatus = (id: string, status: TaskStatusValue): void => {
     const row = findTaskInViewCaches(queryClient, id);
     if (!row) return;
-    toggleMutation.mutate({ id, status, version: row.version, projectId: row.projectId ?? null });
+    // slice 012 (D4/D13): completing a recurring instance whose due DAY (Warsaw) is reached makes the server
+    // spawn the successor inside this write — surface it (toast → polite LiveRegion, FR-101) once the write
+    // settles and the lists refetch. An EARLY completion is silent (the spawn is deferred server-side, AS-04).
+    const spawnsNow =
+      status === "done" &&
+      row.status !== "done" &&
+      row.recurrenceRule != null &&
+      row.dueDate != null &&
+      isDueDayReached(new Date(row.dueDate), new Date());
+    toggleMutation.mutate(
+      { id, status, version: row.version, projectId: row.projectId ?? null },
+      {
+        onSuccess: () => {
+          if (spawnsNow) toast?.push(RECURRENCE_SPAWNED_TOAST);
+        },
+      },
+    );
   };
 
   const setTaskDone = (id: string, done: boolean): void => {
@@ -1369,6 +1395,8 @@ export function useTaskMutations() {
       dueDate: Date | null;
       dueHasTime: boolean | null;
       projectId: string | null;
+      /** slice 012: the recurrence rule or null — every caller passes the task's CURRENT rule through (D11). */
+      recurrenceRule: RecurrenceRule | null;
     },
   ): void => {
     const row = findTaskInViewCaches(queryClient, id);
@@ -1383,6 +1411,7 @@ export function useTaskMutations() {
       dueDate: parsed.dueDate ? parsed.dueDate.toISOString() : null,
       dueHasTime: parsed.dueHasTime,
       projectId: parsed.projectId,
+      recurrenceRule: toWireRule(parsed.recurrenceRule),
       version: row.version,
     });
   };

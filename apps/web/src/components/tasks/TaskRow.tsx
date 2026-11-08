@@ -1,9 +1,10 @@
 "use client";
 
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Pencil } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil, Repeat } from "lucide-react";
 
 import { LabelChips } from "@/components/labels/LabelChips";
+import { parseRecurrenceRule, recurrenceLabel } from "@/lib/recurrence";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { IconButton } from "@/components/ui/IconButton";
 import { Menu, type MenuItemSpec } from "@/components/ui/Menu";
@@ -223,6 +224,7 @@ export function TaskRow({
   const done = task.status === "done";
   const projected = task.projectId != null;
   const priority = priorityLabel(task.priority);
+  const recurrence = parseRecurrenceRule(task.recurrenceRule);
 
   return (
     <div
@@ -279,6 +281,15 @@ export function TaskRow({
         ) : null}
 
         {!isRenaming && isOverdue ? <span className={styles.overdue}>zaległe</span> : null}
+
+        {/* Slice 012 (US-06.AS-01, FR-044/FR-046): the recurring indicator — decorative icon + visible TEXT label. */}
+        {!isRenaming && recurrence ? (
+          <span className={styles.recurring}>
+            <Repeat aria-hidden="true" size={12} />
+            <span className="sr-only">powtarzanie: </span>
+            {recurrenceLabel(recurrence)}
+          </span>
+        ) : null}
 
         {/* Slice 011 (D7, FR-044): the keep-rollover flag as visible TEXT, never color alone. */}
         {!isRenaming && task.carriedOver ? <span className={styles.carried}>przeniesione</span> : null}

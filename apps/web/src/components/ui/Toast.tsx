@@ -152,6 +152,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/** Access the toast queue, or `null` outside a `ToastProvider` (hooks that must also run in bare test harnesses). */
+export function useOptionalToast(): ToastContextValue | null {
+  return useContext(ToastContext);
+}
+
 /** Access the toast queue. Throws if used outside a `ToastProvider`. */
 export function useToast(): ToastContextValue {
   const ctx = useContext(ToastContext);

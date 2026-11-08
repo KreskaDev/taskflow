@@ -1,6 +1,9 @@
 "use client";
 
+import { Repeat } from "lucide-react";
+
 import { LabelChips } from "@/components/labels/LabelChips";
+import { parseRecurrenceRule, recurrenceLabel } from "@/lib/recurrence";
 import {
   buildMenuItems,
   formatDueDate,
@@ -50,6 +53,7 @@ function priorityLabel(priority: string | null | undefined): string | null {
 export function BoardCard({ task, actions, assigneeName }: BoardCardProps) {
   const done = task.status === "done";
   const priority = priorityLabel(task.priority);
+  const recurrence = parseRecurrenceRule(task.recurrenceRule);
 
   const resolvedAssignees = task.assignees
     .map((userId) => ({ userId, name: assigneeName?.(userId) ?? null }))
@@ -84,7 +88,7 @@ export function BoardCard({ task, actions, assigneeName }: BoardCardProps) {
         ) : null}
       </div>
 
-      {priority || task.dueDate || task.labels.length > 0 || task.assignees.length > 0 ? (
+      {priority || task.dueDate || recurrence || task.labels.length > 0 || task.assignees.length > 0 ? (
         <div className={styles.chips}>
           {priority ? (
             <span className={styles.priority} data-priority={task.priority}>
@@ -97,6 +101,14 @@ export function BoardCard({ task, actions, assigneeName }: BoardCardProps) {
             <span className={styles.due}>
               <span className="sr-only">termin: </span>
               {formatDueDate(task.dueDate, task.dueHasTime)}
+            </span>
+          ) : null}
+
+          {recurrence ? (
+            <span className={styles.recurring}>
+              <Repeat aria-hidden="true" size={12} />
+              <span className="sr-only">powtarzanie: </span>
+              {recurrenceLabel(recurrence)}
             </span>
           ) : null}
 
