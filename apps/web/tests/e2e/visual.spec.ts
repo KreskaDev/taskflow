@@ -214,6 +214,78 @@ test.describe("[V] project board & grouped list (slice 010)", () => {
  * „7 dni pozostało” is a constant; the absolute date-range text carries `data-visual-hide` and is
  * hidden by the stylePath. One user per test × attempt (the PR-#11 isolation rule).
  */
+/**
+ * Slice-012 screens (T022): the Inbox List with a recurring row per rule type (chips) and the drawer hosting
+ * „Powtarzanie". Determinism (contract ui-recurrence.md): dues are RELATIVE (today Warsaw) so the chip text is
+ * date-free; the preview's absolute date carries `data-visual-hide` and is hidden by the stylePath. One user per
+ * test × attempt (the PR-#11 isolation rule). [INV-182]
+ */
+test.describe("[V] recurrence (slice 012)", () => {
+  for (const palette of PALETTES) {
+    for (const width of WIDTHS) {
+      for (const state of ["rows", "drawer"] as const) {
+        test(`recurrence-${state} × ${palette} × ${width}px`, async ({ browser }, testInfo) => {
+          const key = `recurrence-${state}-${palette}-${width}-r${testInfo.retry}`;
+          const profile = await ensureUser({
+            sub: `google-sub-visual-${key}`,
+            email: `visual-${key}@taskflow.test`,
+            name: "Vis Ualnie",
+          });
+          const api = apiAs(profile.id);
+          const noon = `${new Date().toISOString().slice(0, 10)}T12:00:00Z`;
+          const seedRecurring = async (title: string, position: string, rule: Record<string, unknown>): Promise<void> => {
+            const task = await api.createTask({ title, position, dueDate: noon, dueHasTime: false });
+            const edited = await api.request("PATCH", `/api/tasks/${task.id}/edit`, {
+              title,
+              description: null,
+              priority: null,
+              dueDate: noon,
+              dueHasTime: false,
+              projectId: null,
+              recurrenceRule: rule,
+              version: task.version,
+            });
+            if (!edited.ok) throw new Error(`recurrence seed failed (${String(edited.status)})`);
+          };
+          await seedRecurring("Codzienne zadanie", "a0", { type: "daily" });
+          await seedRecurring("Co trzy dni", "a1", { type: "every_n_days", interval: 3 });
+          await seedRecurring("Poniedziałki i środy", "a2", { type: "weekdays", weekdays: [1, 3] });
+          await seedRecurring("Co miesiąc", "a3", { type: "monthly", dayOfMonth: 15 });
+
+          const sessionId = await insertSession(profile.id);
+          const context = await browser.newContext({
+            viewport: { width, height: 900 },
+            reducedMotion: "reduce",
+          });
+          await context.addCookies([
+            { name: "taskflow_session", value: sessionId, url: "http://localhost:3000" },
+          ]);
+          const page = await context.newPage();
+          await page.goto("/");
+          await settled(page);
+          await expect(page.getByRole("img", { name: "Vis Ualnie" }).first()).toBeVisible();
+          await expect(page.getByRole("row").filter({ hasText: "Co miesiąc" })).toBeVisible();
+          if (state === "drawer") {
+            await page.getByRole("button", { name: "Co trzy dni", exact: true }).click();
+            await expect(page.getByRole("complementary").getByRole("spinbutton", { name: "Co ile dni" })).toBeVisible();
+          }
+          await forcePalette(page, palette);
+          await assertRealTypography(page);
+
+          await expect(page).toHaveScreenshot(`recurrence-${state}-${palette}-${width}.png`, {
+            fullPage: true,
+            animations: "disabled",
+            caret: "hide",
+            stylePath: SCREENSHOT_STYLE,
+          });
+
+          await context.close();
+        });
+      }
+    }
+  }
+});
+
 test.describe("[V] cycle view (slice 011)", () => {
   for (const palette of PALETTES) {
     for (const width of WIDTHS) {

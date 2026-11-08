@@ -287,6 +287,58 @@ test.describe("axe AA — cycle view (slice 011)", () => {
   }
 });
 
+/**
+ * Slice 012 (T021): the recurrence controls in their OPEN states — the `E` editor on Today („Co N dni" and
+ * weekday variants, the due-date guard) and the drawer hosting the field [INV-176] [INV-177] [INV-178] [INV-181].
+ */
+test.describe("axe AA — recurrence field (slice 012)", () => {
+  for (const palette of PALETTES) {
+    test(`editor + drawer with „Powtarzanie” open in ${palette}: zero WCAG 2.1 AA violations`, async ({ browser }) => {
+      const { page, context, profile } = await signedInPage(browser, `axe-recurrence-${palette}`);
+      const api = apiAs(profile.id);
+      const noon = `${new Date().toISOString().slice(0, 10)}T12:00:00Z`;
+      const task = await api.createTask({ title: "Zadanie cykliczne AA", position: "a0", dueDate: noon, dueHasTime: false });
+      const edited = await api.request("PATCH", `/api/tasks/${task.id}/edit`, {
+        title: "Zadanie cykliczne AA",
+        description: null,
+        priority: null,
+        dueDate: noon,
+        dueHasTime: false,
+        projectId: null,
+        recurrenceRule: { type: "every_n_days", interval: 3 },
+        version: task.version,
+      });
+      if (!edited.ok) throw new Error(`recurrence seed failed (${String(edited.status)})`);
+
+      // 1) Today's editor with „Co N dni" (number input) — then the weekday checkboxes and the due guard.
+      await page.goto("/today");
+      await page.waitForLoadState("networkidle");
+      await expect(page.getByRole("row").filter({ hasText: "Zadanie cykliczne AA" })).toBeVisible({ timeout: 30_000 });
+      await setPalette(page, palette);
+      await page.getByRole("button", { name: "Edytuj „Zadanie cykliczne AA”" }).click();
+      const dialog = page.getByRole("dialog", { name: "Edytuj zadanie" });
+      await expect(dialog.getByRole("spinbutton", { name: "Co ile dni" })).toBeVisible();
+      await auditCurrentPage(page, `editor every_n_days × ${palette}`);
+      await dialog.getByRole("combobox", { name: "Powtarzanie" }).selectOption("weekdays");
+      await expect(dialog.getByRole("checkbox", { name: "poniedziałek" })).toBeVisible();
+      await dialog.getByRole("checkbox", { name: "Usuń termin" }).check();
+      await expect(dialog.getByRole("alert").last()).toBeVisible();
+      await auditCurrentPage(page, `editor weekdays + guard × ${palette}`);
+      await page.keyboard.press("Escape");
+
+      // 2) The drawer hosting the field (Inbox).
+      await page.goto("/");
+      await page.waitForLoadState("networkidle");
+      await setPalette(page, palette);
+      await page.getByRole("button", { name: "Zadanie cykliczne AA", exact: true }).click();
+      await expect(page.getByRole("complementary").getByRole("combobox", { name: "Powtarzanie" })).toBeVisible();
+      await auditCurrentPage(page, `drawer recurrence × ${palette}`);
+
+      await context.close();
+    });
+  }
+});
+
 test.describe("axe AA — sign-in (anonymous)", () => {
   for (const palette of PALETTES) {
     test(`/signin in ${palette}: zero WCAG 2.1 AA violations`, async ({ browser }) => {
