@@ -176,6 +176,33 @@ public sealed class UndoAndDeferredSpawnTests : RecurrenceTestBase
     }
 
     [Fact]
+    public async Task Deferred_job_re_schedules_instead_of_spawning_early_when_the_done_instance_was_rescheduled_later()
+    {
+        var (owner, token) = await NewOwnerAsync("job-moved");
+        var taskId = await SeedRecurringTaskAsync(owner, "Jutro", DueOnDay(1), new DailyRecurrence());
+        var done = await SetStatusAsync(token, taskId, "done", (await LoadTaskAsync(taskId))!.Version);
+        var completedAt = (await LoadTaskAsync(taskId))!.CompletedAt!.Value;
+        // The anchor moves two days further while the instance stays done (contract: reschedule moves the anchor).
+        using (var moved = await SendAsync(HttpMethod.Patch, DuePath(taskId), token, new { dueDate = DueOnDay(3), dueHasTime = false, version = done.Version }))
+        {
+            moved.EnsureSuccessStatusCode();
+        }
+
+        Clock.Now = FrozenNow.AddDays(1); // the ORIGINAL due day — the parked message fires now
+        var before = await CountScheduledEnvelopesAsync<SpawnRecurrenceSuccessor>(taskId);
+        await SendSpawnAsync(taskId, completedAt);
+
+        (await ListSuccessorsIncludingDeletedAsync(taskId)).Should().BeEmpty("EC-05: never spawn before the CURRENT due day");
+        (await CountScheduledEnvelopesAsync<SpawnRecurrenceSuccessor>(taskId)).Should().Be(before + 1, "the job re-parks itself at the new due day");
+
+        Clock.Now = FrozenNow.AddDays(3); // the NEW due day
+        await SendSpawnAsync(taskId, completedAt);
+        var successors = await ListSuccessorsIncludingDeletedAsync(taskId);
+        successors.Should().HaveCount(1);
+        successors[0].DueDate.Should().Be(DueOnDay(4), "anchor (day 3) + daily");
+    }
+
+    [Fact]
     public async Task Deferred_job_no_ops_when_the_rule_was_removed_meanwhile()
     {
         var (owner, token) = await NewOwnerAsync("job-norule");
