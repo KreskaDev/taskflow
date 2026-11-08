@@ -1903,14 +1903,12 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description OK */
-            200: {
+            /** @description No Content — the identity carrier is valid. */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["IResult"];
-                };
+                content?: never;
             };
             /** @description Not Found */
             404: {
