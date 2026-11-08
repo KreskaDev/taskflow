@@ -41,6 +41,9 @@ public sealed record TaskBody(
 /// <summary>The <c>RecurrenceRule</c> wire shape (slice 012): the closed union flattened to optional members.</summary>
 public sealed record RecurrenceRuleBody(string Type, int? Interval = null, IReadOnlyList<int>? Weekdays = null, int? DayOfMonth = null);
 
+/// <summary>The <c>SearchResponse</c> envelope (slice 013): three access-scoped buckets.</summary>
+public sealed record SearchBody(IReadOnlyList<TaskBody> Tasks, IReadOnlyList<ProjectBody> Projects, IReadOnlyList<LabelBody> Labels);
+
 /// <summary>The <c>LabelResponse</c> read model (slice 006): id + name + optional preset color. No ownerId.</summary>
 public sealed record LabelBody(Guid Id, string Name, string? Color = null);
 
@@ -214,6 +217,13 @@ public static class ApiResponse
         ArgumentNullException.ThrowIfNull(response);
         return (await response.Content.ReadFromJsonAsync<AssignedBody>(Web))
             ?? throw new InvalidOperationException("Expected an AssignedResponse body but the response was empty.");
+    }
+
+    public static async Task<SearchBody> ReadSearchAsync(this HttpResponseMessage response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        return (await response.Content.ReadFromJsonAsync<SearchBody>(Web))
+            ?? throw new InvalidOperationException("Expected a SearchResponse body but the response was empty.");
     }
 
     public static async Task<LabelBody> ReadLabelAsync(this HttpResponseMessage response)
