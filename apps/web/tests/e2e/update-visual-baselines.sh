@@ -61,7 +61,12 @@ export ConnectionStrings__postgres="Host=host.docker.internal;Port=55432;Databas
 
 echo "[baselines] generating [V] baselines (--update-snapshots)…"
 cd "$WORK/apps/web"
-npx playwright test tests/e2e/visual.spec.ts --update-snapshots
+# VISUAL_GREP (optional, diagnostic): limit the run to matching titles, e.g. -e VISUAL_GREP=palette-populated
+if [ -n "${VISUAL_GREP:-}" ]; then
+  npx playwright test tests/e2e/visual.spec.ts --update-snapshots -g "$VISUAL_GREP"
+else
+  npx playwright test tests/e2e/visual.spec.ts --update-snapshots
+fi
 
 echo "[baselines] copying linux-suffixed baselines back into the repo…"
 mkdir -p "$REPO_MOUNT/apps/web/tests/e2e/visual.spec.ts-snapshots"

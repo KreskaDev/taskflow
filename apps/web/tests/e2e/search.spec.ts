@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { warsawDayIso } from "./helpers/dates";
 import { apiAs, ensureUser, insertSession } from "./helpers/seed";
 
 /**
@@ -210,7 +211,7 @@ test.describe("US-08.AS-08 View filter", () => {
     await api.moveTask(a.id, project.id, a.version);
     await api.moveTask(b.id, project.id, b.version);
     await api.request("PATCH", `/api/tasks/${b.id}/status`, { status: "in_progress", version: b.version + 1 });
-    const today = `${new Date().toISOString().slice(0, 10)}T12:00:00Z`;
+    const today = warsawDayIso(0);
     await api.createTask({ title: "Dzisiejsze mleko", position: "a2", dueDate: today, dueHasTime: false });
     await api.createTask({ title: "Dzisiejszy chleb", position: "a3", dueDate: today, dueHasTime: false });
 

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 import { expect, test, type Page } from "@playwright/test";
+import { warsawDayIso } from "./helpers/dates";
 import { apiAs, ensureUser, insertSession, resetCycles } from "./helpers/seed";
 
 /**
@@ -259,11 +260,13 @@ test.describe("[V] command palette (slice 013)", () => {
           await expect(page.getByRole("row").filter({ hasText: "Kup mleko" })).toBeVisible();
           await page.getByRole("button", { name: "Szukaj", exact: true }).click();
           const dialog = page.getByRole("dialog", { name: "Szukaj i wykonaj" });
-          await expect(dialog.getByRole("option", { name: "Nowy task" })).toBeVisible();
+          await expect(dialog.getByRole("option", { name: "Nowy task" })).toBeVisible({ timeout: 30_000 });
           if (state === "populated") {
             await dialog.getByRole("combobox").fill("za");
-            await expect(dialog.getByRole("option", { name: /Zakupy domowe/ })).toBeVisible();
-            await expect(dialog.getByRole("option", { name: /zaległe/ })).toBeVisible();
+            // Generous timeout: the run's FIRST /api/search hit compiles the BFF proxy route on demand in `next dev`.
+            await expect(dialog.getByRole("option", { name: /Zakupy domowe/ })).toBeVisible({ timeout: 30_000 });
+            await expect(dialog.getByRole("option", { name: /zaległe/ })).toBeVisible({ timeout: 30_000 });
+            await expect(dialog.getByRole("option", { name: /Kup mleko/ })).toHaveCount(0);
           }
           await forcePalette(page, palette);
           await assertRealTypography(page);
@@ -294,7 +297,7 @@ test.describe("[V] recurrence (slice 012)", () => {
             name: "Vis Ualnie",
           });
           const api = apiAs(profile.id);
-          const noon = `${new Date().toISOString().slice(0, 10)}T12:00:00Z`;
+          const noon = warsawDayIso(0); // today in Warsaw at 12:00Z — not the UTC date
           const seedRecurring = async (title: string, position: string, rule: Record<string, unknown>): Promise<void> => {
             const task = await api.createTask({ title, position, dueDate: noon, dueHasTime: false });
             const edited = await api.request("PATCH", `/api/tasks/${task.id}/edit`, {
@@ -365,8 +368,7 @@ test.describe("[V] cycle view (slice 011)", () => {
             const api = apiAs(profile.id);
             // Relative dates: 12:00Z sits inside the same Warsaw calendar day at every UTC
             // offset, so daysRemaining(end, now) is a constant 7.
-            const dayIso = (days: number): string =>
-              `${new Date(Date.now() + days * 24 * 3600 * 1000).toISOString().slice(0, 10)}T12:00:00Z`;
+            const dayIso = (days: number): string => warsawDayIso(days); // Warsaw calendar day, not the UTC date
             const cycleId = randomUUID();
             const created = await api.request("PUT", `/api/cycles/${cycleId}`, {
               name: "Cykl wizualny",
