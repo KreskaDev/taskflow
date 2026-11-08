@@ -346,6 +346,43 @@ test.describe("axe AA — recurrence field (slice 012)", () => {
   }
 });
 
+/**
+ * Slice 013 (T014): the command palette in its OPEN states — empty query (action catalogue) and a populated
+ * query (tasks + project + label groups), plus the Inbox header's view filter [INV-188] [INV-190] [INV-198].
+ */
+test.describe("axe AA — command palette (slice 013)", () => {
+  for (const palette of PALETTES) {
+    test(`palette (empty + populated) in ${palette}: zero WCAG 2.1 AA violations`, async ({ browser }, testInfo) => {
+      const { page, context, profile } = await signedInPage(browser, `axe-palette-${palette}-r${testInfo.retry}`);
+      const api = apiAs(profile.id);
+      await api.createTask({ title: "Zadanie palety AA", position: "a0" });
+      await api.createProject({ name: "Projekt palety", color: "blue", icon: "folder" });
+      const labelRes = await api.request("PUT", `/api/labels/${randomUUID()}`, { name: "paleta", color: "blue" });
+      if (!labelRes.ok) throw new Error(`label seed failed (${String(labelRes.status)})`);
+
+      await page.goto("/");
+      await page.waitForLoadState("networkidle");
+      await expect(page.getByRole("row").filter({ hasText: "Zadanie palety AA" })).toBeVisible({ timeout: 30_000 });
+      await setPalette(page, palette);
+      await page.mouse.move(0, 0);
+      await auditCurrentPage(page, `inbox with view filter × ${palette}`);
+
+      await page.getByRole("button", { name: "Szukaj", exact: true }).click();
+      const dialog = page.getByRole("dialog", { name: "Szukaj i wykonaj" });
+      await expect(dialog.getByRole("option", { name: "Nowy task" })).toBeVisible();
+      await auditCurrentPage(page, `palette empty × ${palette}`);
+
+      await dialog.getByRole("combobox").fill("pale");
+      await expect(dialog.getByRole("option", { name: /Zadanie palety AA/ })).toBeVisible();
+      await expect(dialog.getByRole("option", { name: /Projekt palety/ })).toBeVisible();
+      await expect(dialog.getByRole("option", { name: /^paleta/ })).toBeVisible();
+      await auditCurrentPage(page, `palette populated × ${palette}`);
+
+      await context.close();
+    });
+  }
+});
+
 test.describe("axe AA — sign-in (anonymous)", () => {
   for (const palette of PALETTES) {
     test(`/signin in ${palette}: zero WCAG 2.1 AA violations`, async ({ browser }) => {

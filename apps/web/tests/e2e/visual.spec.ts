@@ -220,6 +220,68 @@ test.describe("[V] project board & grouped list (slice 010)", () => {
  * date-free; the preview's absolute date carries `data-visual-hide` and is hidden by the stylePath. One user per
  * test × attempt (the PR-#11 isolation rule). [INV-182]
  */
+/**
+ * Slice-013 screens (T015): the command palette open over the Inbox — empty query (action catalogue) and a
+ * populated query („za" over deterministic dateless seeds so every bucket renders). One user per test × attempt.
+ * [INV-191] [INV-192]
+ */
+test.describe("[V] command palette (slice 013)", () => {
+  for (const palette of PALETTES) {
+    for (const width of WIDTHS) {
+      for (const state of ["empty", "populated"] as const) {
+        test(`palette-${state} × ${palette} × ${width}px`, async ({ browser }, testInfo) => {
+          const key = `palette-${state}-${palette}-${width}-r${testInfo.retry}`;
+          const profile = await ensureUser({
+            sub: `google-sub-visual-${key}`,
+            email: `visual-${key}@taskflow.test`,
+            name: "Vis Ualnie",
+          });
+          const api = apiAs(profile.id);
+          await api.createTask({ title: "Zaplanować tydzień", position: "a0" });
+          await api.createTask({ title: "Zadzwonić do dentysty", position: "a1" });
+          await api.createTask({ title: "Kup mleko", position: "a2" });
+          await api.createProject({ name: "Zakupy domowe", color: "blue", icon: "folder" });
+          const labelRes = await api.request("PUT", `/api/labels/${randomUUID()}`, { name: "zaległe", color: "blue" });
+          if (!labelRes.ok) throw new Error(`label seed failed (${String(labelRes.status)})`);
+
+          const sessionId = await insertSession(profile.id);
+          const context = await browser.newContext({
+            viewport: { width, height: 900 },
+            reducedMotion: "reduce",
+          });
+          await context.addCookies([
+            { name: "taskflow_session", value: sessionId, url: "http://localhost:3000" },
+          ]);
+          const page = await context.newPage();
+          await page.goto("/");
+          await settled(page);
+          await expect(page.getByRole("img", { name: "Vis Ualnie" }).first()).toBeVisible();
+          await expect(page.getByRole("row").filter({ hasText: "Kup mleko" })).toBeVisible();
+          await page.getByRole("button", { name: "Szukaj", exact: true }).click();
+          const dialog = page.getByRole("dialog", { name: "Szukaj i wykonaj" });
+          await expect(dialog.getByRole("option", { name: "Nowy task" })).toBeVisible();
+          if (state === "populated") {
+            await dialog.getByRole("combobox").fill("za");
+            await expect(dialog.getByRole("option", { name: /Zakupy domowe/ })).toBeVisible();
+            await expect(dialog.getByRole("option", { name: /zaległe/ })).toBeVisible();
+          }
+          await forcePalette(page, palette);
+          await assertRealTypography(page);
+
+          await expect(page).toHaveScreenshot(`palette-${state}-${palette}-${width}.png`, {
+            fullPage: true,
+            animations: "disabled",
+            caret: "hide",
+            stylePath: SCREENSHOT_STYLE,
+          });
+
+          await context.close();
+        });
+      }
+    }
+  }
+});
+
 test.describe("[V] recurrence (slice 012)", () => {
   for (const palette of PALETTES) {
     for (const width of WIDTHS) {

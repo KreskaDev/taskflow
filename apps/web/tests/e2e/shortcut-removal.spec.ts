@@ -119,4 +119,23 @@ test.describe("Shortcut-system removal (FR-111, S3.5)", () => {
 
     await context.close();
   });
+
+  test("Ctrl+K and / do nothing — the palette opens only from the visible „Szukaj…” button (slice 013, FR-027 deferred) [INV-188]", async ({
+    browser,
+  }) => {
+    const { page, context } = await signedInPage(browser, "no-palette-keys");
+    await page.goto("/");
+    await createViaInlineCapture(page, "Klawiszowy");
+    await page.getByRole("grid", { name: "Zadania" }).focus();
+
+    await page.keyboard.press("Control+k");
+    await page.keyboard.press("/");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.getByRole("textbox", { name: "Filtruj zadania w tym widoku" })).not.toBeFocused();
+
+    await page.getByRole("button", { name: "Szukaj", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Szukaj i wykonaj" })).toBeVisible();
+
+    await context.close();
+  });
 });
