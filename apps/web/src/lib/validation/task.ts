@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { recurrenceRuleSchema } from "@/lib/recurrence";
+
 /**
  * Task title validation (Constitution VI: "Zod at every trust boundary").
  *
@@ -59,10 +61,18 @@ export const editTaskSchema = z
     dueDate: z.date().nullable(),
     dueHasTime: z.boolean().nullable(),
     projectId: z.string().uuid().nullable(),
+    // slice 012 (ENT-05, D11): the recurrence rule rides the whole-object save; null = one-off task.
+    recurrenceRule: recurrenceRuleSchema.nullable().default(null),
   })
   .refine((value) => (value.dueDate === null) === (value.dueHasTime === null), {
     message: "dueDate and dueHasTime must both be present or both be absent",
     path: ["dueDate"],
+  })
+  // slice 012 (Clarifications Q4, D9): a recurring task must keep a due date — the server's
+  // `recurrence_requires_due_date` guard mirrored at the client boundary.
+  .refine((value) => value.recurrenceRule === null || value.dueDate !== null, {
+    message: "Zadanie cykliczne musi mieć termin — wyłącz powtarzanie albo ustaw termin",
+    path: ["recurrenceRule"],
   });
 
 type EditTaskInput = z.infer<typeof editTaskSchema>;

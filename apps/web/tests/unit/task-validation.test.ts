@@ -120,6 +120,29 @@ describe("task editor-form validation", () => {
     expect(editTaskSchema.safeParse({ ...valid, priority: "P9" }).success).toBe(false);
   });
 
+  it("accepts a recurrence rule alongside a due date and defaults an absent rule to null [INV-176]", () => {
+    const parsed = editTaskSchema.safeParse({ ...valid, recurrenceRule: { type: "every_n_days", interval: 3 } });
+    expect(parsed.success).toBe(true);
+    expect(editTaskSchema.parse(valid).recurrenceRule).toBeNull();
+  });
+
+  it("rejects a recurrence rule without a due date — the recurrence_requires_due_date guard [INV-181]", () => {
+    const result = editTaskSchema.safeParse({
+      ...valid,
+      dueDate: null,
+      dueHasTime: null,
+      recurrenceRule: { type: "daily" },
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.path.join(".") === "recurrenceRule")).toBe(true);
+    }
+  });
+
+  it("rejects an invalid recurrence rule shape", () => {
+    expect(editTaskSchema.safeParse({ ...valid, recurrenceRule: { type: "every_n_days", interval: 1 } }).success).toBe(false);
+  });
+
   it("rejects a half-set due pair (date without flag)", () => {
     expect(editTaskSchema.safeParse({ ...valid, dueHasTime: null }).success).toBe(false);
   });
