@@ -55,6 +55,8 @@ const ERROR_UX = {
   cycle_not_active: { message: "Można zamknąć tylko aktywny cykl.", redirectToSignIn: false },
   cycle_not_empty: { message: "Cykl zawiera zadania — najpierw przenieś je do innego cyklu lub backlogu.", redirectToSignIn: false },
   cycle_active_delete_forbidden: { message: "Cyklu nie można usunąć — najpierw go zamknij.", redirectToSignIn: false },
+  // slice 012 (contracts/recurrence-api.md D16, Clarifications Q4): the rule is never dropped silently.
+  recurrence_requires_due_date: { message: "Zadanie cykliczne musi mieć termin — wyłącz powtarzanie albo ustaw termin.", redirectToSignIn: false },
 } satisfies Record<ErrorCode, ErrorUx>;
 
 const FALLBACK: ErrorUx = ERROR_UX.internal_error;
