@@ -9,6 +9,8 @@ import { CycleMetrics } from "@/components/cycles/CycleMetrics";
 import { TaskRow, taskOptionId } from "@/components/tasks/TaskRow";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { VIEW_FILTER_EMPTY_HINT, ViewFilterInput } from "@/components/search/ViewFilterInput";
+import { filterTasks, isFilterActive } from "@/lib/filter";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { useCycles, useCycleTasks, useCycleMutations } from "@/hooks/useCycles";
@@ -70,7 +72,11 @@ export function CycleView() {
   const [closing, setClosing] = useState(false);
   const [rowIndex, setRowIndex] = useState(0);
 
-  const rows = tasks ?? [];
+  const allRows = tasks ?? [];
+  // slice 013 (D11): the visible view filter over the cycle's caller-visible rows.
+  const [filter, setFilter] = useState("");
+  const rows = filterTasks(allRows, filter);
+  const isFilteredEmpty = allRows.length > 0 && rows.length === 0 && isFilterActive(filter);
   useEffect(() => {
     setRowIndex((i) => Math.min(i, Math.max(0, rows.length - 1)));
   }, [rows.length]);
@@ -226,8 +232,19 @@ export function CycleView() {
 
               <CycleMetrics cycle={current} now={now} />
 
+              <ViewFilterInput id="cycle-filter" value={filter} onChange={setFilter} />
+
               {tasksPending ? (
                 <Skeleton variant="row" count={3} />
+              ) : isFilteredEmpty ? (
+                <EmptyState
+                  hint={VIEW_FILTER_EMPTY_HINT}
+                  action={
+                    <Button variant="secondary" onClick={() => setFilter("")}>
+                      Wyczyść filtr
+                    </Button>
+                  }
+                />
               ) : rows.length === 0 ? (
                 <p className={styles.noTasks}>Brak widocznych zadań w tym cyklu.</p>
               ) : (

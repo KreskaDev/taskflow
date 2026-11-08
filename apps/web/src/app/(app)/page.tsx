@@ -13,6 +13,8 @@ import { TaskList } from "@/components/tasks/TaskList";
 import type { TaskRowActions } from "@/components/tasks/TaskRow";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { VIEW_FILTER_EMPTY_HINT, ViewFilterInput } from "@/components/search/ViewFilterInput";
+import { filterTasks, isFilterActive } from "@/lib/filter";
 import { useDuplicateTask } from "@/hooks/useDuplicateTask";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
 import { useTasks, type TaskResponse } from "@/hooks/useTasks";
@@ -33,8 +35,12 @@ const CAPTURE_INPUT_ID = "inbox-capture";
 export default function WorkspaceHome() {
   const router = useRouter();
   const { data, isPending, isError, error, refetch } = useTasks();
-  const tasks = useMemo(() => data ?? [], [data]);
-  const isEmpty = !isPending && !isError && tasks.length === 0;
+  const allTasks = useMemo(() => data ?? [], [data]);
+  // slice 013 (US-08.AS-08 reinterpreted, D11): the visible view filter narrows the loaded rows client-side.
+  const [filter, setFilter] = useState("");
+  const tasks = useMemo(() => filterTasks(allTasks, filter), [allTasks, filter]);
+  const isEmpty = !isPending && !isError && allTasks.length === 0;
+  const isFilteredEmpty = !isPending && !isError && allTasks.length > 0 && tasks.length === 0 && isFilterActive(filter);
 
   const {
     renameTask,
@@ -114,6 +120,8 @@ export default function WorkspaceHome() {
 
       <TaskCapture errorId="inbox-capture-error" inputId={CAPTURE_INPUT_ID} />
 
+      <ViewFilterInput id="inbox-filter" value={filter} onChange={setFilter} />
+
       <ProjectSelector
         open={movingId !== null}
         onClose={() => setMovingId(null)}
@@ -167,6 +175,15 @@ export default function WorkspaceHome() {
             Spróbuj ponownie
           </Button>
         </div>
+      ) : isFilteredEmpty ? (
+        <EmptyState
+          hint={VIEW_FILTER_EMPTY_HINT}
+          action={
+            <Button variant="secondary" onClick={() => setFilter("")}>
+              Wyczyść filtr
+            </Button>
+          }
+        />
       ) : isEmpty ? (
         <EmptyState
           hint="Twój Inbox jest pusty."
@@ -178,6 +195,7 @@ export default function WorkspaceHome() {
         />
       ) : (
         <TaskList
+          tasks={tasks}
           selectedIndex={selectedIndex}
           onSelectedIndexChange={setSelectedIndex}
           renamingId={renamingId}
