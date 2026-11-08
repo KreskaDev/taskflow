@@ -112,15 +112,19 @@ test.describe("US-06 Recurring tasks", () => {
 
     // Undo (Clarifications Q1): reopening the completed instance removes the successor.
     const reopened = page.waitForResponse((r) => r.request().method() === "PATCH" && r.url().includes("/status") && r.ok());
-    // The catalog checkbox's visible box overlays the input — set the state directly (Playwright verifies it flipped).
-    await page.getByRole("checkbox", { name: "Oznacz „Podlej kwiaty” jako niezrobione" }).uncheck({ force: true });
+    // The catalog checkbox's visible box overlays the input, so a pointer click (even forced) is unreliable in CI —
+    // toggle it the way a keyboard user does: focus + Space (the Space activation is WCAG operability, not a shortcut).
+    const doneBox = page.getByRole("checkbox", { name: "Oznacz „Podlej kwiaty” jako niezrobione" });
+    await doneBox.focus();
+    await page.keyboard.press("Space");
     await reopened;
     await expect(row(page, "Podlej kwiaty")).toHaveCount(1);
     await expect(successor).toHaveCount(0);
 
     // Re-complete → a fresh successor.
     const recompleted = page.waitForResponse((r) => r.request().method() === "PATCH" && r.url().includes("/status") && r.ok());
-    await page.getByRole("checkbox", { name: "Oznacz „Podlej kwiaty” jako zrobione" }).first().check({ force: true });
+    await page.getByRole("checkbox", { name: "Oznacz „Podlej kwiaty” jako zrobione" }).first().focus();
+    await page.keyboard.press("Space");
     await recompleted;
     await expect(row(page, "Podlej kwiaty").filter({ hasText: ddmmyyyy(shiftDate(today, 1)) })).toHaveCount(1);
 
