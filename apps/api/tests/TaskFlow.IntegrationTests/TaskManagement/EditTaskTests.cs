@@ -33,6 +33,7 @@ public sealed class EditTaskTests : SharingTestBase
             dueDate = ValidDue,
             dueHasTime = true,
             projectId = (Guid?)null,
+            recurrenceRule = (object?)null,
             version = 0,
         });
 
@@ -62,6 +63,7 @@ public sealed class EditTaskTests : SharingTestBase
             dueDate = (DateTime?)null,
             dueHasTime = (bool?)null,
             projectId = (Guid?)project.Id,
+            recurrenceRule = (object?)null,
             version = 0,
         });
 
@@ -85,6 +87,7 @@ public sealed class EditTaskTests : SharingTestBase
             dueDate = (DateTime?)null,
             dueHasTime = (bool?)null,
             projectId = (Guid?)foreignProject.Id,
+            recurrenceRule = (object?)null,
             version = 0,
         });
 
@@ -110,6 +113,7 @@ public sealed class EditTaskTests : SharingTestBase
             dueDate = (DateTime?)null,
             dueHasTime = (bool?)null,
             projectId = (Guid?)null,
+            recurrenceRule = (object?)null,
             version = 0,
         });
 
@@ -134,6 +138,7 @@ public sealed class EditTaskTests : SharingTestBase
             dueDate = (DateTime?)null,
             dueHasTime = (bool?)null,
             projectId = (Guid?)null,
+            recurrenceRule = (object?)null,
             version = 0,
         });
 
@@ -155,6 +160,7 @@ public sealed class EditTaskTests : SharingTestBase
             dueDate = ValidDue,
             dueHasTime = (bool?)null,
             projectId = (Guid?)null,
+            recurrenceRule = (object?)null,
             version = 0,
         });
 
@@ -176,6 +182,7 @@ public sealed class EditTaskTests : SharingTestBase
             dueDate = (DateTime?)null,
             dueHasTime = (bool?)null,
             projectId = (Guid?)null,
+            recurrenceRule = (object?)null,
             version = 0,
         });
 
@@ -197,6 +204,7 @@ public sealed class EditTaskTests : SharingTestBase
             dueDate = (DateTime?)null,
             dueHasTime = (bool?)null,
             projectId = (Guid?)null,
+            recurrenceRule = (object?)null,
             version = 5,
         });
 
@@ -219,6 +227,7 @@ public sealed class EditTaskTests : SharingTestBase
             dueDate = (DateTime?)null,
             dueHasTime = (bool?)null,
             projectId = (Guid?)null,
+            recurrenceRule = (object?)null,
             version = 0,
         });
 
@@ -246,6 +255,7 @@ public sealed class EditTaskTests : SharingTestBase
             dueDate = (DateTime?)null,
             dueHasTime = (bool?)null,
             projectId = (Guid?)project.Id, // unchanged → no move → no target ownership check
+            recurrenceRule = (object?)null,
             version = 0,
         });
 
@@ -273,6 +283,7 @@ public sealed class EditTaskTests : SharingTestBase
             dueDate = (DateTime?)null,
             dueHasTime = (bool?)null,
             projectId = (Guid?)project.Id,
+            recurrenceRule = (object?)null,
             version = 0,
         });
 
@@ -297,6 +308,7 @@ public sealed class EditTaskTests : SharingTestBase
             dueDate = (DateTime?)null,
             dueHasTime = (bool?)null,
             projectId = (Guid?)project.Id,
+            recurrenceRule = (object?)null,
             version = 0,
         });
 

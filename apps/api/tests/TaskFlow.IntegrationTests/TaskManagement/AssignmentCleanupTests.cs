@@ -118,7 +118,7 @@ public sealed class AssignmentCleanupTests : SharingTestBase
         var version = (await LoadTaskAsync(id))!.Version;
 
         using var response = await SendAsync(HttpMethod.Patch, $"/api/tasks/{id}/edit", token,
-            new { title = "Shared task", description = (string?)null, priority = (string?)null, dueDate = (DateTime?)null, dueHasTime = (bool?)null, projectId = (string?)null, version });
+            new { title = "Shared task", description = (string?)null, priority = (string?)null, dueDate = (DateTime?)null, dueHasTime = (bool?)null, projectId = (string?)null, recurrenceRule = (object?)null, version });
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         (await AssigneeIdsAsync(id)).Should().BeEmpty("a /edit move to the Inbox clears assignees (FR-069)");

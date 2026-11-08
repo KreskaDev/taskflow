@@ -399,7 +399,7 @@ public sealed class TaskTests
         var projectId = ProjectId.From(Guid.NewGuid());
         var due = new DateTime(2026, 8, 2, 13, 0, 0, DateTimeKind.Utc);
 
-        task.EditTask("Edited title", "A description", "P1", due, dueHasTime: true, projectId, MutateInstant);
+        task.EditTask("Edited title", "A description", "P1", due, dueHasTime: true, projectId, recurrenceRule: null, MutateInstant);
 
         task.Title.Should().Be("Edited title");
         task.Description.Should().Be("A description");
@@ -415,9 +415,9 @@ public sealed class TaskTests
     public void EditTask_clears_nullable_fields_when_passed_null()
     {
         var task = NewTask();
-        task.EditTask("First", "desc", "P0", new DateTime(2026, 8, 2, 13, 0, 0, DateTimeKind.Utc), true, ProjectId.From(Guid.NewGuid()), MutateInstant);
+        task.EditTask("First", "desc", "P0", new DateTime(2026, 8, 2, 13, 0, 0, DateTimeKind.Utc), true, ProjectId.From(Guid.NewGuid()), recurrenceRule: null, MutateInstant);
 
-        task.EditTask("Second", null, null, null, null, null, LaterInstant);
+        task.EditTask("Second", null, null, null, null, null, recurrenceRule: null, LaterInstant);
 
         task.Title.Should().Be("Second");
         task.Description.Should().BeNull();
@@ -433,10 +433,10 @@ public sealed class TaskTests
     {
         var task = NewTask();
 
-        task.EditTask("  spaced  ", null, null, null, null, null, MutateInstant);
+        task.EditTask("  spaced  ", null, null, null, null, null, recurrenceRule: null, MutateInstant);
         task.Title.Should().Be("spaced");
 
-        var act = () => task.EditTask(new string('x', 501), null, null, null, null, null, LaterInstant);
+        var act = () => task.EditTask(new string('x', 501), null, null, null, null, null, recurrenceRule: null, LaterInstant);
         act.Should().Throw<ArgumentException>("the domain NormalizeTitle guard backs the command validator");
     }
 
@@ -445,7 +445,7 @@ public sealed class TaskTests
     {
         var task = NewTask();
 
-        var act = () => task.EditTask("Title", null, "P9", null, null, null, MutateInstant);
+        var act = () => task.EditTask("Title", null, "P9", null, null, null, recurrenceRule: null, MutateInstant);
 
         act.Should().Throw<ArgumentException>();
     }
@@ -455,7 +455,7 @@ public sealed class TaskTests
     {
         var task = NewTask();
 
-        task.EditTask("Title", "   ", null, null, null, null, MutateInstant);
+        task.EditTask("Title", "   ", null, null, null, null, recurrenceRule: null, MutateInstant);
 
         task.Description.Should().BeNull("a whitespace-only description is normalized to no description");
     }
@@ -558,7 +558,7 @@ public sealed class TaskTests
         var task = SharedProjectTask();
         task.SetAssignees([UserId.New(), UserId.New()], UserId.New(), MutateInstant);
 
-        task.EditTask("Title", null, null, null, null, ProjectId.From(Guid.NewGuid()), LaterInstant);
+        task.EditTask("Title", null, null, null, null, ProjectId.From(Guid.NewGuid()), recurrenceRule: null, LaterInstant);
 
         task.Assignees.Should().BeEmpty("EditTask moving to a different project clears the assignee set");
     }
@@ -569,7 +569,7 @@ public sealed class TaskTests
         var task = SharedProjectTask();
         task.SetAssignees([UserId.New()], UserId.New(), MutateInstant);
 
-        task.EditTask("Title", null, null, null, null, null, LaterInstant); // to the Inbox
+        task.EditTask("Title", null, null, null, null, null, recurrenceRule: null, LaterInstant); // to the Inbox
 
         task.Assignees.Should().BeEmpty("EditTask to the Inbox clears the assignee set (FR-069)");
     }

@@ -36,7 +36,10 @@ public sealed record TaskBody(
     DateTime? DueDate = null, bool? DueHasTime = null,
     Guid? ProjectId = null, string? Priority = null, string? Description = null,
     IReadOnlyList<Guid>? Assignees = null, IReadOnlyList<Guid>? Labels = null,
-    Guid? CycleId = null, bool? CarriedOver = null);
+    Guid? CycleId = null, bool? CarriedOver = null, RecurrenceRuleBody? RecurrenceRule = null);
+
+/// <summary>The <c>RecurrenceRule</c> wire shape (slice 012): the closed union flattened to optional members.</summary>
+public sealed record RecurrenceRuleBody(string Type, int? Interval = null, IReadOnlyList<int>? Weekdays = null, int? DayOfMonth = null);
 
 /// <summary>The <c>LabelResponse</c> read model (slice 006): id + name + optional preset color. No ownerId.</summary>
 public sealed record LabelBody(Guid Id, string Name, string? Color = null);
