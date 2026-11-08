@@ -219,6 +219,30 @@ BEFORE their covering tests per the 019 gate convention. Screens: sidebar, `/cyc
 
 ---
 
+## O. Recurring tasks (slice 012)
+
+New behaviors of slice 012 (contract `specs/012-recurring-tasks/contracts/ui-recurrence.md`);
+rows added BEFORE their covering tests per the 019 gate convention. Screens: the `E` task
+editor (daily views), the task details drawer (every surface), task rows on Inbox/daily/List/
+`/cycle` and Board cards.
+
+| ID | Given / When / Then | Realizes | Level |
+|---|---|---|---|
+| INV-176 | Given the `E` task editor or the task details drawer for a task WITH a due date, When it renders, Then a labelled „Powtarzanie" select offers „Nie powtarza się" (default) / „Codziennie" / „Co N dni" / „W wybrane dni tygodnia" / „Co miesiąc"; for a task WITHOUT a due date the select is disabled with the visible hint „Ustaw najpierw termin". | US-06 AS-01, FR-007, FR-043 | [E]+[C] |
+| INV-177 | Given „Co N dni" is selected, When the per-type input renders, Then a labelled number input „Co ile dni" (2..365, default 2) appears and out-of-range values block the save. | FR-007 | [C] |
+| INV-178 | Given „W wybrane dni tygodnia" is selected, When the per-type inputs render, Then seven labelled checkboxes Pn Wt Śr Cz Pt So Nd appear in ISO order; with none checked the inline message „Wybierz co najmniej jeden dzień" blocks the save. | FR-007, FR-049 | [C] |
+| INV-179 | Given „Co miesiąc" is selected, When the per-type text renders, Then it reads „co miesiąc, N. dnia" where N is the due date's day-of-month in Europe/Warsaw (an existing rule shows its stored anchor). | FR-007, FR-092 | [C] |
+| INV-180 | Given a rule other than „Nie powtarza się", When the field renders, Then a preview line „Następne wystąpienie: dd.MM.yyyy" (plus „ HH:mm" for timed dues) shows the first occurrence strictly after the task's CURRENT due date, computed in Europe/Warsaw (DST-safe, monthly clamped). | FR-092, ASM-09 | [C]+[E] |
+| INV-181 | Given a recurring task, When the user checks „Usuń termin" in the editor OR clears the „Termin" input in the drawer, Then the inline message „Zadanie cykliczne musi mieć termin — wyłącz powtarzanie albo ustaw termin" appears, „Zapisz" is disabled / no reschedule is sent, and the server's `422 recurrence_requires_due_date` maps to the same copy. | Clarifications Q4, FR-049 | [E]+[C] |
+| INV-182 | Given a task with a recurrence rule, When any row renders it (Inbox, Today/Upcoming, project List, `/cycle`, Assigned, Board card), Then a text chip with the Repeat icon (decorative) and the rule label („codziennie" / „co N dni" / „pn, śr" / „co miesiąc, N.") appears after the due chip and before „przeniesione"; a task without a rule shows no chip. | US-06 AS-01, FR-044, FR-046 | [E]+[C]+[V] |
+| INV-183 | Given a recurring task whose due day (Europe/Warsaw) is today or earlier, When the user completes it, Then after the write settles a new instance with the next due date, the same title/priority/project/labels and the same chip appears adjacent to the completed row, and a toast „Utworzono kolejne wystąpienie" is shown and announced politely. | US-06 AS-02/AS-03/AS-05, FR-008, FR-101 | [E]+[C] |
+| INV-184 | Given a recurring task whose due day is in the future, When the user completes it, Then NO new instance appears and no toast is shown (the server schedules the spawn for the due day). | US-06 AS-04, EC-05, FR-009 | [E]+[C] |
+| INV-185 | Given a completed recurring task whose successor exists, When the user reopens it (unchecks done), Then the successor disappears from the lists; completing it again creates a fresh successor. | FR-009 undo, Clarifications Q1 | [E] |
+| INV-186 | Given a recurring task, When the user moves it to „Anulowane" on the Board, Then no new instance is created. | US-06 AS-06, FR-010 | [E] |
+| INV-187 | Given a recurring task with a chip, When the user sets „Powtarzanie" to „Nie powtarza się" and saves, Then the chip disappears and completing the task no longer creates an instance. | FR-010, US-06 AS-01 | [E] |
+
+---
+
 ## Transfer notes (D11 — rows asserting UNSHIPPED capabilities move to their owning slices)
 
 | UIT row | Assertion | Disposition |
