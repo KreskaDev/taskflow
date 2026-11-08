@@ -37,6 +37,12 @@ interface DialogProps {
   titleId: string;
   /** id of the element describing the dialog (optional). */
   descriptionId?: string;
+  /**
+   * Surface width: `default` = 28rem (confirmations, forms); `wide` = 36rem for list-bearing
+   * dialogs (the command palette). Content never sets its own min-width — a wider child would
+   * overflow the surface and the focused input would scroll it (clipped title/headings).
+   */
+  size?: "default" | "wide";
   children: ReactNode;
 }
 
@@ -48,7 +54,7 @@ const FOCUSABLE =
  * sets initial focus into the dialog, traps focus, dismisses on Esc, and returns
  * focus to the invoking element on close.
  */
-export function Dialog({ open, onClose, titleId, descriptionId, children }: DialogProps) {
+export function Dialog({ open, onClose, titleId, descriptionId, size = "default", children }: DialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const invokerRef = useRef<HTMLElement | null>(null);
 
@@ -110,7 +116,7 @@ export function Dialog({ open, onClose, titleId, descriptionId, children }: Dial
     <div className={styles.overlay} role="presentation" onClick={onClose}>
       <div
         ref={dialogRef}
-        className={styles.dialog}
+        className={size === "wide" ? `${styles.dialog} ${styles.dialogWide}` : styles.dialog}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

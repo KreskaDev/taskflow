@@ -22,6 +22,21 @@ function Host() {
 }
 
 describe("Dialog (catalog) [INV-132]", () => {
+  it("size=\"wide\" widens the surface (the palette's content must not overflow the 28rem default)", () => {
+    render(
+      <Dialog open onClose={() => {}} titleId="w" size="wide">
+        <h2 id="w">Szeroki</h2>
+      </Dialog>,
+    );
+    expect(screen.getByRole("dialog").className).toContain("dialogWide");
+  });
+
+  it("defaults to the standard width (no wide class)", () => {
+    render(<Host />);
+    fireEvent.click(screen.getByRole("button", { name: "Otwórz" }));
+    expect(screen.getByRole("dialog").className).not.toContain("dialogWide");
+  });
+
   it("sets initial focus into the dialog on open", () => {
     render(<Host />);
     const invoker = screen.getByRole("button", { name: "Otwórz" });

@@ -77,6 +77,9 @@ describe("CommandPalette — dialog + empty query [INV-189] [INV-191]", () => {
   it("renders the titled dialog with the focused combobox and ONLY the Akcje group for an empty query", () => {
     const { input } = renderPalette();
     expect(screen.getByRole("dialog", { name: PALETTE_TITLE })).toBeTruthy();
+    // Regression ([V] palette baselines, 2026-11-09): the 560px palette overflowed the 28rem catalog
+    // dialog and the focused input scrolled the surface — the title/headings rendered clipped.
+    expect(screen.getByRole("dialog", { name: PALETTE_TITLE }).className).toContain("dialogWide");
     expect(document.activeElement).toBe(input());
     const groups = screen.getAllByRole("group");
     expect(groups).toHaveLength(1);

@@ -26,6 +26,11 @@
   box-shadow: 0 12px 32px var(--color-scrim);
 }
 
+/* size="wide" — list-bearing dialogs (command palette, slice 013). */
+.dialogWide {
+  max-width: 36rem;
+}
+
 /* ── Shared dialog-content pieces (consumed via the DialogTitle/DialogActions/
       DialogChoices subcomponents and, for the generic classes, direct import) ── */
 
