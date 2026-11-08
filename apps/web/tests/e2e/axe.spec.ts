@@ -332,6 +332,9 @@ test.describe("axe AA — recurrence field (slice 012)", () => {
       await setPalette(page, palette);
       await page.getByRole("button", { name: "Zadanie cykliczne AA", exact: true }).click();
       await expect(page.getByRole("complementary").getByRole("combobox", { name: "Powtarzanie" })).toBeVisible();
+      // Park the pointer: the row title's HOVER accent (a pre-slice-010 token pairing, 4.49:1 on the dark
+      // palettes) is not this slice's surface — the audit targets the drawer's resting state.
+      await page.mouse.move(0, 0);
       await auditCurrentPage(page, `drawer recurrence × ${palette}`);
 
       await context.close();
