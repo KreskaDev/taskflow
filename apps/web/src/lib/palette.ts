@@ -12,7 +12,7 @@ type LabelResponse = components["schemas"]["LabelResponse"];
  * Akcje → Zadania → Projekty → Etykiety.
  */
 
-export type PaletteActionKind = "dialog:new-task" | "dialog:new-project" | "route";
+type PaletteActionKind = "dialog:new-task" | "dialog:new-project" | "route";
 
 export interface PaletteAction {
   id: string;
