@@ -84,10 +84,10 @@ test.describe("US-04 Command palette & search", () => {
     await input.press("ArrowDown");
     await expect(input).toHaveAttribute("aria-activedescendant", /task:/);
     const activeId = await input.getAttribute("aria-activedescendant");
-    const activeTitle = await dialog.locator(`#${activeId!}`).innerText();
+    const activeTitle = await dialog.locator(`[id="${activeId!}"]`).innerText();
     await input.press("Enter");
     await expect(page.getByRole("dialog", { name: PALETTE })).toHaveCount(0);
-    await expect(page).toHaveURL(/\?task=/);
+    await expect(page).toHaveURL(/\?task=/, { timeout: 30_000 });
     await expect(page.getByRole("complementary").getByRole("textbox", { name: "Tytuł zadania" })).toHaveValue(
       activeTitle.startsWith("Kup mleko") ? "Kup mleko" : "Zakupy",
     );
@@ -126,8 +126,9 @@ test.describe("US-04 Command palette & search", () => {
     const archivedRow = dialog.getByRole("option", { name: /Stary remont/ });
     await expect(archivedRow).toContainText("(zarchiwizowany)");
     await dialog.getByRole("option", { name: /Remont łazienki/ }).click();
-    await expect(page).toHaveURL(new RegExp(`/projects/${live.id}`));
-    await expect(page.getByRole("heading", { name: "Remont łazienki" })).toBeVisible();
+    // Generous timeout: the run's FIRST /projects/[id] hit compiles the route on demand in `next dev`.
+    await expect(page).toHaveURL(new RegExp(`/projects/${live.id}`), { timeout: 30_000 });
+    await expect(page.getByRole("heading", { name: "Remont łazienki" })).toBeVisible({ timeout: 30_000 });
 
     // US-10.AS-06: „Przywróć" restores the archived project in place.
     ({ dialog, input } = await openPalette(page));
