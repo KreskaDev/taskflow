@@ -80,7 +80,7 @@ and dropped silently; no `TaskAssigned` notification.
 | monthly/15 | 2026-12-15 | 2027-01-15 (year wrap) |
 | daily, timed 09:00 | 2026-03-28 09:00 CET | 2026-03-29 09:00 CEST (DST: wall-clock kept) |
 | every_n_days/7, timed 09:00 | 2026-10-24 09:00 CEST | 2026-10-31 09:00 CET |
-| daily, date-only | 2026-03-28 (midnight CET = 23:00Z 03-27) | 2026-03-29 midnight CEST (= 22:00Z 03-28) |
+| every_n_days/2, date-only | 2026-03-28 (midnight CET = 23:00Z 03-27) | 2026-03-30 midnight CEST (= 22:00Z 03-29) |
 
 ## Error codes (D16)
 
