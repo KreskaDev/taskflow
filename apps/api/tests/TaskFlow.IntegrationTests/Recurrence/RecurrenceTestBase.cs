@@ -111,7 +111,12 @@ public abstract class RecurrenceTestBase : SharingTestBase
     protected async Task<TaskBody> SetStatusAsync(string token, Guid id, string status, int version)
     {
         using var response = await SendStatusAsync(token, id, status, version);
-        response.StatusCode.Should().Be(HttpStatusCode.OK, $"the helper sets status {status}");
+        if (response.StatusCode != HttpStatusCode.OK)
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            throw new Xunit.Sdk.XunitException($"the helper sets status {status} but got {(int)response.StatusCode}; body: {body.Replace('{', '(').Replace('}', ')')}");
+        }
+
         return await response.ReadTaskAsync();
     }
 
