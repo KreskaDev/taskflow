@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { CloseCycleDialog, type CloseCycleConfirm } from "@/components/cycles/CloseCycleDialog";
 import { CycleFormDialog, type CycleFormFields } from "@/components/cycles/CycleFormDialog";
@@ -54,6 +55,18 @@ export function CycleView() {
 
   const { data: tasks, isPending: tasksPending } = useCycleTasks(currentId);
   const [form, setForm] = useState<FormState>(null);
+  // slice 013 (D12): the palette's „Nowy cykl" action lands here with `?nowy=1` — open the create dialog once
+  // and strip the flag so a reload/back does not reopen it.
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const wantsNew = searchParams.get("nowy") === "1";
+  useEffect(() => {
+    if (wantsNew) {
+      setForm({ mode: "create" });
+      router.replace(pathname);
+    }
+  }, [wantsNew, router, pathname]);
   const [closing, setClosing] = useState(false);
   const [rowIndex, setRowIndex] = useState(0);
 

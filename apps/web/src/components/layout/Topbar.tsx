@@ -2,12 +2,18 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { PanelLeft, Plus, Search } from "lucide-react";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
+import { ProjectForm } from "@/components/projects/ProjectForm";
+import { CommandPalette } from "@/components/search/CommandPalette";
 import { GlobalCaptureDialog } from "@/components/tasks/TaskCapture";
+import { invalidateSearch } from "@/hooks/useSearch";
+import type { PaletteAction } from "@/lib/palette";
 import { useSession } from "@/hooks/useSession";
 import styles from "./Topbar.module.css";
 
@@ -27,8 +33,33 @@ interface TopbarProps {
  */
 export function Topbar({ sidebarCollapsed, onToggleSidebar }: TopbarProps) {
   const [captureOpen, setCaptureOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [projectFormOpen, setProjectFormOpen] = useState(false);
   const { data: session } = useSession();
   const user = session?.authenticated ? session.user : undefined;
+  const router = useRouter();
+  const queryClient = useQueryClient();
+
+  // slice 013 (D8/D10): the visible opener; every open drops cached results so revoked items never resurface.
+  const openPalette = () => {
+    void invalidateSearch(queryClient);
+    setPaletteOpen(true);
+  };
+
+  // Dialog-opening actions run AFTER the palette has closed so the FR-101 focus hand-over is clean (D12).
+  const runAction = (action: PaletteAction) => {
+    switch (action.kind) {
+      case "dialog:new-task":
+        setCaptureOpen(true);
+        return;
+      case "dialog:new-project":
+        setProjectFormOpen(true);
+        return;
+      case "route":
+        if (action.href) router.push(action.href);
+        return;
+    }
+  };
 
   return (
     <header className={styles.topbar}>
@@ -44,21 +75,18 @@ export function Topbar({ sidebarCollapsed, onToggleSidebar }: TopbarProps) {
         TaskFlow
       </Link>
 
-      <div
+      {/* slice 013 (US-04.AS-01 reinterpreted, D8): the palette opener — a real button, in the tab order, no Ctrl+K. */}
+      <button
+        type="button"
         className={styles.search}
-        role="searchbox"
-        aria-label="Szukaj (wkrótce)"
-        aria-disabled="true"
+        aria-label="Szukaj"
+        aria-haspopup="dialog"
+        aria-expanded={paletteOpen}
+        onClick={openPalette}
       >
         <Search size={14} strokeWidth={1.75} aria-hidden="true" />
-        <input
-          type="text"
-          placeholder="Szukaj…"
-          disabled
-          tabIndex={-1}
-          aria-hidden="true"
-        />
-      </div>
+        <span className={styles.searchText}>Szukaj…</span>
+      </button>
 
       <Button className={styles.newTask} onClick={() => setCaptureOpen(true)}>
         <Plus size={15} strokeWidth={2} aria-hidden="true" />
@@ -72,6 +100,13 @@ export function Topbar({ sidebarCollapsed, onToggleSidebar }: TopbarProps) {
       ) : null}
 
       <GlobalCaptureDialog open={captureOpen} onClose={() => setCaptureOpen(false)} />
+      <ProjectForm open={projectFormOpen} onClose={() => setProjectFormOpen(false)} mode="create" />
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        onNavigate={(href) => router.push(href)}
+        onAction={runAction}
+      />
     </header>
   );
 }

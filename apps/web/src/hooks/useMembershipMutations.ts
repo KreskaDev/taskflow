@@ -7,6 +7,7 @@ import { apiClient, mapError, type ProblemDetails } from "@/lib/api/client";
 import type { MemberResponse } from "@/hooks/useProjectMembers";
 import { membersKey } from "@/hooks/useProjectMembers";
 import { ACTIVE_PROJECTS_KEY, ARCHIVED_PROJECTS_KEY, type ProjectResponse } from "@/hooks/useProjects";
+import { invalidateSearch } from "@/hooks/useSearch";
 import type { MembershipRole } from "@/lib/validation/membership";
 
 /**
@@ -22,6 +23,8 @@ import type { MembershipRole } from "@/lib/validation/membership";
 /** Re-invalidates the roster on settle; visibility/owner-changing ops also refresh the sidebar lists. */
 async function invalidateRoster(queryClient: QueryClient, projectId: string, alsoProjectLists: boolean): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: membersKey(projectId) });
+  // slice 013 (D10 / FR-095 posture): a membership change can revoke access — never serve a stale search result.
+  await invalidateSearch(queryClient);
   // Membership/project changes shift the sidebar counts (slice 019, D6).
   await invalidateViewCounts(queryClient);
   if (alsoProjectLists) {
