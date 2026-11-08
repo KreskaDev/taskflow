@@ -1,5 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using TaskFlow.Application.Errors;
+using TaskFlow.Application.Time;
+using Wolverine;
 using TaskStatus = TaskFlow.Domain.TaskManagement.TaskStatus;
 using TaskFlow.Domain.TaskManagement.Events;
 
@@ -19,7 +21,8 @@ namespace TaskFlow.Application.TaskManagement.Recurrence;
 /// <item>row absent or soft-deleted → no-op;</item>
 /// <item>not <c>done</c>, or <c>completed_at</c> differs from the message's instant (µs) → no-op — the instance was
 /// reopened/cancelled, or re-completed later (that completion carries its OWN message);</item>
-/// <item>rule or due removed meanwhile → no-op;</item>
+/// <item>rule or due removed meanwhile → no-op; due day moved into the future (the done instance was
+/// rescheduled) → re-schedule for the new due day, never spawn early (EC-05);</item>
 /// <item>a live successor already exists → no-op;</item>
 /// <item>otherwise build + insert; a <see cref="SuccessorAlreadyExistsException"/> (the partial unique index won a
 /// race) is swallowed as a no-op.</item>
@@ -38,9 +41,11 @@ public static class SpawnRecurrenceSuccessorHandler
         IProjectMembershipRepository members,
         Labels.ITaskLabelRepository taskLabels,
         TimeProvider timeProvider,
+        IMessageContext messages,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(message);
+        ArgumentNullException.ThrowIfNull(messages);
         ArgumentNullException.ThrowIfNull(tasks);
         ArgumentNullException.ThrowIfNull(projects);
         ArgumentNullException.ThrowIfNull(members);
@@ -58,8 +63,23 @@ public static class SpawnRecurrenceSuccessorHandler
             return;
         }
 
-        if (task.RecurrenceRule is null || task.DueDate is null)
+        if (task.RecurrenceRule is null || task.DueDate is not { } due)
         {
+            return;
+        }
+
+        // 3b. The anchor may have MOVED since the message was scheduled (a done instance can still be
+        //     rescheduled — contracts/recurrence-api.md §RescheduleDueDate). EC-05: never spawn before the
+        //     CURRENT due day — re-park the message at the new due day's start instead.
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var dueDay = WarsawDayBounds.WarsawLocalDate(due);
+        if (WarsawDayBounds.WarsawLocalDate(now) < dueDay)
+        {
+            await messages
+                .PublishAsync(
+                    new SpawnRecurrenceSuccessor(task.Id, message.CompletedAtInstant),
+                    new DeliveryOptions { ScheduledTime = new DateTimeOffset(WarsawDayBounds.StartOfDayUtc(dueDay), TimeSpan.Zero) })
+                .ConfigureAwait(false);
             return;
         }
 
@@ -68,7 +88,6 @@ public static class SpawnRecurrenceSuccessorHandler
             return;
         }
 
-        var now = timeProvider.GetUtcNow().UtcDateTime;
         var successor = await RecurrenceSuccessor
             .BuildAndAddAsync(task, tasks, projects, members, now, cancellationToken)
             .ConfigureAwait(false);

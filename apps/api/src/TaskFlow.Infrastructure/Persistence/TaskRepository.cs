@@ -182,9 +182,9 @@ public sealed class TaskRepository(AppDbContext db) : ITaskRepository
             // slice 012 (D2/D7): a LIVE successor of this predecessor already exists — the deferred job and an
             // interleaved spawn raced. Detach the staged successor so Wolverine's commit-flush cannot re-attempt
             // the insert (the TaskLabelRepository lesson), then signal the handler to no-op.
-            foreach (var entry in db.ChangeTracker.Entries<TaskEntity>().Where(e => e.State == EntityState.Added).ToList())
+            foreach (var entry in db.ChangeTracker.Entries().Where(e => e.State == EntityState.Added).ToList())
             {
-                entry.State = EntityState.Detached;
+                entry.State = EntityState.Detached; // the task AND its owned task_assignees rows
             }
 
             throw new SuccessorAlreadyExistsException("A live successor of this recurring instance already exists.", ex);

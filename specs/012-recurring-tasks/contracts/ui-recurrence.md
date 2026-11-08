@@ -8,7 +8,7 @@ grid/row/gridcell remediation.
 
 ## `RecurrenceField` (shared; D10) — hosted by `TaskEditor` AND `TaskDrawer`
 
-- Labelled control **„Powtarzanie"** (a `<select>` in a `fieldRow` like „Priorytet"):
+- Labelled control **„Powtarzanie"** (a `<select>` in a `fieldRow` like „Priorytet"; inside the drawer the host's `<dt>` carries the visible label and the field's own label is visually hidden):
   „Nie powtarza się" (default) / „Codziennie" / „Co N dni" / „W wybrane dni tygodnia" /
   „Co miesiąc".
 - Per-type inputs appear under the select, each labelled:
@@ -40,7 +40,7 @@ grid/row/gridcell remediation.
   is present: „codziennie" / „co N dni" / weekday abbreviations joined by „, " („pn, śr") /
   „co miesiąc, N.". The icon is decorative (`aria-hidden`); the text carries the meaning
   (FR-044/FR-046 — never icon- or color-only).
-- Chip order within the row: after the due chip, before the „przeniesione" chip.
+- Chip order within the row: after the priority/„zaległe" markers and before the „przeniesione" chip (the due chip stays the row's trailing element, as on every list).
 
 ## Completion feedback (D13 / FR-101)
 
