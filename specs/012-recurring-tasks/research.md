@@ -152,7 +152,7 @@ recoverable and reuses the tested reaper path.
 2. `A.Status != Done` or `!SameInstant(A.CompletedAt, message.CompletedAtInstant)` (µs
    resolution, the reaper's comparison) → no-op (reopened, cancelled, or re-completed later —
    a later re-completion carries its OWN message);
-3. `A.RecurrenceRule == null || A.DueDate == null` → no-op (rule removed meanwhile);
+3. `A.RecurrenceRule == null || A.DueDate == null` → no-op (rule removed meanwhile); `today(Warsaw) < dueDay(A)` (a done instance was rescheduled later — the anchor moved) → re-publish `SpawnRecurrenceSuccessor` with `ScheduledTime` = the new due day's start and stop (never spawn early);
 4. a live successor already exists → no-op;
 5. otherwise build (D5) + insert; a `DbUpdateException` on `ux_tasks_spawned_from_live` →
    swallowed as an idempotent no-op (the race backstop).

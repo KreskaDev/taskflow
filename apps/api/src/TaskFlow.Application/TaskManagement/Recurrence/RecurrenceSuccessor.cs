@@ -1,4 +1,3 @@
-using TaskFlow.Application.Errors;
 using TaskFlow.Domain.IdentityAccess;
 using TaskEntity = TaskFlow.Domain.TaskManagement.Task;
 using TaskId = TaskFlow.Domain.TaskManagement.TaskId;
@@ -36,9 +35,14 @@ internal static class RecurrenceSuccessor
         {
             // Re-validate the carried assignees against CURRENT membership ∪ the owner anchor (FR-008/FR-066).
             var memberships = await members.ListByProjectAsync(projectId, cancellationToken).ConfigureAwait(false);
-            var project = await projects.FindByIdAsync(projectId, cancellationToken).ConfigureAwait(false)
-                ?? throw new NotFoundException();
-            var valid = new HashSet<UserId>(memberships.Select(m => m.UserId)) { project.OwnerId };
+            var project = await projects.FindByIdAsync(projectId, cancellationToken).ConfigureAwait(false);
+            // A soft-deleted project (dispositions should prevent the pointer, but never lose a status write over
+            // it): nobody is a valid assignee any more — the successor is simply unassigned.
+            var valid = new HashSet<UserId>(memberships.Select(m => m.UserId));
+            if (project is not null)
+            {
+                valid.Add(project.OwnerId);
+            }
 
             var carried = predecessor.Assignees
                 .Select(a => a.UserId)

@@ -56,7 +56,7 @@ HttpContext). Decision path, in order — every "no-op" is silent and idempotent
 
 1. task absent or soft-deleted → no-op
 2. `Status != done` OR `CompletedAt` ≠ `CompletedAtInstant` (µs) → no-op (reopened / cancelled / re-completed later)
-3. no rule or no due → no-op
+3. no rule or no due → no-op; due day now in the FUTURE (the done instance was rescheduled — the anchor moved) → re-publish the message for the new due day's start and stop (EC-05: never spawn early)
 4. a live successor exists → no-op
 5. build + insert (D5); unique-index violation (`ux_tasks_spawned_from_live`) → swallowed no-op
 
