@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
@@ -45,6 +46,12 @@ internal sealed class TaskFlowDocumentTransformer : IOpenApiDocumentTransformer
 
         document.Components ??= new OpenApiComponents();
         document.Components.Schemas[ProblemDetailsSchemaId] = BuildProblemDetailsSchema();
+
+        // Determinism: the built-in generator documents `IResult`-returning endpoints with an empty component
+        // schema whose NAME depends on type-discovery order (`IResult` vs `IResult2` — the main-branch
+        // openapi-sync job flipped between runs). The only such endpoint is the BFF auth probe, which returns
+        // 204 No Content; document exactly that and drop the lottery schema so `gen:api` is reproducible.
+        NormalizeNoContentProbe(document, "/api/internal/auth-check", OperationType.Get);
 
         // Stable operationIds + a documented 401 on the authenticated user endpoints (deny-by-default).
         SetOperation(document, "/api/users/ensure", OperationType.Post, "ensureUser");
@@ -181,6 +188,21 @@ internal sealed class TaskFlowDocumentTransformer : IOpenApiDocumentTransformer
     /// <c>404</c>/<c>409</c>/<c>422</c>). All reference the shared <c>ProblemDetails</c> schema. No-ops if
     /// the path is not yet in the document (so the call is safe before its endpoint is mapped).
     /// </summary>
+    private static void NormalizeNoContentProbe(OpenApiDocument document, string path, OperationType method)
+    {
+        if (document.Paths.TryGetValue(path, out var item) &&
+            item.Operations.TryGetValue(method, out var operation))
+        {
+            operation.Responses.Remove("200");
+            operation.Responses["204"] = new OpenApiResponse { Description = "No Content — the identity carrier is valid." };
+        }
+
+        foreach (var key in document.Components.Schemas.Keys.Where(k => Regex.IsMatch(k, "^IResult[0-9]*$")).ToList())
+        {
+            document.Components.Schemas.Remove(key);
+        }
+    }
+
     private static void SetOperation(
         OpenApiDocument document,
         string path,
