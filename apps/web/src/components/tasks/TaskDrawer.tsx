@@ -152,7 +152,8 @@ export function TaskDrawer({ task, onClose }: TaskDrawerProps) {
         />
       </header>
 
-      <p className={styles.taskId}>
+      {/* data-visual-hide: a random UUID per run — hidden ONLY in [V] screenshots (visual.hide-dev-overlay.css). */}
+      <p className={styles.taskId} data-visual-hide>
         <span className="sr-only">identyfikator: </span>
         {task.id}
       </p>
