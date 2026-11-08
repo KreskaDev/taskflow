@@ -36,8 +36,8 @@ internal static class RecurrenceSuccessor
         {
             // Re-validate the carried assignees against CURRENT membership ∪ the owner anchor (FR-008/FR-066).
             var memberships = await members.ListByProjectAsync(projectId, cancellationToken).ConfigureAwait(false);
-            var projectRows = await projects.ListByIdsAsync([projectId], includeArchived: true, cancellationToken).ConfigureAwait(false);
-            var project = projectRows.Count > 0 ? projectRows[0] : throw new NotFoundException();
+            var project = await projects.FindByIdAsync(projectId, cancellationToken).ConfigureAwait(false)
+                ?? throw new NotFoundException();
             var valid = new HashSet<UserId>(memberships.Select(m => m.UserId)) { project.OwnerId };
 
             var carried = predecessor.Assignees

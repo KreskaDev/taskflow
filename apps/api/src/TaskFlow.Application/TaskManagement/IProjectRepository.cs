@@ -40,6 +40,13 @@ public interface IProjectRepository
     Task<Project?> FindReadableAsync(ProjectId id, UserId caller, CancellationToken cancellationToken);
 
     /// <summary>
+    /// The live (not soft-deleted) project by id regardless of archive state and WITHOUT a caller (slice 012,
+    /// research D5): the recurrence spawn re-validates carried assignees against the project's owner + current
+    /// membership and has no HttpContext. Callers that act for a user keep using the scoped finders above.
+    /// </summary>
+    Task<Project?> FindByIdAsync(ProjectId id, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Loads the NON-deleted projects whose ids are in <paramref name="ids"/>, filtered to the ACTIVE set
     /// (<paramref name="includeArchived"/> = false) or the ARCHIVED set (true) — the two disjoint sidebar
     /// views (R8). Used by <c>GetMyProjects</c> to materialize the shared projects the caller is a member of

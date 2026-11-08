@@ -898,7 +898,7 @@ export interface components {
              * @description Stable machine-readable error code.
              * @enum {string}
              */
-            errorCode: "validation_failed" | "unauthenticated" | "not_admitted" | "forbidden" | "not_found" | "conflict_lww" | "last_owner" | "internal_error" | "version_conflict" | "duplicate_id" | "no_next_cycle" | "cycle_not_planned" | "cycle_active_conflict" | "cycle_not_active" | "cycle_not_empty" | "cycle_active_delete_forbidden";
+            errorCode: "validation_failed" | "unauthenticated" | "not_admitted" | "forbidden" | "not_found" | "conflict_lww" | "last_owner" | "internal_error" | "version_conflict" | "duplicate_id" | "no_next_cycle" | "cycle_not_planned" | "cycle_active_conflict" | "cycle_not_active" | "cycle_not_empty" | "cycle_active_delete_forbidden" | "recurrence_requires_due_date";
             /** @description Field-level validation errors (field path -> messages). */
             errors?: {
                 [key: string]: string[];
@@ -1062,6 +1062,7 @@ export interface components {
             dueHasTime: boolean | null;
             /** Format: uuid */
             projectId: string | null;
+            recurrenceRule: components["schemas"]["RecurrenceRuleDto"];
             /** Format: int32 */
             version: number;
         };
@@ -1133,6 +1134,14 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        RecurrenceRuleDto: {
+            type: string;
+            /** Format: int32 */
+            interval?: number | null;
+            weekdays?: number[] | null;
+            /** Format: int32 */
+            dayOfMonth?: number | null;
+        } | null;
         RenameTaskRequest: {
             title: string;
             /** Format: int32 */
@@ -1204,6 +1213,7 @@ export interface components {
             /** Format: uuid */
             cycleId?: string | null;
             carriedOver: boolean;
+            recurrenceRule?: components["schemas"]["RecurrenceRuleDto"];
         };
         TodayGroup: {
             /** Format: uuid */
@@ -1239,6 +1249,7 @@ export interface components {
             /** Format: uuid */
             cycleId?: string | null;
             carriedOver: boolean;
+            recurrenceRule?: components["schemas"]["RecurrenceRuleDto"];
             isOverdue: boolean;
         };
         TransferOwnershipRequest: {

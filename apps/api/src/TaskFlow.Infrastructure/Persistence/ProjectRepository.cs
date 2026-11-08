@@ -36,6 +36,10 @@ public sealed class ProjectRepository(AppDbContext db) : IProjectRepository
                         && db.ProjectMemberships.Any(m => m.ProjectId == id && m.UserId == caller))),
             cancellationToken);
 
+    public Task<Project?> FindByIdAsync(ProjectId id, CancellationToken cancellationToken) =>
+        // No caller scoping (the recurrence spawn runs off the durable queue); archive-agnostic, tombstone-exclusive.
+        db.Projects.FirstOrDefaultAsync(p => p.Id == id && p.DeletedAt == null, cancellationToken);
+
     public async Task<IReadOnlyList<Project>> ListByIdsAsync(IReadOnlyCollection<ProjectId> ids, bool includeArchived, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(ids);
