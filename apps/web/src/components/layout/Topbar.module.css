@@ -36,23 +36,28 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   color: var(--color-text-secondary);
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-.search input {
-  flex: 1;
-  min-width: 0;
-  background: none;
-  border: 0;
-  color: var(--color-text-primary);
   font: inherit;
   font-size: var(--text-sm);
-  cursor: not-allowed;
+  cursor: pointer;
+  text-align: left;
 }
 
-.search input::placeholder {
-  color: var(--color-text-secondary);
+.search:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-text-primary);
+}
+
+.search:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.searchText {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .newTask {
