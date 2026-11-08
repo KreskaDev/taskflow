@@ -147,8 +147,10 @@ jobs:
             filter: "FullyQualifiedName~IntegrationTests.Cycles"
           - name: recurrence
             filter: "FullyQualifiedName~IntegrationTests.Recurrence"
+          - name: search
+            filter: "FullyQualifiedName~IntegrationTests.Search"
           - name: identity-labels-infra
-            filter: "FullyQualifiedName!~IntegrationTests.Comments&FullyQualifiedName!~IntegrationTests.Cycles&FullyQualifiedName!~IntegrationTests.Recurrence&FullyQualifiedName!~IntegrationTests.TaskManagement"
+            filter: "FullyQualifiedName!~IntegrationTests.Comments&FullyQualifiedName!~IntegrationTests.Cycles&FullyQualifiedName!~IntegrationTests.Recurrence&FullyQualifiedName!~IntegrationTests.Search&FullyQualifiedName!~IntegrationTests.TaskManagement"
           - name: tasks-core
             filter: "FullyQualifiedName~IntegrationTests.TaskManagement&FullyQualifiedName!~ChangeMemberRole&FullyQualifiedName!~GetProjectMembers&FullyQualifiedName!~InviteMember&FullyQualifiedName!~LeaveProject&FullyQualifiedName!~RemoveMember&FullyQualifiedName!~RoleOperationDenyMatrix&FullyQualifiedName!~SharedProjectReadAccess&FullyQualifiedName!~ShareUnshareProject&FullyQualifiedName!~TransferOwnership&FullyQualifiedName!~SetTaskAssignees&FullyQualifiedName!~GetAssignedToMe&FullyQualifiedName!~TaskAssigneesEagerLoad&FullyQualifiedName!~AssignmentCleanup&FullyQualifiedName!~SetTaskDoneSharedAuthz&FullyQualifiedName!~MoveTaskToProject&FullyQualifiedName!~InboxAndProjectTasks&FullyQualifiedName!~SetPriority&FullyQualifiedName!~RescheduleDueDate&FullyQualifiedName!~EditTask&FullyQualifiedName!~GetUpcoming&FullyQualifiedName!~DailyViewsDst&FullyQualifiedName!~GetTodayTasks&FullyQualifiedName!~GetMyTasks&FullyQualifiedName!~SetTaskDoneTests"
           - name: tasks-daily-triage

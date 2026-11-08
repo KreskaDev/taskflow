@@ -40,6 +40,45 @@ public sealed class ProjectRepository(AppDbContext db) : IProjectRepository
         // No caller scoping (the recurrence spawn runs off the durable queue); archive-agnostic, tombstone-exclusive.
         db.Projects.FirstOrDefaultAsync(p => p.Id == id && p.DeletedAt == null, cancellationToken);
 
+    public async Task<IReadOnlyList<ProjectId>> ListOwnedProjectIdsAsync(UserId owner, CancellationToken cancellationToken) =>
+        await db.Projects
+            .Where(p => p.OwnerId == owner && p.DeletedAt == null)
+            .Select(p => p.Id)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task<IReadOnlyList<Project>> SearchReadableAsync(
+        UserId caller,
+        IReadOnlyCollection<ProjectId> sharedProjectIds,
+        IReadOnlyList<string> tokens,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(sharedProjectIds);
+        ArgumentNullException.ThrowIfNull(tokens);
+        if (tokens.Count == 0)
+        {
+            return [];
+        }
+
+        // Owned OR a current membership (Contains over the NON-nullable value-converted PK translates — the
+        // ListByIdsAsync precedent); both archive states on purpose (US-10.AS-06).
+        var ids = sharedProjectIds.ToList();
+        var query = db.Projects.Where(p => p.DeletedAt == null && (p.OwnerId == caller || ids.Contains(p.Id)));
+        foreach (var token in tokens)
+        {
+            var pattern = TaskFlow.Application.TaskManagement.Search.SearchTokens.ContainsPattern(token);
+            query = query.Where(p => EF.Functions.ILike(p.Name, pattern, "\\"));
+        }
+
+        return await query
+            .OrderBy(p => p.Name)
+            .ThenBy(p => p.Id)
+            .Take(limit)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public async Task<IReadOnlyList<Project>> ListByIdsAsync(IReadOnlyCollection<ProjectId> ids, bool includeArchived, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(ids);

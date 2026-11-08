@@ -17,6 +17,9 @@ public interface ILabelRepository
     /// <summary>Lists the caller's labels (owner-scoped), ordered by name — the roster (FR-065/R6).</summary>
     Task<IReadOnlyList<Label>> ListForOwnerAsync(UserId owner, CancellationToken cancellationToken);
 
+    /// <summary>The owner's labels whose name contains every token (case-insensitive, literal — slice 013), capped.</summary>
+    Task<IReadOnlyList<Label>> SearchForOwnerAsync(UserId owner, IReadOnlyList<string> tokens, int limit, CancellationToken cancellationToken);
+
     /// <summary>The set of label ids the caller owns — the cross-row check behind <c>SetTaskLabels</c> (R4).</summary>
     Task<IReadOnlySet<LabelId>> ListIdsForOwnerAsync(UserId owner, CancellationToken cancellationToken);
 
