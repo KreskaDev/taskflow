@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { warsawDayIso as warsawDayIsoShared } from "./helpers/dates";
 import { apiAs, ensureUser, insertSession, resetCycles } from "./helpers/seed";
 
 /**
@@ -55,8 +56,8 @@ async function seedCycle(
 /** UTC instant of Warsaw midnight `days` from today — mirrors the app's D18 convention closely
  * enough for seeding (12:00Z is inside the same Warsaw calendar day at every UTC offset). */
 function warsawDayIso(days: number): string {
-  const d = new Date(Date.now() + days * 24 * 3600 * 1000);
-  return `${d.toISOString().slice(0, 10)}T12:00:00Z`;
+  // Warsaw calendar day (NOT the UTC date — see helpers/dates.ts: the midnight-hour lag turned this suite red).
+  return warsawDayIsoShared(days);
 }
 
 /** `yyyy-MM-dd` + N days (pure date arithmetic — DST-free by construction). */

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { warsawDayIso } from "./helpers/dates";
 import { apiAs, ensureUser, insertSession, resetCycles } from "./helpers/seed";
 
 /**
@@ -64,7 +65,7 @@ async function seedScreen(screen: string, userId: string): Promise<string | null
   if (screen === "/today") {
     // 12:00Z is the same Warsaw calendar day for every UTC clock; a boundary-window
     // run at worst renders the row as overdue — still a row on /today.
-    const noon = `${new Date().toISOString().slice(0, 10)}T12:00:00Z`;
+    const noon = warsawDayIso(0);
     await api.createTask({ title: "Zadanie na dziś", position: "a0", dueDate: noon });
     return "Zadanie na dziś";
   }
@@ -297,7 +298,7 @@ test.describe("axe AA — recurrence field (slice 012)", () => {
       // Unique user per test × attempt — a CI retry must not see the first attempt's seeded row.
       const { page, context, profile } = await signedInPage(browser, `axe-recurrence-${palette}-r${testInfo.retry}`);
       const api = apiAs(profile.id);
-      const noon = `${new Date().toISOString().slice(0, 10)}T12:00:00Z`;
+      const noon = warsawDayIso(0);
       const task = await api.createTask({ title: "Zadanie cykliczne AA", position: "a0", dueDate: noon, dueHasTime: false });
       const edited = await api.request("PATCH", `/api/tasks/${task.id}/edit`, {
         title: "Zadanie cykliczne AA",

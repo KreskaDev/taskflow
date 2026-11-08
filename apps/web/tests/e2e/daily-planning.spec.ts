@@ -1,5 +1,6 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { apiAs, ensureUser, insertSession } from "./helpers/seed";
+import { warsawDateString } from "./helpers/dates";
 
 /**
  * Daily Planning E2E (slice 005, T032/T033; US-02 AS-01..AS-08, US-08 AS-01/AS-02 — re-driven through
@@ -41,8 +42,8 @@ function dueToday(): string {
   return new Date().toISOString();
 }
 function dueInDays(days: number): string {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() + days);
+  // Warsaw calendar day + 10:00Z (inside that Warsaw day at every offset) — see helpers/dates.ts.
+  const d = new Date(`${warsawDateString(days)}T00:00:00Z`);
   d.setUTCHours(10, 0, 0, 0);
   return d.toISOString();
 }
