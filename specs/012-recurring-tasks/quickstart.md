@@ -55,7 +55,7 @@ pnpm --dir apps/web e2e tasks daily-planning board cycles   # touched row/editor
    nothing to remove; complete again → still nothing (one scheduled job).
 5. Reopen the task from step 2 → the tomorrow instance disappears (undo). Complete again → a
    fresh tomorrow instance.
-6. Board: move a recurring task to „Anulowane" → no new instance (AS-06).
+6. Cancel a recurring task (`PATCH /api/tasks/{id}/status` → `cancelled`; the UI has no cancel affordance — slice-010 scope) → reload: no new instance (AS-06).
 7. Today view, `E` on a recurring task → „Usuń termin" + „Zapisz" → blocked with „Zadanie
    cykliczne musi mieć termin…"; switch „Powtarzanie" to „Nie powtarza się" → save succeeds,
    chip gone.

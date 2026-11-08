@@ -238,7 +238,7 @@ editor (daily views), the task details drawer (every surface), task rows on Inbo
 | INV-183 | Given a recurring task whose due day (Europe/Warsaw) is today or earlier, When the user completes it, Then after the write settles a new instance with the next due date, the same title/priority/project/labels and the same chip appears adjacent to the completed row, and a toast „Utworzono kolejne wystąpienie" is shown and announced politely. | US-06 AS-02/AS-03/AS-05, FR-008, FR-101 | [E]+[C] |
 | INV-184 | Given a recurring task whose due day is in the future, When the user completes it, Then NO new instance appears and no toast is shown (the server schedules the spawn for the due day). | US-06 AS-04, EC-05, FR-009 | [E]+[C] |
 | INV-185 | Given a completed recurring task whose successor exists, When the user reopens it (unchecks done), Then the successor disappears from the lists; completing it again creates a fresh successor. | FR-009 undo, Clarifications Q1 | [E] |
-| INV-186 | Given a recurring task, When the user moves it to „Anulowane" on the Board, Then no new instance is created. | US-06 AS-06, FR-010 | [E] |
+| INV-186 | Given a recurring task, When its status becomes `cancelled` (the API status write — the Board/List offer no cancel affordance, a pre-existing slice-010 scope boundary), Then no new instance is created and the lists show no successor row. | US-06 AS-06, FR-010 | [E] |
 | INV-187 | Given a recurring task with a chip, When the user sets „Powtarzanie" to „Nie powtarza się" and saves, Then the chip disappears and completing the task no longer creates an instance. | FR-010, US-06 AS-01 | [E] |
 
 ---
