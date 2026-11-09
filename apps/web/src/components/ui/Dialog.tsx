@@ -85,6 +85,21 @@ export function Dialog({ open, onClose, titleId, descriptionId, size = "default"
     };
   }, [open, focusable]);
 
+  // Esc must dismiss even when focus has LEFT the dialog — e.g. the focused control was removed
+  // from the DOM (the palette's „Przywróć" reconciling away) and focus fell to <body>, where the
+  // dialog's own onKeyDown never sees the key. Inside-dialog Esc is handled (and stopped) by onKeyDown.
+  useEffect(() => {
+    if (!open) return;
+    const onDocumentKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== "Escape") return;
+      const root = dialogRef.current;
+      if (root && root.contains(document.activeElement)) return;
+      onClose();
+    };
+    document.addEventListener("keydown", onDocumentKeyDown);
+    return () => document.removeEventListener("keydown", onDocumentKeyDown);
+  }, [open, onClose]);
+
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
       if (event.key === "Escape") {

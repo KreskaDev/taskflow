@@ -142,6 +142,7 @@ test.describe("US-04 Command palette & search", () => {
     await expect(dialog.getByText("(zarchiwizowany)")).toHaveCount(0);
     await expect(dialog.getByRole("option", { name: /Stary remont/ })).toBeVisible();
     await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
     await expect(page.getByRole("link", { name: /Stary remont/ })).toBeVisible();
 
     await context.close();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   Calendar,
   CalendarClock,
@@ -76,6 +76,7 @@ export function CommandPalette({ open, onClose, onNavigate, onAction }: CommandP
   const search = useSearch(query);
   const { data: projects } = useProjects();
   const { unarchiveProject } = useProjectMutations();
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const groups = useMemo(() => buildPaletteGroups(query, search.data), [query, search.data]);
   const options = useMemo(() => flattenOptions(groups), [groups]);
@@ -145,6 +146,7 @@ export function CommandPalette({ open, onClose, onNavigate, onAction }: CommandP
         <div className={styles.inputRow}>
           <Search size={16} strokeWidth={1.75} aria-hidden="true" />
           <input
+            ref={inputRef}
             className={styles.input}
             type="text"
             role="combobox"
@@ -194,7 +196,12 @@ export function CommandPalette({ open, onClose, onNavigate, onAction }: CommandP
                     onMouseEnter={() => setActiveIndex(options.indexOf(option))}
                     onClick={() => activate(option)}
                   >
-                    {renderOption(option, projectName, (project) => unarchiveProject(project.id, project.version))}
+                    {renderOption(option, projectName, (project) => {
+                      // The „Przywróć" button vanishes once the row reconciles — hand focus back to the
+                      // combobox first so Esc/arrow keys keep working and the user keeps their place.
+                      inputRef.current?.focus();
+                      unarchiveProject(project.id, project.version);
+                    })}
                   </div>
                 );
               })}
