@@ -31,6 +31,19 @@ describe("Dialog (catalog) [INV-132]", () => {
     expect(screen.getByRole("dialog").className).toContain("dialogWide");
   });
 
+  it("renders through a portal on document.body — a host inside a stacking context (sticky topbar) must not trap the overlay under the sidebar", () => {
+    render(
+      <div data-testid="host" style={{ position: "sticky", zIndex: 10 }}>
+        <Dialog open onClose={() => {}} titleId="p">
+          <h2 id="p">Portal</h2>
+        </Dialog>
+      </div>,
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(screen.getByTestId("host").contains(dialog)).toBe(false);
+    expect(dialog.closest("body")).toBe(document.body);
+  });
+
   it("defaults to the standard width (no wide class)", () => {
     render(<Host />);
     fireEvent.click(screen.getByRole("button", { name: "Otwórz" }));

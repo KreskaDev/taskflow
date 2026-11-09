@@ -256,8 +256,10 @@ test.describe("[V] command palette (slice 013)", () => {
           const page = await context.newPage();
           await page.goto("/");
           await settled(page);
-          await expect(page.getByRole("img", { name: "Vis Ualnie" }).first()).toBeVisible();
-          await expect(page.getByRole("row").filter({ hasText: "Kup mleko" })).toBeVisible();
+          // Generous timeouts: in a palette-only run (VISUAL_GREP) this is the run's FIRST `/` hit — `next dev`
+          // compiles the route on demand and the default 5 s anchor timed out once (2026-11-09).
+          await expect(page.getByRole("img", { name: "Vis Ualnie" }).first()).toBeVisible({ timeout: 30_000 });
+          await expect(page.getByRole("row").filter({ hasText: "Kup mleko" })).toBeVisible({ timeout: 30_000 });
           await page.getByRole("button", { name: "Szukaj", exact: true }).click();
           const dialog = page.getByRole("dialog", { name: "Szukaj i wykonaj" });
           await expect(dialog.getByRole("option", { name: "Nowy task" })).toBeVisible({ timeout: 30_000 });

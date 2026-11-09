@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode, useCallback, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import styles from "./Dialog.module.css";
 
 /**
@@ -53,6 +54,11 @@ const FOCUSABLE =
  * Modal dialog implementing the FR-101 focus contract (Constitution II):
  * sets initial focus into the dialog, traps focus, dismisses on Esc, and returns
  * focus to the invoking element on close.
+ *
+ * Rendered through a portal on `document.body` (like {@link Menu}): a host inside its own
+ * stacking context (the sticky Topbar, z-sticky 10) would otherwise paint the overlay UNDER
+ * the sidebar (z-sidebar 20) — the scrim stopped at the sidebar edge and a wide dialog was
+ * clipped behind it at 768px (slice 013 palette baselines, 2026-11-09).
  */
 export function Dialog({ open, onClose, titleId, descriptionId, size = "default", children }: DialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -110,9 +116,9 @@ export function Dialog({ open, onClose, titleId, descriptionId, size = "default"
     [focusable, onClose],
   );
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
-  return (
+  return createPortal(
     <div className={styles.overlay} role="presentation" onClick={onClose}>
       <div
         ref={dialogRef}
@@ -127,6 +133,7 @@ export function Dialog({ open, onClose, titleId, descriptionId, size = "default"
       >
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
