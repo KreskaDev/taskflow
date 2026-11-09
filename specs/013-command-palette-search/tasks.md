@@ -62,9 +62,36 @@ Web monorepo per plan.md: `apps/web` (Next.js 15) + `apps/api` (.NET 9). Feature
 
 - [X] T020 Run `pnpm --dir apps/web test` and drive the inventory-coverage gate green — every slice-013 `INV-###` row has an `[INV-###]`-tagged covering test and vice versa; reconcile as needed
 - [X] T021 [P] `pnpm --dir apps/web audit:dead` (zero dead modules) + hex audit clean (tokens-only in the new .module.css) + `pnpm --dir apps/web lint` + `typecheck`
-- [ ] T022 Regenerate [V] baselines via apps/web/tests/e2e/update-visual-baselines.ps1 (docker; prereqs per the runbook: Debug API build, port 55432 free) — new palette baselines + the re-baked base screens committed for human approval per palette; unrelated baselines must NOT drift
-- [ ] T023 Run the full suites per quickstart.md: web unit, `dotnet test` shard-by-shard (verify the new `search` shard partitions correctly — D13), full `pnpm --dir apps/web e2e` (incl. axe + shortcut-removal + tasks/daily/board/cycles/recurrence regression), `gen:api` diff clean
-- [ ] T024 Walk quickstart.md manual steps 1–8 against the interactive stack and record the outcome in this file
+- [X] T022 Regenerate [V] baselines via apps/web/tests/e2e/update-visual-baselines.ps1 (docker; prereqs per the runbook: Debug API build, port 55432 free) — new palette baselines + the re-baked base screens committed for human approval per palette; unrelated baselines must NOT drift
+- [X] T023 Run the full suites per quickstart.md: web unit, `dotnet test` shard-by-shard (verify the new `search` shard partitions correctly — D13), full `pnpm --dir apps/web e2e` (incl. axe + shortcut-removal + tasks/daily/board/cycles/recurrence regression), `gen:api` diff clean
+- [X] T024 Walk quickstart.md manual steps 1–8 against the interactive stack and record the outcome in this file
+
+### T020–T023 — verification record (2026-11-09)
+
+Layers 1–2 (static + web unit): typecheck clean, lint 0 errors (the 20 pre-existing `no-unused-vars` warnings, all on main), `audit:dead` clean after un-exporting `PaletteActionKind` (knip), hex audit clean (no raw hex in the new `.module.css`), web unit 67 files green incl. the inventory gate (every slice-013 `INV-188..199` row ↔ tag) and the new regression facts below.
+Layer 3 (API, Release, `--no-build`): unit 202/202; integration shards run SEQUENTIALLY (one Testcontainers shard at a time): search 17/17 · comments 48/48 · cycles 72/72 · recurrence 47/47 · identity-labels-infra 62/62 · tasks-core 126/126 · tasks-daily 61/61 · tasks-sharing 100/100 = 533 facts. Partition check (D13): `--list-tests` per filter → union 521 = unfiltered 521, zero duplicates, zero gaps (the 533 vs 521 gap is theory-row expansion at run time). The 10k characterization passed under its 250 ms ceiling.
+`gen:api`: dev PG + API from the Debug DLL on :4311 → `/api/search` operationId `search` present → regenerated client diff clean.
+Layer 4 (E2E, self-booted stack): full run 149 passed / 1 failed / 168 skipped ([V] linux-gated) — the failure was `recurrence.spec` „uncheck … did not change its state" (slice 012, `force: true` on a checked catalog checkbox), green on an immediate solo rerun (6/6) and green in the earlier full run of the same session → flake, not a product defect. Earlier full run of the session: 150/1 where the 1 was the obsolete slice-013 carve-out fact (disabled searchbox placeholder) — removed, the opener is covered by `search.spec`. Targeted rerun after the dialog fixes: search + axe + counts-duplicate + shortcut-removal 58/58.
+T022 ([V], CI image `v1.61.0-noble`): 168/168 generated; 108 view baselines re-baked for the „Filtruj…" input (inbox/today/upcoming/assigned/board/grouped-list/cycle-seeded/recurrence-rows/recurrence-drawer — the topbar opener is pixel-identical to the placeholder, so settings/signin/cycle-empty did NOT drift); 24 new palette baselines (palette-empty / palette-populated × 4 palettes × 3 widths), regenerated with `VISUAL_GREP=palette` after each fix below. Awaiting human approval per palette.
+
+Defects found by the [V] baselines and the T024 walk — each fixed red→green with a regression fact:
+1. The palette's `min-width: 560px` overflowed the 28rem catalog dialog and the focused input scrolled the surface (title/headings clipped) → `Dialog size="wide"` (36rem), no content min-width (Dialog + CommandPalette specs).
+2. Dialogs hosted in the sticky Topbar (palette, „Nowy task", „Nowy projekt") painted UNDER the sidebar (z-sticky 10 < z-sidebar 20): scrim stopped at the sidebar edge, the 768 px palette was clipped behind it → `Dialog` renders through a portal on `document.body` (Dialog spec).
+3. „Przywróć" restored the project server-side but the OPEN result row stayed „(zarchiwizowany)" with a now-stale button → project mutations' `settle` also invalidates `["search"]` (use-project-mutations spec; `search.spec` asserts the row reconciles in place).
+4. After „Przywróć" the focused button vanished, focus fell to `<body>` and Esc no longer closed the palette (it stayed open behind the scrim and blocked the page) → `Dialog` listens for Esc on `document` when focus is outside it; the palette hands focus back to the combobox before the button reconciles away (Dialog + CommandPalette specs; `search.spec` asserts the dialog is gone after Esc).
+
+### T024 — manual walk record (2026-11-09, interactive stack: PG :55432 + API :4311 + fake IdP :4321 + BFF :3000, fresh admitted users via fake-IdP sign-in, Playwright-driven real browser)
+
+1. Inbox → topbar „Szukaj…" → dialog „Szukaj i wykonaj", combobox focused, group Akcje: Nowy task · Nowy projekt · Nowy cykl · Przejdź: Inbox/Dziś/Nadchodzące/Przypisane/Cykl/Ustawienia (AS-01). ✅
+2. „mleko" → Zadania: „Kup mleko" (title) AND „Zadzwonić do dentysty" (description „Zapytać o mleko bez laktozy") (AS-02); „kup mleko" → only „Kup mleko" (server verified 1 task). ✅ Note: while the first `/api/search` hit compiled in `next dev`, the previous result stayed visible (`keepPreviousData`, by design D10) — on a warm stack this is imperceptible.
+3. Enter on „Kup mleko" → `/?task=<id>`, Inbox with the drawer open on that task (AS-03). ✅
+4. Palette → „create project" → Akcje: „Nowy projekt" → Enter → the project form with focus on „Nazwa" (AS-04); created „Zakupy domowe". ✅
+5. Palette → „Zakupy" → Projekty: „Zakupy domowe" → Enter → `/projects/<id>` (AS-05). Archived it from the sidebar menu → palette shows „Zakupy domowe (zarchiwizowany)" + „Przywróć" → click → server restored (`archivedAt: null`) but the open row stayed stale and Esc stopped working (defects 3–4 above) → after the fixes: the row reconciles to „Zakupy domowe" in place, focus is on the combobox, Esc closes (US-10.AS-06). ✅
+6. Esc → the palette closes and focus returns to the „Szukaj…" button (also observed implicitly: Enter on the focused opener re-opened the palette after step 3) (AS-06). ✅
+7. Inbox „Filtruj…" → „sro" keeps only „Środa: spotkanie zespołu" (diacritic-insensitive); „zzz" → „Brak zadań pasujących do filtru" + „Wyczyść filtr" → click → all 4 rows back, filter empty. Dziś → „rap" keeps „Raport" (due today). Project Tablica → „chleb" → Backlog „1 zadanie" (only „Chleb i masło"), the other columns at „0 zadań" (US-08.AS-08). ✅
+8. Shared „Zakupy domowe" (Udostępnij) → signed out → second admitted user (non-member) → palette „Chleb" → „Brak wyników dla „Chleb""; API `q=Chleb|mleko|Zakupy|Środa` → 0 tasks / 0 projects / 0 labels. ✅
+
+Observed, out of this slice's scope (backlog candidates): (a) with `keepPreviousData` an EMPTY previous result shows „Brak wyników" (not „Szukam…") while a new query is in flight — a warm stack answers in < 100 ms so it rarely shows; (b) the LiveRegion count is „1 wyników" (Polish plural form for 1 should be „1 wynik") — the contract fixes the string as „N wyników"; (c) archiving a project from the sidebar menu has no confirmation step (slice 004 behaviour).
 
 ## Dependencies & Execution Order
 
