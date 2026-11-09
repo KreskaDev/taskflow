@@ -44,6 +44,17 @@ describe("Dialog (catalog) [INV-132]", () => {
     expect(dialog.closest("body")).toBe(document.body);
   });
 
+  it("Escape still dismisses when focus has LEFT the dialog (the focused control was removed from the DOM)", () => {
+    render(<Host />);
+    fireEvent.click(screen.getByRole("button", { name: "Otwórz" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    // Simulate a control vanishing under the focus (palette „Przywróć” reconciling away): focus falls to body.
+    (document.activeElement as HTMLElement | null)?.blur();
+    expect(document.activeElement).toBe(document.body);
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
   it("defaults to the standard width (no wide class)", () => {
     render(<Host />);
     fireEvent.click(screen.getByRole("button", { name: "Otwórz" }));

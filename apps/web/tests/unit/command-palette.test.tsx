@@ -146,9 +146,14 @@ describe("CommandPalette — projects, labels, states [INV-194] [INV-195] [INV-1
     const { onNavigate, input } = renderPalette();
     fireEvent.change(input(), { target: { value: "stary" } });
     expect(screen.getByText("(zarchiwizowany)")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Przywróć" }));
+    const restore = screen.getByRole("button", { name: "Przywróć" });
+    restore.focus(); // a real pointer click focuses the button first
+    fireEvent.click(restore);
     expect(unarchiveProject).toHaveBeenCalledWith("p2", 3);
     expect(onNavigate).not.toHaveBeenCalled();
+    // The button disappears once the row reconciles — focus must already be back on the combobox, or Esc
+    // (and the keyboard user's place) is lost to <body> (manual walk 2026-11-09).
+    expect(input()).toHaveFocus();
   });
 
   it("selecting a label replaces the query with the label name (labels have no page)", () => {
