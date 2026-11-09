@@ -298,6 +298,32 @@ describe("unarchiveProjectMutationOptions — optimistic unarchive (removes from
   });
 });
 
+describe("project recipes — search reconciliation [INV-194]", () => {
+  it("unarchive onSettled invalidates the palette search cache — the open result row must drop „(zarchiwizowany)” after „Przywróć” (manual walk 2026-11-09)", async () => {
+    const queryClient = primedClient(seedActive());
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+    const variables = { id: OTHER_ID, version: 1 };
+
+    const options = unarchiveProjectMutationOptions(queryClient);
+    const context = (await options.onMutate?.(variables)) as ProjectMutationContext;
+    await options.onSettled?.(makeProject({ id: OTHER_ID }), null, variables, context);
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["search"] });
+  });
+
+  it("archive onSettled invalidates the palette search cache as well (the row gains the suffix)", async () => {
+    const queryClient = primedClient(seedActive());
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+    const variables = { id: OTHER_ID, version: 1 };
+
+    const options = archiveProjectMutationOptions(queryClient);
+    const context = (await options.onMutate?.(variables)) as ProjectMutationContext;
+    await options.onSettled?.(makeProject({ id: OTHER_ID }), null, variables, context);
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["search"] });
+  });
+});
+
 describe("deleteProjectMutationOptions — optimistic delete (removes from active)", () => {
   it("onMutate optimistically REMOVES the deleted project from the active list", async () => {
     const seed = seedActive();
