@@ -1,5 +1,6 @@
 "use client";
 
+import { invalidateSearch } from "@/hooks/useSearch";
 import { invalidateViewCounts } from "@/hooks/useViewCounts";
 import { type QueryClient, useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -57,6 +58,9 @@ async function settle(queryClient: QueryClient): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: ARCHIVED_PROJECTS_KEY });
   // Membership/project changes shift the sidebar counts (slice 019, D6).
   await invalidateViewCounts(queryClient);
+  // Slice 013: the palette's open result list reconciles too — „Przywróć" must drop the archived
+  // suffix in place, a rename/create/delete must not leave stale project rows behind (D10).
+  await invalidateSearch(queryClient);
 }
 
 /* ───────────────────────────────── CREATE (PUT) ────────────────────────────────── */

@@ -137,6 +137,10 @@ test.describe("US-04 Command palette & search", () => {
     const restored = page.waitForResponse((r) => r.request().method() === "PATCH" && r.url().includes("/unarchive") && r.ok());
     await dialog.getByRole("button", { name: "Przywróć" }).click();
     await restored;
+    // The OPEN result row reconciles in place (search cache invalidated on settle): suffix + button gone.
+    await expect(dialog.getByRole("button", { name: "Przywróć" })).toHaveCount(0, { timeout: 10_000 });
+    await expect(dialog.getByText("(zarchiwizowany)")).toHaveCount(0);
+    await expect(dialog.getByRole("option", { name: /Stary remont/ })).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.getByRole("link", { name: /Stary remont/ })).toBeVisible();
 
